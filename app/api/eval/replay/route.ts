@@ -23,6 +23,7 @@ import { callOpenRouter } from "@/lib/analysis/openrouter-client";
 import { replayFixtures, buildRunInputFromReplay, runJudge, filterFixturesForReplay, type EvalFixtureRecord, type ReplayCallFn, type JudgeCallFn } from "@/lib/eval/replay-core";
 import { buildScorecard, estimateEvalCost } from "@/lib/eval/scorecard";
 import { DEFAULT_REQUIRED_SECTIONS } from "@/lib/eval/output-checks";
+import { scoorTegenScenarios, kanalenVanSopType } from "@/lib/eval/demo-scenarios";
 
 // Bewust GEEN maxDuration-export: de monthly route heeft die ook niet, en een replay van
 // een volledige stappenreeks moet dezelfde platform-limieten volgen als de run zelf.
@@ -127,7 +128,15 @@ export async function POST(request: NextRequest) {
       if (outputError) console.warn(`[eval] eval_outputs insert faalde voor stap ${stepResult.step}: ${outputError.message}`);
     }
 
-    const scorecard = buildScorecard(buildRunInputFromReplay({ model, fixtureSet, run, requiredSections }));
+    // Een fixture-set van de demo-klant krijgt ook de scenarioscore: welke van S1 tot S20 de
+    // replay terugvindt, welke hij mist en waar hij een valse bevinding geeft (lib/eval/demo-scenarios.ts).
+    // Fixture-sets heten standaard "<klant>:<job>", dus het voorvoegsel zegt van welke klant de prompts zijn.
+    const scorecard = {
+      ...buildScorecard(buildRunInputFromReplay({ model, fixtureSet, run, requiredSections })),
+      ...(fixtureSet.startsWith("demo-greentech:")
+        ? { scenarios: scoorTegenScenarios(run.combinedDeliverable, { kanalen: kanalenVanSopType(sopType) }) }
+        : {}),
+    };
 
     let judge: Awaited<ReturnType<typeof runJudge>> | null = null;
     if (wantsJudge) {

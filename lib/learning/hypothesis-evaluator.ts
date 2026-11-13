@@ -1,6 +1,7 @@
 // =====================================================================
 // STATUS: gewired sinds commit 1a557ff (16 juli): app/api/cron/evaluate-hypotheses/route.ts
-// roept deze evaluator wekelijks aan (vercel.json) op accountniveau-weekdata. Deze regel zei
+// roept deze evaluator aan op de weekdata van het kanaal van de hypothese. Die route staat NIET in
+// vercel.json (zie de kop daar): hij draait alleen als iemand hem aanroept. Deze regel zei
 // eerder "nog niet gewired" -- dat klopte niet meer sinds die route bestaat en was daarmee
 // zelf een van de redenen dat de kolomfout hieronder zo lang onopgemerkt bleef: wie deze
 // kop las nam aan dat er niets aan te controleren viel.
@@ -24,12 +25,21 @@ const MIN_WINDOW_IMPRESSIONS = 100; // onder dit volume is een oordeel niet betr
 const EXPIRY_DAYS = 45; // open en onmeetbaar ouder dan dit verloopt
 const STABLE_BAND = 0.05; // standaard band voor richting "stable" (5 procent van baseline)
 
-export type PredicateDirection = "increase" | "decrease" | "above" | "below" | "stable";
+// no_drop is een guardrail: de metric mag niet meer dan `threshold` dalen. Bedoeld voor volume,
+// zodat een CPA die daalt omdat de helft van de conversies wegvalt niet als geslaagd telt.
+export type PredicateDirection = "increase" | "decrease" | "above" | "below" | "stable" | "no_drop";
 
 export interface Predicate {
   metric: string;
   direction: PredicateDirection;
-  threshold?: number; // above/below: absolute grens; increase/decrease: minimale magnitude (optioneel); stable: band-fractie
+  threshold?: number; // above/below: absolute grens; increase/decrease: minimale magnitude (optioneel); stable: band-fractie; no_drop: toegestane daling
+  /**
+   * De ruisband bij increase/decrease ZONDER drempel: de beweging moet groter zijn dan dit om te
+   * tellen. Zonder ruisband gold m < b, en dan was een CPA van 25,00 naar 24,99 "gehaald" -- een
+   * oordeel dat ook door toeval elke tweede keer uitkomt. De aanroeper leidt hem af uit de
+   * week-op-week-spreiding van de baseline (evaluate-hypothesis-row.ts).
+   */
+  noiseBand?: number;
 }
 
 export type Verdict = "accepted" | "rejected" | "unmeasurable" | "expired";
@@ -64,11 +74,12 @@ export interface EvaluateInput {
 function describe(p: Predicate): string {
   const t = p.threshold;
   switch (p.direction) {
-    case "increase": return t != null ? `${p.metric} stijgt met minimaal ${t}` : `${p.metric} stijgt`;
-    case "decrease": return t != null ? `${p.metric} daalt met minimaal ${t}` : `${p.metric} daalt`;
+    case "increase": return t != null ? `${p.metric} stijgt met minimaal ${t}` : p.noiseBand != null ? `${p.metric} stijgt meer dan de ruisband (${p.noiseBand.toFixed(2)})` : `${p.metric} stijgt`;
+    case "decrease": return t != null ? `${p.metric} daalt met minimaal ${t}` : p.noiseBand != null ? `${p.metric} daalt meer dan de ruisband (${p.noiseBand.toFixed(2)})` : `${p.metric} daalt`;
     case "above": return `${p.metric} boven ${t}`;
     case "below": return `${p.metric} onder ${t}`;
     case "stable": return `${p.metric} stabiel`;
+    case "no_drop": return `${p.metric} daalt niet meer dan ${t ?? 0}`;
   }
 }
 
@@ -97,9 +108,11 @@ function judge(p: Predicate, kind: "success" | "guardrail", baseline: Record<str
   // increase/decrease/stable zijn relatief aan de baseline
   if (!haveB || !haveM) return base;
   if (p.direction === "increase") {
-    base.met = p.threshold != null ? (m - b) >= p.threshold : m > b;
+    base.met = p.threshold != null ? (m - b) >= p.threshold : p.noiseBand != null ? (m - b) > p.noiseBand : m > b;
   } else if (p.direction === "decrease") {
-    base.met = p.threshold != null ? (b - m) >= p.threshold : m < b;
+    base.met = p.threshold != null ? (b - m) >= p.threshold : p.noiseBand != null ? (b - m) > p.noiseBand : m < b;
+  } else if (p.direction === "no_drop") {
+    base.met = (b - m) <= (p.threshold ?? 0);
   } else { // stable
     const band = p.threshold != null ? p.threshold : Math.abs(b) * STABLE_BAND;
     base.met = Math.abs(m - b) <= band;

@@ -11,6 +11,7 @@ import { toFairWeeks, currentWeekIndex, editieNaam, fairCountdown, type FairWeek
 import { today } from "@/lib/reporting-date";
 import { PeriodPopover } from "@/components/ui/period-popover";
 import { Vensterlabel } from "@/components/ui/vensterlabel";
+import { WEEK_SOORT_LABEL, WEEK_SOORT_UITLEG, weekSoort } from "@/lib/overzicht/beursweek";
 
 const ALLE_METRICS: ForecastMetric[] = ["conversions", "revenue", "roas", "cpa"];
 
@@ -136,7 +137,7 @@ function WeekCard({
           andere hoogte en lijken de drie blokken onderling niet uitgelijnd. */}
       <div className="flex-1 space-y-1.5">
         <div className="flex justify-between items-baseline">
-          <span className="text-meta text-muted-foreground">{geenData ? geenWaardeLabel(week, metric) : isRealized ? "Gerealiseerd" : "Prognose"}</span>
+          <span className="text-meta text-muted-foreground" title={geenData ? undefined : WEEK_SOORT_UITLEG[weekSoort(week, today())]}>{geenData ? geenWaardeLabel(week, metric) : WEEK_SOORT_LABEL[weekSoort(week, today())]}</span>
           <span className={`text-base font-bold ${variant === "current" ? "text-brand-blue-ink" : "text-brand-gray"}`}>
             {geenData ? "—" : format(value)}
           </span>
@@ -335,7 +336,7 @@ export function FairWeeksView({
               {/* Zonder waarde staat de reden op de plek van "gerealiseerd" en een streepje op de plek
                   van het getal: dezelfde woorden en hetzelfde oordeel als de weekkaart. */}
               <span className={`text-micro ${oordeelZonderGetal === null ? "text-muted-foreground" : oordeelZonderGetal ? "font-semibold text-green-700" : "font-semibold text-red-700"}`}>
-                {geenData ? geenWaardeLabel(huidige, metric).toLowerCase() : huidige.realized !== null ? "gerealiseerd" : "prognose"}
+                {geenData ? geenWaardeLabel(huidige, metric).toLowerCase() : WEEK_SOORT_LABEL[weekSoort(huidige, today())].toLowerCase()}
                 {oordeelZonderGetal !== null && <span className="sr-only"> ({oordeelZonderGetal ? "gunstig" : "ongunstig"})</span>}
               </span>
               <span className="text-lead font-bold tabular-nums text-brand-gray">{geenData ? "—" : format(waarde)}</span>
@@ -448,8 +449,8 @@ export function FairWeeksView({
                   <div key={m} className="flex items-center justify-between border-b border-border pb-2 last:border-0 last:pb-0">
                     <div>
                       <p className="text-body font-semibold text-brand-gray">{METRIC_LABELS[m]}</p>
-                      <p className="text-micro text-muted-foreground">
-                        {mGeenData ? geenWaardeLabel(w, m) : w.realized !== null ? "Gerealiseerd" : "Prognose"}
+                      <p className="text-micro text-muted-foreground" title={mGeenData ? undefined : WEEK_SOORT_UITLEG[weekSoort(w, today())]}>
+                        {mGeenData ? geenWaardeLabel(w, m) : WEEK_SOORT_LABEL[weekSoort(w, today())]}
                         {heeftVerwachting && <> · verwacht {mFormat(w.expected)}</>}
                       </p>
                     </div>

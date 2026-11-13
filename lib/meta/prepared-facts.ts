@@ -191,7 +191,7 @@ function buildAdFacts(ads: MetaComputeRow[], accountBenchmark: DerivedMetrics, l
       cpa: d.cpa,
       roas: d.roas,
       vs_average,
-      fatigue: fatigue ? { flag: fatigue.fatigue, baseline_link_ctr_pct: fatigue.baseline_link_ctr_pct, recent_link_ctr_pct: fatigue.recent_link_ctr_pct, ctr_change_pct: fatigue.ctr_change_pct, recent_frequency: fatigue.recent_frequency, days_live: fatigue.days_live } : null,
+      fatigue: fatigue ? { flag: fatigue.fatigue, ctr_daling_frequentie_onbekend: fatigue.ctr_daling_frequentie_onbekend, baseline_link_ctr_pct: fatigue.baseline_link_ctr_pct, recent_link_ctr_pct: fatigue.recent_link_ctr_pct, ctr_change_pct: fatigue.ctr_change_pct, recent_dagfrequentie: fatigue.recent_frequency, days_live: fatigue.days_live } : null,
       classification: classifyAd(d, accountBenchmark, Boolean(fatigue?.fatigue)),
       conversions: d.conversions,
       actief_in_maand: actiefInMaand,
@@ -402,6 +402,11 @@ function buildFrequencyFacts(account: MetaComputeRow[]) {
   const ftir_signal = classifyFtir(ftirRes.ftir, cpaRising, freqRising, ctrFalling, holdRateFalling);
 
   return {
+    // Wat dit getal is: het gemiddelde van de dagfrequenties (de sync haalt per dag op). Dezelfde
+    // persoon telt elke dag opnieuw, dus het ligt ver onder de frequentie over een maand en hoort
+    // niet tegen periodenormen (3 tot 5 per maand) gelegd te worden. Zonder deze regel las het
+    // model 1,3 als "lage frequentie, geen verzadiging".
+    frequentie_soort: "gemiddelde dagfrequentie (vertoningen / bereik per dag); geen ontdubbeld bereik over de maand, niet tegen maandnormen leggen",
     frequency_first: firstFreq,
     frequency_latest: lastFreq,
     frequency_trend: trendDirection(monthly.map((m, i) => ({ ...m, link_ctr_pct: freqSeries[i] ?? null })), "link_ctr_pct", monthly.length),

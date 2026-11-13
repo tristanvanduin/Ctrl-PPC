@@ -1,0 +1,62 @@
+# De poorten op elke pull request: hygiene, datagrond, typecheck, tests en de demoscenario-check.
+#
+# WAAROM. Tot 13 november deed de enige workflow alleen de back-up; de poorten draaiden alleen als
+# iemand lokaal scripts/gates.sh startte. Een merge naar main kon zonder een enkele poort.
+#
+# WAT ER BEWUST NIET IN STAAT:
+#   - De build: die heeft omgevingsvariabelen en geheimen nodig, en een pull request van buiten
+#     hoort geen geheimen te zien. Hij blijft een lokale poort (scripts/gates.sh code).
+#   - De databasepoorten (rpc, views, bureaugrens, rls, analyses): die werken op de echte database
+#     en maken daar gebruikers aan. Niet vanuit een pull request.
+#   - De browserpoorten (rookproef, cijfercontrole): die hebben een draaiende server nodig.
+#   - Lint: er staan nog ongeveer 175 fouten open. Een poort die vanaf de eerste dag rood is, leert
+#     mensen hem te negeren; hij komt erbij zodra die fouten weg zijn.
+# Dat deze drie groepen hier niet draaien, staat in de samenvatting van elke run (laatste stap),
+# zodat groen hier niet gelezen wordt als "alle poorten groen".
+
+name: poorten
+on:
+  pull_request:
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: poorten-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  poorten:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          # 22.18 of nieuwer: de poortscripts laden zuivere .ts-modules rechtstreeks met node.
+          node-version: "22"
+          cache: npm
+      - run: npm ci
+      - name: hygiene
+        run: timeout 60 node scripts/check-hygiene.mjs
+      - name: datagrond
+        run: timeout 60 node scripts/check-datagrond.mjs
+      - name: typecheck
+        run: timeout 300 node_modules/.bin/tsc --noEmit -p tsconfig.json
+      - name: tests
+        run: timeout 300 node scripts/run-tests.mjs
+      # Triggeren de demoscenario's hun detector nog? Raakt geen database. EXACT --check: zonder
+      # dat argument gaat het script seeden (en faalt hier dan op ontbrekende sleutels).
+      - name: demo-scenarios
+        run: timeout 120 npx --yes tsx scripts/demo/seed-demo-client.ts --check
+      - name: niet gedraaid
+        if: always()
+        run: |
+          {
+            echo "### Niet gedraaid in deze workflow"
+            echo "- build (heeft geheimen nodig): lokaal \`scripts/gates.sh code\`"
+            echo "- databasepoorten: lokaal \`scripts/gates.sh database\`"
+            echo "- rookproef en cijfercontrole (draaiende server): lokaal \`scripts/gates.sh browser\`"
+            echo "- lint (nog ongeveer 175 fouten open)"
+          } >> "$GITHUB_STEP_SUMMARY"

@@ -244,6 +244,11 @@ export function analyzeMetaCampaigns(campaignData: ClientMetaCampaignData): Meta
     // Op de MEEST RECENTE maand, niet een gemiddelde: een spike in de lopende maand die door
     // eerdere, lagere maanden wordt weggemiddeld is precies de verzadiging die deze check moet
     // vangen, niet verhullen.
+    //
+    // `frequency` moet hier een MAANDfrequentie zijn: vertoningen gedeeld door het over de maand
+    // ontdubbelde bereik (een insights-aanroep per maand zonder time_increment). Een gemiddelde
+    // van dagfrequenties is een andere grootheid (rond 1,2 waar de maand op 5 staat) en haalt deze
+    // drempel nooit. Geef 0 mee als de maandfrequentie niet gemeten is: dan zwijgt deze check.
     if (s.recentFrequency > 5) {
       findings.push({
         severity: s.recentFrequency > 8 ? "warning" : "info",

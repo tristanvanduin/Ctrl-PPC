@@ -31,9 +31,11 @@ const volgorde = (p: { geordend: Proposal[] }) => p.geordend.map((x) => x.id).jo
 console.log("De volgorde");
 {
   const r = planVoorWachtrij([
-    v("laag", { ice_total: 3 }),
-    v("hoog", { ice_total: 9 }),
-    v("midden", { ice_total: 6 }),
+    // De wachtrij rekent het totaal uit de delen (getoondeIce in lib/ice-score.ts), dus de delen
+    // dragen de score; het opgeslagen totaal past erbij.
+    v("laag", { ice_total: 3, ice_impact: 3, ice_confidence: 3, ice_ease: 3 }),
+    v("hoog", { ice_total: 9, ice_impact: 9, ice_confidence: 9, ice_ease: 9 }),
+    v("midden", { ice_total: 6, ice_impact: 6, ice_confidence: 6, ice_ease: 6 }),
   ]);
   check("hoogste ICE bovenaan", volgorde(r) === "hoog,midden,laag", volgorde(r));
   check("de rang loopt vanaf 1", r.plaatsing.get("hoog")?.rank === 1, String(r.plaatsing.get("hoog")?.rank));
@@ -43,14 +45,14 @@ console.log("De volgorde");
   // tie-breaks kwam hier de volgorde van de database uit.
   const r = planVoorWachtrij([
     v("weinig-impact", { ice_total: 7, ice_impact: 3, ice_confidence: 9, ice_ease: 9 }),
-    v("veel-impact", { ice_total: 7, ice_impact: 9, ice_confidence: 3, ice_ease: 3 }),
+    v("veel-impact", { ice_total: 7, ice_impact: 9, ice_confidence: 6, ice_ease: 6 }),
   ]);
   check("bij gelijke score wint impact", volgorde(r) === "veel-impact,weinig-impact", volgorde(r));
 }
 {
   const r = planVoorWachtrij([
-    v("b", { ice_total: 7, ice_impact: 5, ice_confidence: 2 }),
-    v("a", { ice_total: 7, ice_impact: 5, ice_confidence: 8 }),
+    v("b", { ice_total: 5, ice_impact: 5, ice_confidence: 2, ice_ease: 8 }),
+    v("a", { ice_total: 5, ice_impact: 5, ice_confidence: 8, ice_ease: 2 }),
   ]);
   check("daarna confidence", volgorde(r) === "a,b", volgorde(r));
 }

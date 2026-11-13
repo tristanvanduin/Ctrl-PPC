@@ -70,6 +70,9 @@ import { bandDataStand } from "@/lib/period/band-stand";
 import { NIET_GOOGLE } from "@/lib/period/kanaal-maanden";
 import { PeriodSelector, PeriodeSnelkoppelingen } from "./period-selector";
 import { PeriodSummary } from "./period-summary";
+import { GeenBeursfilter } from "./geen-beursfilter";
+import { overzichtBeursmelding } from "@/lib/overzicht/beursfilter";
+import { kiezerOpTab } from "@/lib/period/kiezer-per-tab";
 import { OverzichtBovenkant } from "./overzicht-bovenkant";
 import { WeergaveSchakelaar } from "./weergave-schakelaar";
 import { useWeergave } from "@/lib/use-weergave";
@@ -111,6 +114,7 @@ import { ClientDataProvider } from "@/lib/client-data-provider";
 import { AnalysisProvider } from "@/lib/analysis-context";
 import { Sectie } from "@/components/ui/sectie";
 import { CollapsiblePanel } from "@/components/ui/disclosure";
+import { OnderdeelGrens } from "@/app/(app)/foutgrens";
 
 interface Client {
   id: string;
@@ -554,8 +558,17 @@ export function ClientDashboard({ client, bewaardeWeergave = null, kanaalbalkVan
   // De periodekiezer staat in de kop en niet per tabblad: hij geldt voor de hele klantweergave, en
   // per tabblad een eigen periode zou betekenen dat twee getallen op hetzelfde scherm over
   // verschillende maanden gaan.
-  const periodeKiezer = (
+  //
+  // Maar alleen op een tabblad waar een blok hem volgt (lib/period/kiezer-per-tab.ts). Op Prognose,
+  // Bevindingen, Sprint en Doelen veranderde bij een andere keuze alleen het label van de kiezer
+  // zelf; daar staat nu welk venster het tabblad wel heeft.
+  const kiezerHier = kiezerOpTab(activeTab, nieuweWeergave);
+  // Eén regel voor beide weergaven (lib/overzicht/beursfilter.ts).
+  const beursmelding = overzichtBeursmelding(geoClone, activeTab, channel);
+  const periodeKiezer = kiezerHier.toon ? (
     <DashboardPeriodPicker klaar={bandKlaar} jaarlijkseEditie={upcomingEdition?.cadence === "annual"} snelVanafTablet={nieuweWeergave} />
+  ) : (
+    <span className="text-meta text-muted-foreground" data-venster="vast">{kiezerHier.uitleg}</span>
   );
   // Op het Overzicht, en in de nieuwe weergave op elk tabblad: daar is de kop anders, dus daar hoort
   // ook de weg terug te staan. Met de schakelaar uit staat hij op de andere tabbladen niet.
@@ -767,6 +780,7 @@ export function ClientDashboard({ client, bewaardeWeergave = null, kanaalbalkVan
               onKies={setChannel}
               onBeoordeel={naarBeoordelen}
               googleData={clientData.data}
+              googleStaat={clientData}
               route={blendedStand}
               band={periodSummary}
               bandKlaar={bandKlaar}
@@ -774,6 +788,8 @@ export function ClientDashboard({ client, bewaardeWeergave = null, kanaalbalkVan
               reserveerKaarten={reserveerKaartenrij({ kanalenBekend: kanalen !== null, geheugen: balkGeheugen, nieuw: true, meerdereVerwacht: isDemoClientId(client.id) })}
             />
           )}
+          {/* Dezelfde regel als in de vertrouwde weergave: de tegels lezen het account, niet de beurs. */}
+          {!clientData.error && <GeenBeursfilter geo={geoClone} tekst={beursmelding?.tekst ?? null} />}
           {bronrij}
         </div>
       ) : (
@@ -807,6 +823,9 @@ export function ClientDashboard({ client, bewaardeWeergave = null, kanaalbalkVan
         <div className="space-y-6">
           <ChannelTabs channel={channel} onChange={setChannel} beschikbaar={kanalen ?? []} ladenMetBalk={kanalen === null && hadKanaalbalk} />
           <PeriodSummary data={bandKlaar ? periodSummary.data : null} bronnen={periodSummary.bronnen} laden={!bandKlaar} />
+          {/* De band (en Alle kanalen) leest de accountreeksen, niet de beurs: zeg dat in plaats
+              van accountcijfers onder "Beurs: GreenTech Amsterdam" te zetten. */}
+          <GeenBeursfilter geo={geoClone} tekst={beursmelding?.tekst ?? null} />
         </div>
       )}
 
@@ -831,12 +850,15 @@ export function ClientDashboard({ client, bewaardeWeergave = null, kanaalbalkVan
 
       {/* All content wrapped in data provider */}
       {clientData.data && (
-        <ClientDataProvider clientId={client.id} wachtvlak={<PaginaLaadvlak metBand={false} />}>
+        <ClientDataProvider clientId={client.id} kanalen={kanalen} wachtvlak={<PaginaLaadvlak metBand={false} />}>
         <AnalysisProvider>
           <TrackingAlert clientId={client.id} onNavigateToSettings={() => setActiveTab("settings")} />
 
           <GeoCloneScope value={geoClone} onChange={setGeoClone} />
 
+          {/* Een fout in een tabblad blijft in dat tabblad: kop, navigatie en de andere tabbladen
+              blijven werken (app/(app)/foutgrens.tsx). De key zet de grens terug bij een wissel. */}
+          <OnderdeelGrens key={activeTab} onderdeel={TAB_LABELS[activeTab]}>
           {activeTab === "dashboard" && (
             // De koppen van de nieuwe weergave houden icoon en titel bij elkaar (components/ui/sectie.tsx);
             // met de schakelaar uit, en op elk ander tabblad, blijft de kop wat hij was.
@@ -946,7 +968,7 @@ export function ClientDashboard({ client, bewaardeWeergave = null, kanaalbalkVan
                       <Sectie
                         icoon={<Target className="w-4.5 h-4.5 text-brand-blue-ink" />}
                         titel="Wat een budgetwijziging zou doen"
-                        bijschrift="Over alle kanalen samen"
+                        bijschrift="Meta, LinkedIn en Microsoft Ads samen, zonder Google: Google rekent zijn eigen scenario op de Google-tab"
                       >
                         <ChannelBudgetScenario clientId={client.id} channel="blended" />
                       </Sectie>
@@ -969,6 +991,7 @@ export function ClientDashboard({ client, bewaardeWeergave = null, kanaalbalkVan
 
           {activeTab === "insights" && (
             <div className="space-y-6">
+              <GeenBeursfilter geo={geoClone} onderwerp="Bevindingen" meervoud />
               <InsightsTab
                 kanalen={kanalen ?? []}
                 clientId={client.id}
@@ -979,6 +1002,7 @@ export function ClientDashboard({ client, bewaardeWeergave = null, kanaalbalkVan
 
           {activeTab === "outcomes" && (
             <div className="space-y-6">
+              <GeenBeursfilter geo={geoClone} onderwerp="Dit tabblad" />
               <OutcomesTab clientId={client.id} />
             </div>
           )}
@@ -990,15 +1014,21 @@ export function ClientDashboard({ client, bewaardeWeergave = null, kanaalbalkVan
           )}
 
           {activeTab === "sprint" && (
-            <SprintPlanning clientId={client.id} />
+            <div className="space-y-6">
+              <GeenBeursfilter geo={geoClone} onderwerp="De sprint" />
+              <SprintPlanning clientId={client.id} />
+            </div>
           )}
 
           {activeTab === "reporting" && (
-            <ClientReporting clientId={client.id} />
+            <div className="space-y-6">
+              <GeenBeursfilter geo={geoClone} onderwerp="Rapportages" meervoud />
+              <ClientReporting clientId={client.id} />
+            </div>
           )}
 
           {activeTab === "dgm" && (
-            <DgmView clientId={client.id} />
+            <DgmView clientId={client.id} kanalen={kanalen} geoClone={geoClone} />
           )}
 
           {activeTab === "second-opinion" && (
@@ -1038,6 +1068,7 @@ export function ClientDashboard({ client, bewaardeWeergave = null, kanaalbalkVan
               )}
             </div>
           )}
+          </OnderdeelGrens>
 
           {/* Notities & to-do's onderaan elke "werk"-pagina, gesynchroniseerd (zelfde tabel/
               client-scope overal): niet op Instellingen of Bestanden, dat zijn pure

@@ -1,39 +1,15 @@
-export {};
 /**
  * Verify trend score logic using projectionFactor + lastRatio.
  * Run with: npx tsx lib/__tests__/health-trend.test.ts
  */
 
-function clamp(v: number, min: number, max: number): number {
-  return Math.max(min, Math.min(max, v));
-}
+import { trendOpVerwachting } from "../health-score";
 
-function computeTrend(projectionFactor: number, lastRatio: number): {
-  score: number;
-  anomalies: string[];
-} {
-  const anomalies: string[] = [];
-
-  let base: number;
-  if (projectionFactor > 1.15) base = 18;
-  else if (projectionFactor > 1.05) base = 16;
-  else if (projectionFactor > 0.95) base = 12;
-  else if (projectionFactor > 0.85) base = 8;
-  else if (projectionFactor > 0.75) base = 4;
-  else base = 2;
-
-  const modifier = lastRatio >= 1.0 ? 2 : lastRatio >= 0.85 ? 0 : -2;
-  const score = clamp(base + modifier, 0, 20);
-
-  // De titels zoals lib/health-score.ts ze nu geeft: de factor meet de afstand tot een verwachting
-  // die het jaardoel volgt, geen trend. De echte module zelf: lib/__trend_verwachting_test.ts.
-  if (projectionFactor < 0.80 && lastRatio < 0.80) {
-    anomalies.push("Sterk achter op verwachting");
-  } else if (projectionFactor < 0.90 && lastRatio < 0.90) {
-    anomalies.push("Achter op verwachting");
-  }
-
-  return { score, anomalies };
+// De echte drempels uit lib/health-score.ts. Hier stond een kopie van de rekenregel; een wijziging
+// aan de health score liet die kopie, en dus deze test, ongemoeid.
+function computeTrend(projectionFactor: number, lastRatio: number): { score: number; anomalies: string[] } {
+  const r = trendOpVerwachting(projectionFactor, lastRatio);
+  return { score: r.score, anomalies: r.achterstand ? [r.achterstand.title] : [] };
 }
 
 let passed = 0;

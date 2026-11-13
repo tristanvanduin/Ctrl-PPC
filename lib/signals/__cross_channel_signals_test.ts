@@ -91,6 +91,19 @@ console.log("mix-shift (Simpson):");
   ];
   assert(detectBlendedMixShift(worse).triggered.length === 0, "kanaal-verslechtering => geen mix-claim");
 
+  // Doorlichting 13 november 2026 (S8): de verschuiving naar LinkedIn verklaart het grootste deel,
+  // maar Google deed zelf +11%. De oude detector eiste elk kanaal binnen +5% en zweeg; de lezer
+  // legde de hele stijging bij Google. Nu: mix- en prestatie-deel apart, en hij gaat af.
+  const gemengd = [
+    row("google_ads", "2026-04", { spend: 8000, conversions: 400 }), row("linkedin_ads", "2026-04", { spend: 2000, conversions: 20 }),
+    row("google_ads", "2026-05", { spend: 8000, conversions: 400 }), row("linkedin_ads", "2026-05", { spend: 2000, conversions: 20 }),
+    row("google_ads", "2026-06", { spend: 3000, conversions: 135 }), row("linkedin_ads", "2026-06", { spend: 7000, conversions: 70 }),
+  ];
+  const g = detectBlendedMixShift(gemengd);
+  assert(g.triggered.length === 1, "mix plus een licht slechter Google: mix-shift gaat toch af");
+  assert(/procentpunt uit de budgetverdeling/.test(g.triggered[0]?.story ?? "") && /prestatie binnen de kanalen/.test(g.triggered[0]?.story ?? ""), "het verhaal noemt het mix-deel en het prestatie-deel");
+  assert(/google_ads \+11/.test(g.triggered[0]?.story ?? ""), "en de verslechtering van Google blijft zichtbaar");
+
   // Eén kanaal actief => stil.
   const single = rows.filter((r) => r.channel === "google_ads");
   assert(detectBlendedMixShift(single).triggered.length === 0, "één kanaal => geen mix-oordeel");

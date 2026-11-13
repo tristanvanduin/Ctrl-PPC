@@ -6,6 +6,8 @@ import { loadClientSettingsRij } from "@/lib/client-settings";
 import { matchGeoCloneByCampaignName } from "@/lib/fair/geo-clone-catalog";
 import { resolveChannelConversionConfig, sumSelectedConversions, selectedConversionLabels, type ChannelConversionConfig } from "@/lib/analysis/channel-conversion-config";
 import { Laadvlak } from "@/components/ui/laadvlak";
+import { today } from "@/lib/reporting-date";
+import { eersteDagVanVenster } from "@/lib/period/dag-venster";
 import { Tabel, Kop, KolomKop, Body, Rij, NaamCel, GetalCel, AandeelCel, TotaalRij, TotaalCel } from "./data-table";
 import { CONFIG, eur, fmt, pctS, type ChannelKind, type DailyRow } from "./channel-performance";
 
@@ -31,7 +33,9 @@ export function ChannelCampaignTable({ clientId, channel, geoClone }: { clientId
   useEffect(() => {
     let cancelled = false;
     setCampaign(null); setError(null);
-    const since = new Date(Date.now() - 28 * 86_400_000).toISOString().slice(0, 10);
+    // 28 kalenderdagen in Amsterdam, vandaag meegeteld: hetzelfde venster als de kerncijfers
+    // erboven (lib/period/dag-venster.ts). Hier stonden 29 UTC-dagen.
+    const since = eersteDagVanVenster(today(), 28);
     Promise.all([
       dbSelect<Record<string, unknown>>(cfg.campaignTable, { select: cfg.select, clientId, filters: [{ op: "gte", column: "date", value: since }] }),
       dbSelect<Record<string, unknown>>(cfg.nameTable, { select: `${cfg.nameId}, name`, clientId }),

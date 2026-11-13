@@ -36,7 +36,9 @@ console.log("\n1. Creative fatigue");
   check("stabiele CTR triggert niet", !r.triggered.some((t) => t.scope.includes("Gezond")));
   check("categorie is creative", r.triggered[0]?.category === "creative");
   check("lage frequentie triggert niet", detectMetaCreativeFatigue([ad({ frequency: 1.2, linkCtr: 0.005, prevLinkCtr: 0.01 })]).triggered.length === 0);
-  check("cpa-stijging triggert ook", detectMetaCreativeFatigue([ad({ frequency: 3.2, cpa: 30, prevCpa: 20, linkCtr: 0.01, prevLinkCtr: 0.01 })]).triggered.length === 1);
+  // Met volume in beide vensters: een CPA-vergelijking op een of twee conversies is toeval (zie
+  // __minimumvolumes_test.ts).
+  check("cpa-stijging triggert ook", detectMetaCreativeFatigue([ad({ frequency: 3.2, cpa: 30, prevCpa: 20, conversions: 20, prevConversions: 30, linkCtr: 0.01, prevLinkCtr: 0.01 })]).triggered.length === 1);
   check("onder minimum impressies telt niet", detectMetaCreativeFatigue([ad({ impressions: 500, frequency: 4, linkCtr: 0.005, prevLinkCtr: 0.01 })]).triggered.length === 0);
 }
 

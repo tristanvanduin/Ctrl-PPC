@@ -111,7 +111,7 @@ export function demoFeedItems(clients: { id: string; name: string }[], now: Date
       severity: "critical", type: "task", title: "tROAS bijstellen — deadline verlopen",
       explanation: "Actie uit vorige sprint nog niet uitgevoerd.",
       impactDirection: "neutral", impactLabel: "deadline verlopen", ...owner("Gabrielle"),
-      dueAt: plusDays(now, -2), primaryAction: { kind: "resolve", label: "Afronden" },
+      dueAt: plusDays(now, -2), primaryAction: { kind: "view", label: "Open klant" },
     }),
 
     // ── Beslissing gevraagd ──
@@ -121,14 +121,14 @@ export function demoFeedItems(clients: { id: string; name: string }[], now: Date
       explanation: "ROAS 1,1 vs target 3,0 terwijl spend +45% MoM groeit. Richting: reduce.",
       iceScore: 82, impactType: "estimated", impactDirection: "gain", impactValue: 1240, impactLabel: "~€1.240/mnd onrendabele spend besparen",
       status: "awaiting_approval", ...owner("Tristan"),
-      primaryAction: { kind: "approve", label: "Keur goed" }, secondaryActions: [{ kind: "investigate", label: "Onderzoek" }, { kind: "snooze", label: "Snooze" }],
+      primaryAction: { kind: "view", label: "Open klant" }, secondaryActions: [{ kind: "investigate", label: "Onderzoek" }, { kind: "snooze", label: "Snooze" }],
     }),
     d({
       id: "demo:decision-expand", clientId: c(1).id, clientName: c(1).name, channel: "google",
       severity: "decision", type: "decision", title: "Brand NL — verliest volume op budget",
       explanation: "Haalt target met 22% budget-verlies op impression share — kandidaat om op te schalen.",
       iceScore: 74, impactType: "estimated", impactDirection: "gain", impactLabel: "+18 conversies/mnd bij opschalen",
-      status: "awaiting_approval", primaryAction: { kind: "approve", label: "Keur goed" },
+      status: "awaiting_approval", primaryAction: { kind: "view", label: "Open klant" },
       secondaryActions: [{ kind: "investigate", label: "Onderzoek" }, { kind: "assign", label: "Wijs toe" }],
     }),
 

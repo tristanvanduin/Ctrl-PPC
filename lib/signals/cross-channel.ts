@@ -13,8 +13,9 @@ export const SEED_BRAND_FALL = -0.10;      // -10% brand-klikken bij zaai-golf =
 export const ARBITRAGE_CPL_FRAC = 0.6;     // kanaal A is arbitrage-kandidaat onder 60% van B's CPL
 export const ARBITRAGE_MIN_LEADS = 10;     // onder dit volume per kanaal is CPL ruis
 export const ARBITRAGE_MIN_SPEND_SHARE = 0.25; // het dure kanaal moet echt budget dragen
-export const MIX_BLENDED_CPA_RISE = 0.20;  // +20% blended CPA is materieel
-export const MIX_CHANNEL_CPA_TOLERANCE = 0.05; // per kanaal max +5% om "stabiel" te heten
+export const MIX_BLENDED_CPA_RISE = 0.10;  // onder +10% blended CPA valt er niets te verklaren
+export const MIX_EFFECT_MIN = 0.10;        // de mix alleen moet de blended CPA minstens 10% optillen
+export const MIX_SHARE_MIN = 0.5;          // en minstens de helft van de stijging verklaren
 export const MIN_MONTHS = 3;               // minder historie = geen trend-oordeel
 
 const ATTRIBUTIE_VOETNOOT = "elk kanaal meet zijn eigen attributie; deze vergelijking is richtinggevend, geen exacte verdeling";
@@ -147,10 +148,17 @@ export function detectCplArbitrage(channels: ChannelMonthlyInput[]): DetectionRe
   return { triggered: [story], checked: [id] };
 }
 
-// ── 3. Mix-shift: blended CPA verslechtert terwijl elk kanaal stabiel is ───────────
-// De Simpson-detector: stijgt de blended CPA materieel terwijl geen enkel kanaal zelf
-// verslechtert, dan verschuift het budget-gewicht naar een structureel duurder kanaal. Zonder
-// deze check krijgt ten onrechte "de optimalisatie" de schuld.
+// ── 3. Mix-shift: hoeveel van de blended CPA-stijging komt uit de budgetverdeling ──
+// De Simpson-detector: verschuift het budget-gewicht naar een structureel duurder kanaal, dan
+// stijgt de blended CPA zonder dat een kanaal zelf slechter werd. Zonder deze check krijgt ten
+// onrechte "de optimalisatie" de schuld.
+//
+// Dit was alles-of-niets: alleen als ELK kanaal hooguit +5% deed, en dan +20% blended. Op de
+// seed (LinkedIn-spend x3) steeg de blended CPA 20,5% waarvan 16,3 procentpunt mix, maar Google
+// deed zelf +11%, dus zweeg de detector en legde de lezer de hele stijging bij Google. Nu wordt
+// de stijging altijd ontbonden: de blended CPA met de NIEUWE budgetverdeling en de OUDE kanaal-
+// CPA's is het mix-deel, de rest is prestatie binnen de kanalen. Beide getallen staan in het
+// verhaal. Het gaat af als de mix het grootste deel van de stijging verklaart.
 export function detectBlendedMixShift(channels: ChannelMonthlyInput[]): DetectionResult {
   const id = "cross_mix_shift";
   const activeChannels = [...new Set(channels.filter((r) => r.spend > 0).map((r) => r.channel))];
@@ -174,34 +182,72 @@ export function detectBlendedMixShift(channels: ChannelMonthlyInput[]): Detectio
   const blendedChange = pctChange(blendedLast, blendedPrior);
   if (blendedChange == null || blendedChange < MIX_BLENDED_CPA_RISE) return { triggered: [], checked: [id] };
 
-  // Per kanaal dezelfde vergelijking; iedereen stabiel of beter = mix-effect.
-  const perChannelStable: string[] = [];
-  for (const ch of activeChannels) {
-    const rows = channels.filter((r) => r.channel === ch);
-    const sp = sumByMonth(rows, (r: ChannelMonthlyInput) => r.spend);
-    const cv = sumByMonth(rows, (r: ChannelMonthlyInput) => r.conversions);
-    const chLast = cpaOf(sp.get(lastMonth) ?? 0, cv.get(lastMonth) ?? 0);
-    const chPrior = cpaOf(
-      priorMonths.reduce((s, m) => s + (sp.get(m) ?? 0), 0),
-      priorMonths.reduce((s, m) => s + (cv.get(m) ?? 0), 0)
-    );
-    if (chLast == null || chPrior == null) return { triggered: [], checked: [id] }; // kanaal zonder conversies: geen mix-oordeel
-    const change = pctChange(chLast, chPrior);
-    if (change == null || change > MIX_CHANNEL_CPA_TOLERANCE) return { triggered: [], checked: [id] };
-    perChannelStable.push(`${ch} ${r1(change * 100)}%`);
-  }
+  const ontbinding = ontbindMixEnPrestatie(channels, activeChannels, lastMonth, priorMonths);
+  // Een kanaal zonder conversies in een van beide perioden heeft geen CPA om mee te rekenen.
+  if (!ontbinding) return { triggered: [], checked: [id] };
+  const { mixCpa, perKanaal } = ontbinding;
+  const mixEffect = (mixCpa - blendedPrior) / blendedPrior;           // fractie van de oude CPA
+  const prestatieEffect = (blendedLast - mixCpa) / blendedPrior;
+  const mixAandeel = (blendedLast - blendedPrior) > 0 ? (mixCpa - blendedPrior) / (blendedLast - blendedPrior) : 0;
+  if (mixEffect < MIX_EFFECT_MIN || mixAandeel < MIX_SHARE_MIN) return { triggered: [], checked: [id] };
+
+  const groeier = [...perKanaal].sort((a, b) => (b.aandeelNu - b.aandeelToen) - (a.aandeelNu - a.aandeelToen))[0];
+  const kanaalTekst = perKanaal.map((k) => `${k.kanaal} ${k.cpaVerandering >= 0 ? "+" : ""}${r1(k.cpaVerandering * 100)}%`).join("; ");
+  const pp = (v: number) => `${v >= 0 ? "+" : ""}${r1(v * 100)}`;
 
   const story: SignalStory = {
     id, category: "cross_channel", scope: `maand ${lastMonth}`,
-    story: `De blended CPA steeg ${r1(blendedChange * 100)}% terwijl elk kanaal afzonderlijk stabiel bleef (${perChannelStable.join("; ")}); de verslechtering is een mix-verschuiving naar een duurder kanaal, geen prestatie-probleem binnen een kanaal.`,
-    actionDirection: "beoordeel de budget-mix (bewust duurder kanaal ingekocht, of gedreven?) in plaats van binnen kanalen te sleutelen",
+    story:
+      `De blended CPA steeg ${r1(blendedChange * 100)}%. Daarvan komt ${pp(mixEffect)} procentpunt uit de budgetverdeling ` +
+      `(${groeier.kanaal} van ${Math.round(groeier.aandeelToen * 100)}% naar ${Math.round(groeier.aandeelNu * 100)}% van de spend) ` +
+      `en ${pp(prestatieEffect)} uit de prestatie binnen de kanalen (CPA per kanaal: ${kanaalTekst}). ` +
+      `Het grootste deel is dus een mix-verschuiving naar een duurder kanaal, geen prestatie-probleem binnen een kanaal.`,
+    actionDirection: "beoordeel de budget-mix (bewust duurder kanaal ingekocht, of gedreven?) voordat je binnen kanalen gaat sleutelen; het prestatie-deel hoort bij het kanaal dat het levert",
     certainty: "indicatie",
     evidence: [
       { metric: "blended CPA", value: `€${r1(blendedLast)} (+${r1(blendedChange * 100)}%)`, prev: `€${r1(blendedPrior)}` },
-      { metric: "kanalen afzonderlijk", value: perChannelStable.join("; ") },
+      { metric: "blended CPA bij nieuwe mix en oude kanaal-CPA's", value: `€${r1(mixCpa)}` },
+      { metric: "mix-deel / prestatie-deel (procentpunt)", value: `${pp(mixEffect)} / ${pp(prestatieEffect)}` },
+      { metric: "kanalen afzonderlijk", value: kanaalTekst },
     ],
   };
   return { triggered: [story], checked: [id] };
+}
+
+/**
+ * De blended CPA met de budgetverdeling van de laatste maand en de kanaal-CPA's van de periode
+ * ervoor: wat de CPA was geworden als alleen de mix was veranderd. Null als een kanaal in een van
+ * beide perioden geen conversies heeft.
+ */
+export function ontbindMixEnPrestatie(
+  channels: ChannelMonthlyInput[],
+  activeChannels: string[],
+  lastMonth: string,
+  priorMonths: string[],
+): { mixCpa: number; perKanaal: { kanaal: string; aandeelToen: number; aandeelNu: number; cpaVerandering: number }[] } | null {
+  const som = (ch: string, ms: string[], veld: "spend" | "conversions") =>
+    channels.filter((r) => r.channel === ch && ms.includes(mkey(r.month))).reduce((s, r) => s + r[veld], 0);
+  const spendNu = activeChannels.reduce((s, ch) => s + som(ch, [lastMonth], "spend"), 0);
+  const spendToen = activeChannels.reduce((s, ch) => s + som(ch, priorMonths, "spend"), 0);
+  if (spendNu <= 0 || spendToen <= 0) return null;
+  const perKanaal: { kanaal: string; aandeelToen: number; aandeelNu: number; cpaVerandering: number }[] = [];
+  let conversiesBijOudeCpa = 0;
+  for (const ch of activeChannels) {
+    const sNu = som(ch, [lastMonth], "spend"), cNu = som(ch, [lastMonth], "conversions");
+    const sToen = som(ch, priorMonths, "spend"), cToen = som(ch, priorMonths, "conversions");
+    if ((sNu > 0 && cNu <= 0) || (sToen > 0 && cToen <= 0)) return null;
+    if (sToen <= 0) return null; // nieuw kanaal: geen oude CPA om de mix tegen te zetten
+    const cpaToen = sToen / cToen;
+    conversiesBijOudeCpa += sNu / cpaToen;
+    perKanaal.push({
+      kanaal: ch,
+      aandeelToen: sToen / spendToen,
+      aandeelNu: sNu / spendNu,
+      cpaVerandering: cNu > 0 ? (sNu / cNu - cpaToen) / cpaToen : 0,
+    });
+  }
+  if (conversiesBijOudeCpa <= 0) return null;
+  return { mixCpa: spendNu / conversiesBijOudeCpa, perKanaal };
 }
 
 // ── Bundel ─────────────────────────────────────────────────────────────────────────

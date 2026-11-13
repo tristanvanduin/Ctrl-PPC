@@ -111,5 +111,21 @@ for (const geval of [
   check(`${o.licht} draagt minstens een reden`, o.redenen.length > 0 && o.redenen[0].length > 5, JSON.stringify(o));
 }
 
+// ── Richting (doorlichting 13 november 2026) ────────────────────────────────
+// De reden zei "45% afwijking t.o.v. forecast" zonder teken; twee maanden 45% boven het doel las
+// als een account in nood.
+{
+  const boven = beoordeelAccount({ forecast: { afwijkingenPct: [45, 46] }, nieuweGebruiker: null });
+  check("boven het doeltempo zegt 'boven'", boven.redenen[0].includes("46% boven het doeltempo"), boven.redenen[0]);
+  const onder = beoordeelAccount({ forecast: { afwijkingenPct: [-45, -50] }, nieuweGebruiker: null });
+  check("onder het doeltempo zegt 'onder'", onder.redenen[0].includes("50% onder het doeltempo"), onder.redenen[0]);
+  check("de reden noemt geen 'forecast' meer", !/forecast/.test(boven.redenen[0] + onder.redenen[0]));
+  // Het licht gaat ook af als de maanden van kant wisselen (dat was al zo en blijft zo); de reden
+  // zegt dan dat het afwisselt in plaats van "op rij 45% onder".
+  check("een maand boven en een maand onder blijft een afwijking", heeftStructureleForecastAfwijking({ afwijkingenPct: [45, -45] }));
+  const wissel = beoordeelAccount({ forecast: { afwijkingenPct: [45, -45] }, nieuweGebruiker: null });
+  check("de reden noemt het afwisselen", wissel.licht === "amber" && /afwisselend erboven en eronder/.test(wissel.redenen[0]), wissel.redenen[0]);
+}
+
 console.log(`\n${passed} geslaagd, ${failed} gefaald`);
 if (failed > 0) process.exit(1);

@@ -34,15 +34,13 @@
 
 import { readFileSync } from "node:fs";
 import { sql } from "./supabase-sql.mjs";
+import { slaOver } from "./poort-overslaan.mjs";
 
 {
   try { readFileSync(".env.local", "utf8"); } catch { /* geen bestand: dan de omgeving zelf */ }
   const url = process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
   const token = process.env.SUPABASE_ACCESS_TOKEN;
-  if (!url || !token) {
-    console.log("view-dekking: overgeslagen (geen SUPABASE_ACCESS_TOKEN of project-URL).");
-    process.exit(0);
-  }
+  if (!url || !token) slaOver("view-dekking", "geen SUPABASE_ACCESS_TOKEN of project-URL");
 }
 
 // `verouderd` is geen uitzondering maar een MEETPUNT: een kolom waarvan bewezen is dat de tabel

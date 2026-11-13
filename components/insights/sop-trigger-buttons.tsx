@@ -15,6 +15,8 @@ import { today } from "@/lib/reporting-date";
 // kopie -- zie de kop van dat bestand. Gedrag van deze knoppen blijft ongewijzigd.
 import { CHANNEL_CONFIG, type SopType, type SopChannel } from "@/lib/analysis/sop-channel-config";
 import { isDemoClient } from "@/lib/demo/demo-mode";
+import { useAccess } from "@/lib/auth/use-access";
+import { sopBevestigVraag, sopStartBeleid } from "@/lib/sop-start";
 
 export type { SopChannel };
 
@@ -87,9 +89,17 @@ export function SopTriggerButtons({ clientId, onAnalysisComplete, onAnalysisErro
   // tijd is er niemand om tegen te beschermen. De server-kant blijft hoe dan ook gelden: zonder
   // OPENROUTER_API_KEY draait er niets, en de dekkingsgate voor AUTOMATISCHE runs staat los
   // hiervan (zie de routes; masterplan 17.112).
+  //
+  // 13 november: dat "niemand om tegen te beschermen" bleek niet te houden. In een ?demo=1-sessie
+  // zonder login ging bij één klik op elke kaart een POST de deur uit, en de server houdt zo'n
+  // verzoek niet tegen zolang de toegangscontrole uit staat. Nu: op een demo-klant alleen met een
+  // ingelogde sessie, en altijd eerst een bevestiging (lib/sop-start.ts).
   const demoBlokkadeAan = process.env.NEXT_PUBLIC_SOP_DEMO_BLOKKADE === "1";
-  const [demoModus, setDemoModus] = useState(false);
-  useEffect(() => { setDemoModus(isDemoClient(clientId) && demoBlokkadeAan); }, [clientId, demoBlokkadeAan]);
+  const toegang = useAccess();
+  const [demoKlant, setDemoKlant] = useState(false);
+  useEffect(() => { setDemoKlant(isDemoClient(clientId)); }, [clientId]);
+  const beleid = sopStartBeleid({ demoKlant, ingelogd: toegang.ingelogd, laden: toegang.loading, blokkadeVlag: demoBlokkadeAan });
+  const demoModus = !beleid.mag;
   const [status, setStatus] = useState<Record<SopType, SopStatus>>({
     weekly: { running: false, lastDate: null, error: null, success: false },
     biweekly: { running: false, lastDate: null, error: null, success: false },
@@ -205,6 +215,8 @@ export function SopTriggerButtons({ clientId, onAnalysisComplete, onAnalysisErro
     // toelichting bij demoModus hierboven.
     if (demoModus) return;
     const config = SOP_CONFIG[type];
+    // Een betaalde run start niet op één klik: eerst zeggen wat er gebeurt.
+    if (typeof window !== "undefined" && !window.confirm(sopBevestigVraag(config.label, channelCfg.headerLabel, type === "monthly"))) return;
     const jobId = `sop-${channelCfg.sopTypeKey[type]}-${clientId}`;
     const progressJobId = crypto.randomUUID();
     setActiveJobIds((prev) => ({ ...prev, [type]: progressJobId }));
@@ -352,8 +364,8 @@ export function SopTriggerButtons({ clientId, onAnalysisComplete, onAnalysisErro
       <div className="px-5 py-3 border-b border-border">
         <h3 className="text-title font-semibold text-brand-gray">SOP Analyse — {channelCfg.headerLabel}</h3>
         <p className="text-micro text-muted-foreground mt-0.5">
-          {demoModus
-            ? "In demo-modus kun je geen live SOP's starten -- dit zou een echte LLM-aanroep zijn."
+          {!beleid.mag
+            ? beleid.reden
             : <>Klik op een analyse om deze handmatig uit te voeren. Output wordt opgeslagen bij Bestanden &gt; SOP&apos;s.</>}
         </p>
       </div>

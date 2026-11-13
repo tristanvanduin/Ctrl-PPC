@@ -1,30 +1,36 @@
-export {};
 // Verificatie van build 3: misvormde beslisregels structureel gevangen,
 // en de onmogelijke 8.5-score-poort verwijderd.
 // Draaien: npx tsx lib/analysis/__qa_gate_recal_test.ts
 
-// Exacte replica van hasMalformedDecisionRule (bron: monthly-structured.ts:3620).
-function hasMalformedDecisionRule(text: string): boolean {
-  return /Continueer alleen als doorzetten alleen als|doorzetten alleen als doorzetten alleen als|ga alleen door [^.\n]*ga pas door/i.test(text);
-}
+// De echte validateFinalSopSynthesis. Hier stond een kopie van alleen de beslisregel-tak; nu gaat
+// een minimale synthese door de hele validatie, en kijken de checks naar de fouten die over de
+// beslisregel en de scores gaan. De overige structuurfouten (lege markdown, te weinig secties) horen
+// bij deze minimale invoer en zijn hier niet het onderwerp.
+import { validateFinalSopSynthesis, type FinalSopSynthesis } from "./monthly-structured";
 
-// Replica van de nieuwe structurele validatie-tak.
 function validateScores(opts: {
   recommendationRules: string[];
   taskRules: string[];
   whyScore: number;
   actionabilityScore: number;
 }): string[] {
-  const errors: string[] = [];
-  // NIEUW: structurele check op misvormde regels (objectief, los van de score).
-  if (
-    opts.recommendationRules.some((r) => hasMalformedDecisionRule(r)) ||
-    opts.taskRules.some((r) => hasMalformedDecisionRule(r))
-  ) {
-    errors.push("Malformed decision rule present");
-  }
-  // VERWIJDERD: de oude onmogelijke score-poorten. Geen "below threshold" meer.
-  return errors;
+  const synthese = {
+    primary_thread: "Het account verliest rendement in de landset Noord.",
+    root_cause: "De landset Noord trekt budget zonder conversies.",
+    supporting_evidence: ["a", "b", "c"],
+    what_is_not_the_problem: [],
+    recommendations: opts.recommendationRules.map((beslisregel, i) => ({
+      route: "containment", handeling: `Verlaag budget ${i}`, object: `Campagne ${i}`, doel: "x", meet_via: "CPA",
+      voorwaarde: "x", beslisregel, risico: "x",
+    })),
+    tasks: opts.taskRules.map((beslisregel, i) => ({
+      linked_recommendation: 1, handeling: `Sluit zoekterm ${i} uit`, object: `Zoekterm ${i}`, meet_via: "CPA",
+      voorwaarde: "x", beslisregel, risico: "x",
+    })),
+    qa_self_check: { why_score: opts.whyScore, actionability_score: opts.actionabilityScore, red_flags_remaining: [] },
+    markdown: "",
+  } as unknown as FinalSopSynthesis;
+  return validateFinalSopSynthesis(synthese);
 }
 
 // Replica van de OUDE validatie-tak, puur voor contrast.

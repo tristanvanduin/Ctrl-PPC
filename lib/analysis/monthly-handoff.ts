@@ -191,29 +191,56 @@ export interface OpenPunt {
   status?: unknown;
 }
 
+// Welke statussen nog een signaal zijn. "vervangen" hoort erbij: sinds een nieuwe run de open
+// punten van de vorige op "vervangen" zet (extract-structured.ts), zag dit blok anders nog maar een
+// run terug, en verdween het "sinds wanneer" van een punt dat drie weken terugkomt uit de prompt.
+// Vervangen is opruimwerk voor het scherm, geen besluit; afgerond en afgewezen zijn dat wel.
+const NOG_EEN_SIGNAAL = new Set(["", "open", "pending", "vervangen"]);
+
 export function buildOpenPointsBlock(rijen: OpenPunt[], maxItems = 8): string {
-  const open = rijen.filter((r) => {
-    const s = tekst(r.status).toLowerCase();
-    return s === "" || s === "open" || s === "pending";
-  });
-  if (open.length === 0) return "";
-
-  const regels = open.slice(0, maxItems).map((r) => {
-    const wat = tekst(r.hypothesis);
+  // Hetzelfde punt uit meerdere runs is een rij per run: groepeer op de tekst en onthoud de
+  // eerste en de laatste datum. De eerste is het "sinds wanneer" waar de instructie om vraagt.
+  interface Groep { r: OpenPunt; sinds: string; laatst: string; runs: number; nogOpen: boolean }
+  const groepen = new Map<string, Groep>();
+  for (const r of rijen) {
+    const status = tekst(r.status).toLowerCase();
+    if (!NOG_EEN_SIGNAAL.has(status)) continue;
+    const sleutel = tekst(r.hypothesis).toLowerCase().replace(/\s+/g, " ");
+    if (!sleutel) continue;
     const datum = tekst(r.analysis_date);
-    const metric = tekst(r.measurement_metric);
-    const verwacht = tekst(r.expected_result);
+    const g = groepen.get(sleutel);
+    const open = status !== "vervangen";
+    if (!g) { groepen.set(sleutel, { r, sinds: datum, laatst: datum, runs: 1, nogOpen: open }); continue; }
+    g.runs += 1;
+    g.nogOpen = g.nogOpen || open;
+    if (datum && (!g.sinds || datum < g.sinds)) g.sinds = datum;
+    if (datum && datum > g.laatst) { g.laatst = datum; g.r = r; }
+  }
+  // Wat nu nog open staat eerst, daarna de rest op recentheid.
+  const lijst = [...groepen.values()].sort((x, y) =>
+    Number(y.nogOpen) - Number(x.nogOpen) || (y.laatst > x.laatst ? 1 : y.laatst < x.laatst ? -1 : 0));
+  if (lijst.length === 0) return "";
+
+  const regels = lijst.slice(0, maxItems).map((g) => {
+    const wat = tekst(g.r.hypothesis);
+    const metric = tekst(g.r.measurement_metric);
+    const verwacht = tekst(g.r.expected_result);
     const staart = [metric && `meet op ${metric}`, verwacht && `verwacht: ${verwacht}`].filter(Boolean).join("; ");
-    return `- ${datum ? `[${datum}] ` : ""}${wat}${staart ? ` (${staart})` : ""}`;
+    const wanneer = g.sinds && g.sinds !== g.laatst
+      ? `[sinds ${g.sinds}, ${g.runs} runs, laatst ${g.laatst}] `
+      : g.laatst ? `[${g.laatst}] ` : "";
+    const nietHerhaald = g.nogOpen ? "" : " -- in de laatste run niet meer genoemd";
+    return `- ${wanneer}${wat}${staart ? ` (${staart})` : ""}${nietHerhaald}`;
   });
 
-  const rest = open.length > maxItems ? `\n(en nog ${open.length - maxItems} andere)` : "";
+  const rest = lijst.length > maxItems ? `\n(en nog ${lijst.length - maxItems} andere)` : "";
   return [
     "",
     "## Nog open van je vorige runs in deze cadans",
-    "Dit heb je eerder zelf gesignaleerd en het staat nog open. Kom je hetzelfde punt opnieuw tegen,",
-    "meld het dan als AANHOUDEND met vermelding van sinds wanneer — niet als nieuwe bevinding. Een",
-    "probleem dat drie weken terugkomt is een ander verhaal dan een probleem dat één keer opduikt.",
+    "Dit heb je eerder zelf gesignaleerd en het is niet afgerond of afgewezen. Kom je hetzelfde punt",
+    "opnieuw tegen, meld het dan als AANHOUDEND met vermelding van sinds wanneer — niet als nieuwe",
+    "bevinding. Een probleem dat drie weken terugkomt is een ander verhaal dan een probleem dat één",
+    "keer opduikt.",
     ...regels,
     rest,
   ].filter(Boolean).join("\n");

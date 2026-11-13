@@ -33,7 +33,14 @@ if (!process.env.__TZ_CHILD) {
   const eigenPad = fileURLToPath(import.meta.url);
   let mislukt = 0;
   for (const zone of ZONES) {
-    const res = spawnSync("npx", ["tsx", eigenPad], {
+    // Het kind met dezelfde node en dezelfde loadervlaggen als dit proces (tsx zet zijn loader in
+    // execArgv), en niet via npx. npx zocht het pakket bij elke aanroep opnieuw op (~2 s) en gaf in
+    // de parallelle suite af en toe rood zonder dat er een assertie faalde. Alleen als er geen
+    // loadervlaggen zijn (een andere runner) valt hij terug op npx.
+    const [cmd, args] = process.execArgv.length > 0
+      ? [process.execPath, [...process.execArgv, eigenPad]]
+      : ["npx", ["tsx", eigenPad]];
+    const res = spawnSync(cmd, args, {
       env: { ...process.env, TZ: zone, __TZ_CHILD: "1" },
       encoding: "utf8",
       stdio: "inherit",

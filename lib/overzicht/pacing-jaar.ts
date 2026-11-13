@@ -20,6 +20,7 @@ import { actieveMetrics, jaarKaartCijfers, type ClientForecast, type ForecastMet
 import { isLowerBetter, METRIC_LABELS } from "@/lib/forecast-format";
 import { safeDiv } from "@/lib/util/math";
 import { jaardoelTekst } from "@/lib/analysis/standaard-jaardoel";
+import { doelGeldtVoor, oordeelOverTekst, type DoelReeks, type JaardoelBereik } from "@/lib/doel/jaardoel";
 
 /** De vergelijking met vorig jaar zoals de pacing hem kent: per kanaal gepaard, of null zonder paar. */
 export interface VorigJaar {
@@ -126,6 +127,30 @@ export function gemiddeldPerMaand(totaal: number, maanden: number): number | nul
 }
 
 /**
+ * De twee getallen achter "tegen vorig jaar" als het percentage over een deel van de kanalen gaat:
+ * "1.091 tegen 1.180, vergelijkbaar deel: Google Ads". Null als elk kanaal over alle maanden
+ * gepaard is (dan hoort het percentage bij het gerealiseerde getal ernaast) of zonder paar.
+ *
+ * Waarom in de cel zelf: in de tabel stond "Conversies 3.072 | −8%". De −8% was 1.091 tegen 1.180,
+ * alleen Google, en dat stond alleen in een hover-titel; wie de rij las, zag het account krimpen
+ * terwijl het ruim boven vorig jaar lag.
+ */
+export function vergelijkbaarDeelTekst(
+  sleutel: PacingJaarSleutel,
+  paar: {
+    gepaard: { huidig: { conversions: number; adSpend: number }; vorig: { conversions: number; adSpend: number } };
+    vergeleken: readonly string[];
+    /** Aantal kanalen dat niet of niet over alle maanden in het percentage zit. */
+    nietVolledig: number;
+  } | null,
+  opmaak: (v: number) => string,
+): string | null {
+  if (!paar || paar.vergeleken.length === 0 || paar.nietVolledig === 0) return null;
+  if (sleutel !== "conversions" && sleutel !== "adSpend") return null;
+  return `${opmaak(paar.gepaard.huidig[sleutel])} tegen ${opmaak(paar.gepaard.vorig[sleutel])}, vergelijkbaar deel: ${paar.vergeleken.join(", ")}`;
+}
+
+/**
  * Waar de doelen in de kolom "jaardoel" vandaan komen, als één zin voor de voetregel.
  *
  * De kolom draagt het doel van elke rij: conversies en CPA hangen aan het conversiedoel, omzet en
@@ -134,7 +159,18 @@ export function gemiddeldPerMaand(totaal: number, maanden: number): number | nul
  * omzetdoel (of "een schatting" boven een ingevoerd doel). Zijn ze gelijk, dan één zin; verschillen
  * ze, dan per doel benoemd. Het omzetdoel telt alleen mee als er een rij is die erop leunt.
  */
-export function doelHerkomstZin(forecast: ClientForecast, sleutels: readonly PacingJaarSleutel[]): string {
+export function doelHerkomstZin(
+  forecast: ClientForecast,
+  sleutels: readonly PacingJaarSleutel[],
+  doelGeldt = true,
+): string {
+  // Een los kanaal van een klant met meer kanalen staat tegen zijn eigen schatting; de route levert
+  // daar geen herkomst. "Geen jaardoel ingevoerd" las dan als een uitspraak over het account, naast
+  // een zin die zei dat het doel in Instellingen stond (oordeelOverTekst zegt hoe het daar zit).
+  if (!doelGeldt) {
+    const t = jaardoelTekst(undefined);
+    return `De kolom jaardoel toont een eigen schatting voor dit kanaal${t.toelichting ? ` (${t.toelichting})` : ""}.`;
+  }
   const metOmzet = sleutels.includes("revenue") || sleutels.includes("roas");
   const metConversies = sleutels.includes("conversions") || sleutels.includes("cpa");
   const conv = jaardoelTekst(forecast.doelHerkomst?.conversions);
@@ -150,4 +186,19 @@ export function doelHerkomstZin(forecast: ClientForecast, sleutels: readonly Pac
   return enige.ingevoerd
     ? `Het jaardoel komt uit Instellingen${tussenHaakjes(enige)}.`
     : `Geen jaardoel ingevoerd: de kolom toont een schatting${tussenHaakjes(enige)}.`;
+}
+
+/**
+ * De voetregel over het doel: over welke kanalen het oordeel gaat, en waar de kolom jaardoel
+ * vandaan komt. In één functie omdat de twee zinnen elkaar moeten kloppen: op de Google-tab van een
+ * klant met vier kanalen stond "Het jaardoel uit Instellingen geldt voor alle kanalen samen" en
+ * twee zinnen later "Geen jaardoel ingevoerd" (lib/__jaardoel_bereik_test.ts).
+ */
+export function doelVoetregel(
+  bereik: JaardoelBereik | null,
+  reeks: DoelReeks,
+  forecast: ClientForecast,
+  sleutels: readonly PacingJaarSleutel[],
+): string {
+  return `${oordeelOverTekst(bereik, reeks)} ${doelHerkomstZin(forecast, sleutels, doelGeldtVoor(bereik, reeks))}`;
 }

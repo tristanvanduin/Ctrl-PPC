@@ -53,6 +53,8 @@ import {
   normalizeEvidenceBasis,
   type StepOutput,
   type Finding,
+  normaliseerDoelVeld,
+  MAATSTAF_LABEL,
 } from "@/lib/schema/analysis-schema";
 import { sanitizeOutput } from "@/lib/analysis/sanitize";
 import { computeComparisonFacts, formatComparisonFacts, computeCampaignMomFacts, computeAdGroupMomFacts, computeCampaignComparisonFacts } from "@/lib/analysis/comparison-facts";
@@ -85,7 +87,7 @@ import {
 } from "@/lib/analysis/product-context";
 import { syncMerchantProductSnapshots } from "@/lib/api/merchant-products";
 import { parseCheckpointOutput, type CheckpointOutput } from "@/lib/schema/monthly-pipeline-schema";
-import { buildMonthlyQualityGate, validateMonthlyAcceptance } from "@/lib/analysis/monthly-acceptance";
+import { buildMonthlyQualityGate, dekkingsRegel, validateMonthlyAcceptance } from "@/lib/analysis/monthly-acceptance";
 import { validateStepOutput, type StepValidationResult, type StepPurityRule } from "@/lib/analysis/step-validator";
 import { buildCanonicalMetricMap, validateFindingClaims, type CanonicalMetricMap } from "@/lib/analysis/claim-consistency";
 import {
@@ -96,6 +98,7 @@ import {
 } from "@/lib/progress/server";
 import type { GoogleAdsCredentials } from "@/lib/api/google-ads";
 import { logger } from "@/lib/logger";
+import { ruimVastgelopenRunsOp } from "@/lib/scheduler/vastgelopen-runs";
 import { buildGeheugenMetTaken } from "@/lib/analysis/geheugen-grounding";
 import { buildGoogleSignalsSection, type CampaignIsRow, type CampaignMonthlyRow, type KeywordMonthlyRow, type ChangeHistoryRow, type ScheduleRow, type NetworkMonthlyRow, type DeviceMonthlyRow, type SearchTermMonthlyLite, type NegativeKeywordRow } from "@/lib/analysis/signal-section";
 import { today } from "@/lib/reporting-date";
@@ -427,19 +430,19 @@ const HEAVY_WARNING_MATCHERS = [
   "gedegradeerd of nested JSON",
 ];
 
-function countHeavyWarnings(validation: StepValidationResult): number {
+export function countHeavyWarnings(validation: StepValidationResult): number {
   return validation.warnings.filter((warning) => HEAVY_WARNING_MATCHERS.some((matcher) => warning.includes(matcher))).length;
 }
 
 // F3 4a: generieke repair-trigger. True bij een error, of bij minimaal twee zware warnings.
 // errorsOnly forceert (na de kostenrem) repair alleen nog op errors.
-function shouldRepairStep(validation: StepValidationResult, errorsOnly: boolean): boolean {
+export function shouldRepairStep(validation: StepValidationResult, errorsOnly: boolean): boolean {
   if (validation.errors.length > 0) return true;
   if (errorsOnly) return false;
   return countHeavyWarnings(validation) >= 2;
 }
 
-function buildStepRepairUserMessage(
+export function buildStepRepairUserMessage(
   message: string,
   validation: StepValidationResult,
   runningContext: string,
@@ -463,7 +466,7 @@ type StepAttempt = { step: StepResult; parsed: ParsedStepOutput; validation: Ste
 
 // F3 4a: kies het beste van origineel en repair (minste errors, dan minste zware warnings).
 // Bij gelijke kwaliteit houdt dit het origineel, zodat een repair het nooit slechter maakt.
-function pickBetterStepAttempt(original: StepAttempt, repaired: StepAttempt): StepAttempt {
+export function pickBetterStepAttempt(original: StepAttempt, repaired: StepAttempt): StepAttempt {
   if (repaired.validation.errors.length !== original.validation.errors.length) {
     return repaired.validation.errors.length < original.validation.errors.length ? repaired : original;
   }
@@ -861,14 +864,16 @@ async function persistMonthlyStructuredData(opts: {
   const tasks = structured.tasks;
 
   try {
-    const insightRows = findings.map((finding) => ({
+    // Zelfde scheiding als in de korte cadans (normaliseerDoelVeld): een doel of benchmark in
+    // previous_value is geen vorige waarde, en hoort op het scherm niet als "was" te staan.
+    const insightRows = findings.map((f) => normaliseerDoelVeld(f)).map((finding) => ({
       client_id: clientId,
       analysis_id: analysisId,
       sop_type: sopType,
       analysis_date: analysisDate,
       insight_type: finding.insight_type,
       title: `[Stap ${finding.step}][${finding.issue_cluster}] ${finding.display_label ?? finding.entity_name}: ${finding.metric}`.slice(0, 80),
-      description: `${finding.display_label ?? finding.entity_name} — ${finding.metric}: ${finding.current_value ?? "n.v.t."}${finding.previous_value != null ? ` (was ${finding.previous_value})` : ""}. Cluster: ${finding.issue_cluster}. Oorzaak: ${finding.cause}`,
+      description: `${finding.display_label ?? finding.entity_name} — ${finding.metric}: ${finding.current_value ?? "n.v.t."}${finding.previous_value != null ? ` (was ${finding.previous_value})` : ""}${finding.target_value != null ? ` tegenover ${(finding.benchmark_type && MAATSTAF_LABEL[finding.benchmark_type]) || "doel"} ${finding.target_value}` : ""}. Cluster: ${finding.issue_cluster}. Oorzaak: ${finding.cause}`,
       severity: finding.severity,
       affected_entity: finding.display_label ?? finding.entity_name,
       affected_entity_type: finding.entity_type,
@@ -1071,10 +1076,14 @@ async function finalizeChannelMonthlySynthesis(opts: {
       latencyMs: raw?.latencyMs ?? 0, retries: raw?.retries ?? 0,
     };
   });
+  // Stappen zonder data staan bovenaan de uitvoer, met naam (AC-19 eist het).
+  const dekking = dekkingsRegel(narrativeSteps);
+  if (dekking) structured.deliverable_markdown = `${dekking}\n\n${structured.deliverable_markdown}`;
   const acceptanceReport = validateMonthlyAcceptance({
     stepCount: adapter.stepCount,
     expectedStepNumbers: adapter.expectedStepNumbers,
     expectedCheckpointCount: adapter.expectedCheckpointCount ?? 0,
+    deliverableMarkdown: structured.deliverable_markdown,
     narrativeSteps,
     recommendations: structured.recommendations,
     tasks: structured.tasks,
@@ -1405,6 +1414,19 @@ async function runMetaMonthlyAnalysis(
   // dat telde wel mee in maxDuration, en op een zware analyse kon de opgetelde tijd de client's
   // kant van de wachttijd over de 300s heen duwen, met Vercel's platte foutpagina i.p.v. JSON als
   // gevolg ("Unexpected token 'A'...", live gezien op demo-greentech).
+  // De kanaal-maandpaden riepen markProgressCompleted nergens aan: veertien geslaagde runs
+  // (uitvoer en kwaliteitspoort opgeslagen) bleven daardoor op "running" staan.
+  await markProgressCompleted(supabase, {
+    jobId,
+    message: `Maandanalyse ${adapter.channel} gereed.`,
+    metadata: {
+      analysis_date: analysisDate,
+      sop_type: adapter.sopTypeKey,
+      quality_gate: synthesis.qualityGate,
+      structured_saved: true,
+    },
+  });
+
   after(async () => {
     await triggerCrossChannelSynthesisIfReady(supabase, clientId);
     // Idem voor cross-account: zie lib/analysis/auto-portfolio-synthesis-trigger.ts.
@@ -1669,6 +1691,19 @@ async function runLinkedinMonthlyAnalysis(
   // dat telde wel mee in maxDuration, en op een zware analyse kon de opgetelde tijd de client's
   // kant van de wachttijd over de 300s heen duwen, met Vercel's platte foutpagina i.p.v. JSON als
   // gevolg ("Unexpected token 'A'...", live gezien op demo-greentech).
+  // De kanaal-maandpaden riepen markProgressCompleted nergens aan: veertien geslaagde runs
+  // (uitvoer en kwaliteitspoort opgeslagen) bleven daardoor op "running" staan.
+  await markProgressCompleted(supabase, {
+    jobId,
+    message: `Maandanalyse ${adapter.channel} gereed.`,
+    metadata: {
+      analysis_date: analysisDate,
+      sop_type: adapter.sopTypeKey,
+      quality_gate: synthesis.qualityGate,
+      structured_saved: true,
+    },
+  });
+
   after(async () => {
     await triggerCrossChannelSynthesisIfReady(supabase, clientId);
     // Idem voor cross-account: zie lib/analysis/auto-portfolio-synthesis-trigger.ts.
@@ -1911,6 +1946,19 @@ async function runMicrosoftMonthlyAnalysis(
     }, { status: 422 });
   }
 
+  // De kanaal-maandpaden riepen markProgressCompleted nergens aan: veertien geslaagde runs
+  // (uitvoer en kwaliteitspoort opgeslagen) bleven daardoor op "running" staan.
+  await markProgressCompleted(supabase, {
+    jobId,
+    message: `Maandanalyse ${adapter.channel} gereed.`,
+    metadata: {
+      analysis_date: analysisDate,
+      sop_type: adapter.sopTypeKey,
+      quality_gate: synthesis.qualityGate,
+      structured_saved: true,
+    },
+  });
+
   after(async () => {
     await triggerCrossChannelSynthesisIfReady(supabase, clientId);
     await triggerPortfolioSynthesisIfReady(supabase, clientId);
@@ -1982,6 +2030,10 @@ export async function POST(request: NextRequest) {
   if (automatisch && !(await magSopDraaien(supabase, clientId))) {
     return Response.json({ error: "Automatische SOP's staan uit voor dit account (dekking). Handmatig triggeren kan wel." }, { status: 403 });
   }
+
+  // Wat van een eerdere run van deze klant nog op "running" staat zonder update na een uur, is
+  // vastgelopen: afsluiten met de reden, zodat hij niet als lopend of gedraaid blijft gelden.
+  await ruimVastgelopenRunsOp(supabase, { clientId });
 
   try {
     if (adapter.channel === "meta_ads") {
@@ -3444,20 +3496,26 @@ ${conclusions.join("\n\n---\n\n")}${crossChannelGoogleText ? `\n\n${crossChannel
       conclusionText: parsedConclusion.narrative,
     });
     const officialStepValidations = stepValidations.filter((validation) => validation.stepNumber >= 1 && validation.stepNumber <= 13);
+    const googleNarrativeSteps = parsedSteps.map((step) => ({
+      stepNumber: step.stepNumber,
+      stepName: step.stepName,
+      output: step.narrative,
+      model: steps.find((candidate) => candidate.stepNumber === step.stepNumber)?.model ?? steps[0]?.model ?? "unknown",
+      tokensUsed: steps.find((candidate) => candidate.stepNumber === step.stepNumber)?.tokensUsed ?? 0,
+      saved: false,
+      latencyMs: steps.find((candidate) => candidate.stepNumber === step.stepNumber)?.latencyMs ?? 0,
+      retries: steps.find((candidate) => candidate.stepNumber === step.stepNumber)?.retries ?? 0,
+    }));
+    // Stappen zonder data staan bovenaan de uitvoer, met naam (AC-19 eist het): op 19 augustus
+    // noemden drie runs met elk 5 van 12 lege stappen een hoofdoorzaak zonder dat te zeggen.
+    const googleDekking = dekkingsRegel(googleNarrativeSteps);
+    if (googleDekking) structured.deliverable_markdown = `${googleDekking}\n\n${structured.deliverable_markdown}`;
     const acceptanceReport = validateMonthlyAcceptance({
       stepCount: adapter.stepCount,
       expectedStepNumbers: adapter.expectedStepNumbers,
       expectedCheckpointCount: adapter.expectedCheckpointCount,
-      narrativeSteps: parsedSteps.map((step) => ({
-        stepNumber: step.stepNumber,
-        stepName: step.stepName,
-        output: step.narrative,
-        model: steps.find((candidate) => candidate.stepNumber === step.stepNumber)?.model ?? steps[0]?.model ?? "unknown",
-        tokensUsed: steps.find((candidate) => candidate.stepNumber === step.stepNumber)?.tokensUsed ?? 0,
-        saved: false,
-        latencyMs: steps.find((candidate) => candidate.stepNumber === step.stepNumber)?.latencyMs ?? 0,
-        retries: steps.find((candidate) => candidate.stepNumber === step.stepNumber)?.retries ?? 0,
-      })),
+      deliverableMarkdown: structured.deliverable_markdown,
+      narrativeSteps: googleNarrativeSteps,
       recommendations: structured.recommendations,
       tasks: structured.tasks,
       finalSop: { recommendations: structured.final_sop.recommendations, tasks: structured.final_sop.tasks },

@@ -2,7 +2,8 @@
 //
 // Gebruik: node scripts/check-rpc-rechten.mjs
 // Exitcode 0 als er niets muteerbaars openstaat, 1 als er wél iets openstaat.
-// Zonder databasegegevens slaat hij over met exitcode 0 — zie onderaan.
+// Zonder databasegegevens slaat hij over met exitcode 3 (scripts/poort-overslaan.mjs): niet
+// gedraaid is iets anders dan geslaagd, en gates.sh telt het ook zo.
 //
 // ── WAAROM DIT BESTAAT ──────────────────────────────────────────────────────
 //
@@ -46,6 +47,7 @@
 import { readFileSync } from "node:fs";
 import { sql } from "./supabase-sql.mjs";
 import { MUTATIE, alleenCode } from "./rpc-mutatie.mjs";
+import { slaOver } from "./poort-overslaan.mjs";
 
 // Zonder databasegegevens overslaan in plaats van falen.
 //
@@ -60,10 +62,7 @@ import { MUTATIE, alleenCode } from "./rpc-mutatie.mjs";
   try { readFileSync(".env.local", "utf8"); } catch { /* geen bestand: dan de omgeving zelf */ }
   const url = process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
   const token = process.env.SUPABASE_ACCESS_TOKEN;
-  if (!url || !token) {
-    console.log("rpc-rechten: overgeslagen (geen SUPABASE_ACCESS_TOKEN of project-URL).");
-    process.exit(0);
-  }
+  if (!url || !token) slaOver("rpc-rechten", "geen SUPABASE_ACCESS_TOKEN of project-URL");
 }
 
 // De herkenning van een muterende functie staat in een eigen module met een test ernaast

@@ -122,7 +122,9 @@ export function useTodayFeed(): TodayFeed {
             order: { column: "created_at", ascending: false }, limit: 150,
           }),
           dbSelect<TaskRow>("sop_tasks", {
-            select: "id, client_id, title, description, priority, due_date, status",
+            // Met "*" en niet met een kolomlijst: sop_type bestaat pas na migratie 104, en een
+            // genoemde kolom die ontbreekt laat de hele feed vallen. Kanaal en ouderdom komen eruit.
+            select: "*",
             clientIds: ids, filters: [{ op: "eq", column: "status", value: "open" }],
             order: { column: "due_date", ascending: true }, limit: 150,
           }),

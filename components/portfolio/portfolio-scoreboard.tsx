@@ -1,5 +1,6 @@
 "use client";
 
+import { AANDACHT_YOY_PCT, PORTFOLIO_BEREIK, STIP_LEGENDA, gezondheidStip, portfolioKopregel, type StipKleur } from "@/lib/portfolio-kop";
 import { useState, useEffect, useRef } from "react";
 import { Loader2, TrendingUp, TrendingDown, ArrowRight } from "lucide-react";
 import Link from "next/link";
@@ -19,6 +20,10 @@ import { CHART_CATEGORICAL } from "@/lib/branding/chart-colors";
 import { Tabel, Kop, KolomKop, SorteerKop, Body, Rij, NaamCel, Cel, GetalCel, AandeelCel, TotaalRij, TotaalCel } from "@/components/dashboard/data-table";
 import { Sparkline } from "@/components/ui/sparkline";
 
+const STIP_KLASSE: Record<StipKleur, string> = {
+  grijs: "bg-gray-200", groen: "bg-green-400", oranje: "bg-amber-400", rood: "bg-red-400",
+};
+
 // De demo-klant komt niet uit de Google Ads MCC en heeft dus geen gads-id; zonder deze
 // omweg blijft het scorebord in demo-modus leeg terwijl de periodekiezer er wel boven staat.
 //
@@ -26,6 +31,7 @@ import { Sparkline } from "@/components/ui/sparkline";
 // geseede database), dezelfde adapter en dezelfde periodesnede: wat je hier ziet is wat je daar
 // ziet. Hier stond eerst een eigen aanroep van de GreenTech-fixture. Toen het dashboard naar de
 // database ging, zou deze cel nog de fixture-wereld tonen -- en dit commentaar zou liegen.
+
 async function haalDemoData(): Promise<ClientHistoricalData | null> {
   try {
     const api = await fetch(`/api/google-ads/client-data?customerId=${DEMO_GREENTECH_ID}`).then((r) => r.json());
@@ -163,7 +169,7 @@ export function portfolioTotalen(overviews: readonly AccountOverview[]) {
     conversions, revenue, adSpend,
     roas: adSpend > 0 ? revenue / adSpend : 0,
     groeiend: rijen.filter((o) => (o.yoy?.convChange ?? 0) > 0).length,
-    aandacht: rijen.filter((o) => (o.yoy?.convChange ?? 0) < -10).length,
+    aandacht: rijen.filter((o) => (o.yoy?.convChange ?? 0) < AANDACHT_YOY_PCT).length,
     noot: noten.length === 1 ? noten[0] : undefined,
     /** Rijen met spend die buiten de som vallen omdat ze over een ander venster gaan. */
     buitenTotaal: metSpend.length - rijen.length,
@@ -470,13 +476,8 @@ function PortfolioScoreboardBody() {
                 <Rij key={client.id} className="group">
                   <NaamCel sub={overview?.periodeNoot}>
                     <Link href={`/client/${client.id}`} className="inline-flex items-center gap-2.5 hover:text-brand-blue-ink transition-colors rounded-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue">
-                      {/* Health dot */}
-                      <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${
-                        !hasData ? "bg-gray-200" :
-                        (yoy?.convChange ?? 0) > 10 && ytd!.roas >= 2 ? "bg-green-400" :
-                        (yoy?.convChange ?? 0) > -10 ? "bg-amber-400" :
-                        "bg-red-400"
-                      }`} />
+                      {/* Health dot, met waartegen hij kleurt: er stond geen legenda bij. */}
+                      <span title={STIP_LEGENDA} className={`w-2.5 h-2.5 rounded-full shrink-0 ${STIP_KLASSE[gezondheidStip(!!hasData, yoy?.convChange, ytd?.roas ?? 0)]}`} />
                       {client.name}
                     </Link>
                   </NaamCel>
@@ -524,6 +525,8 @@ function PortfolioScoreboardBody() {
         <p className="text-body text-muted-foreground">
           Cijfers over <span className="font-medium text-brand-gray">{formatRange(periode.range)}</span>
           {periode.compareRange && <> tegenover {formatRange(periode.compareRange)}</>}
+          {/* Het bord leest de Google Ads-routes; Meta, LinkedIn en Microsoft tellen niet mee. */}
+          , <span className="font-medium text-brand-gray">{PORTFOLIO_BEREIK}</span>: Meta, LinkedIn en Microsoft Ads tellen hier niet mee
         </p>
         <PeriodSelector
           value={{
@@ -542,7 +545,7 @@ function PortfolioScoreboardBody() {
             <h1 className="mt-1 text-page font-bold">{greeting}</h1>
             <p className="text-white/70 mt-2 text-sm max-w-lg">
               {activeCount > 0
-                ? `${activeCount} actieve klanten · ${growingCount} groeiend · ${decliningCount > 0 ? `${decliningCount} vragen aandacht` : "alles op schema"}`
+                ? portfolioKopregel({ actief: activeCount, groeiend: growingCount, aandacht: decliningCount, doelGetoetst: false })
                 : `${clients.length} klanten geconfigureerd`
               }
             </p>
@@ -553,15 +556,15 @@ function PortfolioScoreboardBody() {
           {activeCount > 0 && (
             <div className="hidden lg:grid grid-cols-3 gap-6 text-right">
               <div>
-                <p className="text-white/50 text-micro uppercase tracking-wider">Totaal conversies</p>
+                <p className="text-white/50 text-micro uppercase tracking-wider">Totaal conversies, Google Ads</p>
                 <p className="text-xl font-bold">{num(portfolioConv)}</p>
               </div>
               <div>
-                <p className="text-white/50 text-micro uppercase tracking-wider">Totaal omzet</p>
+                <p className="text-white/50 text-micro uppercase tracking-wider">Totaal omzet, Google Ads</p>
                 <p className="text-xl font-bold">{fmt(portfolioRev)}</p>
               </div>
               <div>
-                <p className="text-white/50 text-micro uppercase tracking-wider">Gem. ROAS</p>
+                <p className="text-white/50 text-micro uppercase tracking-wider">Gem. ROAS, Google Ads</p>
                 <p className="text-xl font-bold">{formatRoas(portfolioRoas)}</p>
               </div>
             </div>

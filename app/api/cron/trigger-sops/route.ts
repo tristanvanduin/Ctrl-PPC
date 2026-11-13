@@ -65,7 +65,8 @@ import { getSupabase } from "@/lib/analysis/helpers";
 import { magSopDraaien } from "@/lib/tenancy/sop-dekking";
 import { laadBeschikbareKanalen, ALLE_KANALEN, type Kanaal } from "@/lib/kanalen/beschikbaar";
 import { CHANNEL_CONFIG, ALLE_SOP_TYPES, type SopChannel, type SopType } from "@/lib/analysis/sop-channel-config";
-import { isSopDue, type SopCadence } from "@/lib/scheduler/sop-cadence";
+import { isSopDue, AFRONDINGS_SECTIE, type SopCadence } from "@/lib/scheduler/sop-cadence";
+import { ruimVastgelopenRunsOp } from "@/lib/scheduler/vastgelopen-runs";
 import { today } from "@/lib/reporting-date";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
@@ -120,6 +121,10 @@ export async function GET(request: NextRequest) {
   const limitParam = Number(url.searchParams.get("limit"));
   const limit = Number.isFinite(limitParam) && limitParam > 0 ? Math.floor(limitParam) : DEFAULT_LIMIT;
 
+  // Eerst wat vastgelopen is afsluiten (zie lib/scheduler/vastgelopen-runs.ts). Niet bij een
+  // proefrun: dry_run schrijft niets.
+  const vastgelopen = dryRun ? 0 : await ruimVastgelopenRunsOp(supabase, clientFilter ? { clientId: clientFilter } : {});
+
   let vraag = supabase.from("accounts").select("client_id, agency_id");
   if (clientFilter) vraag = vraag.eq("client_id", clientFilter);
   if (agencyFilter) vraag = vraag.eq("agency_id", agencyFilter);
@@ -162,11 +167,17 @@ export async function GET(request: NextRequest) {
       const cadences = ALLE_SOP_TYPES.filter((c) => !cadenceFilter || c === cadenceFilter);
       for (const cadence of cadences) {
         const sopTypeKey = CHANNEL_CONFIG[channel].sopTypeKey[cadence];
+        // Alleen het afrondingsteken telt (section "full"): runStep schrijft elke stap direct weg,
+        // dus de nieuwste analysis_date van een willekeurige sectie maakte een run die na stap 1
+        // crashte tot "gedraaid", en de herkansing schoof 7 of 14 dagen of een maand op. "full"
+        // komt bij weekly en biweekly pas na opgeslagen bevindingen (lib/analysis/run-afronding.ts)
+        // en bij de monthly pas na een geslaagde kwaliteitspoort.
         const { data: laatsteRij } = await supabase
           .from("sop_analysis_output")
           .select("analysis_date")
           .eq("client_id", clientId)
           .eq("sop_type", sopTypeKey)
+          .eq("section", AFRONDINGS_SECTIE)
           .order("analysis_date", { ascending: false })
           .limit(1)
           .maybeSingle();
@@ -234,6 +245,7 @@ export async function GET(request: NextRequest) {
     limit,
     aantal_klanten: klanten.length,
     getriggerd,
+    vastgelopen_afgesloten: vastgelopen,
     resultaten,
   });
 }
@@ -321,6 +333,7 @@ async function triggerMonthlyPdfIfComplete(
       .select("analysis_date")
       .eq("client_id", clientId)
       .eq("sop_type", sopTypeKey)
+      .eq("section", AFRONDINGS_SECTIE) // een halve maandrun is niet "klaar deze cyclus"
       .order("analysis_date", { ascending: false })
       .limit(1)
       .maybeSingle();

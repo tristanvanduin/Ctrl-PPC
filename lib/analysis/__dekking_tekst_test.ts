@@ -47,6 +47,9 @@ console.log("voorbehoudenUitDekking");
   check("beëindigde campagnes zijn voorbehoud", v.some((t) => /1 beëindigde/.test(t)));
   check("uurdata=true geeft geen voorbehoud", voorbehoudenUitDekking({ uurdata: true }).length === 0);
   check("incidenten zijn geen voorbehoud", voorbehoudenUitDekking({ verouderd: true, rijenAfgekapt: true }).length === 0);
+  // Meta zonder periodelezing (migratie 110): fatigue en saturatie niet beoordeeld, op de kaart.
+  check("geen periodebereik wordt een voorbehoud", voorbehoudenUitDekking({ periodeBereik: false }).some((t) => /fatigue/.test(t) && /niet beoordeeld/.test(t)));
+  check("met periodebereik geen voorbehoud", voorbehoudenUitDekking({ periodeBereik: true }).length === 0);
 }
 
 console.log(`\n${passed} geslaagd, ${failed} gefaald`);

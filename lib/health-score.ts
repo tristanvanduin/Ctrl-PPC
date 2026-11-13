@@ -17,12 +17,12 @@
  *    Opschalend account: verbetert of verslechtert de efficiency? (dat is wel een trend)
  *
  * 4. BUDGET UTILIZATION (20pt)
- *    Wordt het beschikbare budget benut?
- *    >90% benut = 20pt, <50% = 0pt
+ *    Loopt de besteding op het budgettempo? 90% tot 110% = 20pt, daaronder minder (onderbesteding),
+ *    daarboven ook minder (overbesteding); een jaarbudget dat al op is krijgt hooguit 4.
  *
  * 5. ACCOUNT HYGIENE (20pt)
- *    Zoekterm verspilling, ad group bleeders, 0-conv campagnes
- *    Geen waste = 20pt, veel waste = 0pt
+ *    Zoekterm verspilling en ad group bleeders, als aandeel van de besteding over DEZELFDE 30 dagen.
+ *    Geen waste = 20pt, veel waste = 0pt. Zonder verspillingsdata: niet beoordeeld.
  *
  * Anomalies zijn events die buiten normaal patroon vallen:
  * - MoM verandering > 30% in een metric
@@ -33,8 +33,8 @@
  */
 
 import type { ClientForecast } from "./forecast";
-import type { ImpressionShareData, WastefulSearchTermData, AdGroupBleederData } from "./use-client-data";
-import { cpaTrendVanForecast } from "./analysis/trend";
+import type { ImpressionShareData, WastefulSearchTermData, AdGroupBleederData, ClientDataState } from "./use-client-data";
+import { cpaTrendVanForecast, MIN_CONVERSIES_CPA_TREND } from "./analysis/trend";
 import { formatPercent } from "@/lib/forecast-format";
 import { jaardoelTekst, metToelichting } from "./analysis/standaard-jaardoel";
 
@@ -76,6 +76,32 @@ function clamp(v: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, v));
 }
 
+/**
+ * De Trend-factor voor een volwassen account: de gewogen prestatiefactor en de laatste maand, allebei
+ * tegen de verwachting. Los van computeHealthScore zodat lib/__tests__/health-trend.test.ts deze
+ * drempels zelf toetst; daar stond een kopie die bij een wijziging hier gewoon groen bleef.
+ */
+export function trendOpVerwachting(pf: number, lastRatio: number): {
+  score: number;
+  achterstand: { severity: "critical" | "warning"; title: string } | null;
+} {
+  let base: number;
+  if (pf > 1.15) base = 18;
+  else if (pf > 1.05) base = 16;
+  else if (pf > 0.95) base = 12;
+  else if (pf > 0.85) base = 8;
+  else if (pf > 0.75) base = 4;
+  else base = 2;
+
+  const modifier = lastRatio >= 1.0 ? 2 : lastRatio >= 0.85 ? 0 : -2;
+  const achterstand = pf < 0.80 && lastRatio < 0.80
+    ? { severity: "critical" as const, title: "Sterk achter op verwachting" }
+    : pf < 0.90 && lastRatio < 0.90
+      ? { severity: "warning" as const, title: "Achter op verwachting" }
+      : null;
+  return { score: clamp(base + modifier, 0, 20), achterstand };
+}
+
 function fmt(v: number): string {
   return new Intl.NumberFormat("nl-NL", {
     style: "currency", currency: "EUR",
@@ -88,6 +114,14 @@ export function computeHealthScore(
   impressionShare?: ImpressionShareData[],
   wastefulTerms?: WastefulSearchTermData[],
   adGroupBleeders?: AdGroupBleederData[],
+  /** De besteding over dezelfde 30 dagen als de verspillingslijsten; de noemer van Hygiëne. */
+  besteding30d?: number | null,
+  /**
+   * De campagnes waarover besteding30d gaat. De noemer komt uit de accountstructuur, en die kent
+   * alleen campagnes die nu aan staan; de lijsten tellen ook kosten van campagnes die in die 30
+   * dagen gepauzeerd zijn. Zonder deze grens viel de verhouding bij een pauze te hoog uit.
+   */
+  noemerCampagnes?: ReadonlySet<string> | null,
 ): HealthScore {
   const factors: HealthFactor[] = [];
   const anomalies: Anomaly[] = [];
@@ -154,7 +188,9 @@ export function computeHealthScore(
   // maand met restkosten onder één gewone CPA niet meetelt.
   const t = cpaTrendVanForecast(forecast);
   const zonderConversies = t.zonderConversies;
-  const efficiencyBeoordeeld = cpaPoints.length >= 2 || zonderConversies.length > 0;
+  // Te weinig conversies in een van beide vensters: geen oordeel. Hier stond dan t.pct ?? 0,
+  // en dat is "stabiel", 16 van de 20 punten, over een vergelijking die toeval is.
+  const efficiencyBeoordeeld = zonderConversies.length > 0 || (cpaPoints.length >= 2 && !t.teWeinigConversies);
   let efficiencyScore = 0;
 
   if (zonderConversies.length > 0) {
@@ -165,7 +201,7 @@ export function computeHealthScore(
       title: "Kosten zonder conversies",
       description: `In ${maanden} waren er kosten zonder één conversie: daar is geen CPA te berekenen, en slechter wordt de efficiency niet.`,
     });
-  } else if (cpaPoints.length >= 2) {
+  } else if (efficiencyBeoordeeld) {
     // Gedeelde berekening en drempels (lib/analysis/trend.ts). Hier stond een eigen kopie die
     // de eerste maand met de laatste vergeleek; zes plekken deden dat, met vier verschillende
     // drempels, waardoor twee blokken op hetzelfde scherm elkaar konden tegenspreken.
@@ -199,7 +235,9 @@ export function computeHealthScore(
     score: efficiencyScore,
     maxScore: 20,
     description: !efficiencyBeoordeeld
-      ? "Te weinig maanden voor een CPA-trend — niet beoordeeld"
+      ? t.teWeinigConversies
+        ? `Minder dan ${MIN_CONVERSIES_CPA_TREND} conversies in een van de vergeleken perioden: de CPA-verandering is toeval — niet beoordeeld`
+        : "Te weinig maanden voor een CPA-trend — niet beoordeeld"
       : zonderConversies.length > 0 ? "Kosten zonder conversies"
       : efficiencyScore >= 16 ? "CPA stabiel of dalend" : efficiencyScore >= 10 ? "CPA licht stijgend" : "CPA stijgt significant",
     assessed: efficiencyBeoordeeld,
@@ -257,16 +295,8 @@ export function computeHealthScore(
     } else {
       // ── Mature client: use projectionFactor as primary signal ──
       opVerwachting = true;
-      let base: number;
-      if (pf > 1.15) base = 18;
-      else if (pf > 1.05) base = 16;
-      else if (pf > 0.95) base = 12;
-      else if (pf > 0.85) base = 8;
-      else if (pf > 0.75) base = 4;
-      else base = 2;
-
-      const modifier = lastRatio >= 1.0 ? 2 : lastRatio >= 0.85 ? 0 : -2;
-      trendScore = clamp(base + modifier, 0, 20);
+      const opVerw = trendOpVerwachting(pf, lastRatio);
+      trendScore = opVerw.score;
 
       // Anomalies: only flag genuinely concerning situations
       //
@@ -278,18 +308,8 @@ export function computeHealthScore(
       // in vrije val. De drempels en de ernst blijven; alleen de woorden zeggen nu wat er gemeten is.
       const verwachting = `Gewogen prestatiefactor ${formatPercent(pf, 0)}, laatste maand ${formatPercent(lastRatio, 0)} van verwachting. `
         + `De verwachting volgt ${metToelichting(trendDoel)}: dit meet de achterstand op dat doel, niet of de conversies dalen.`;
-      if (pf < 0.80 && lastRatio < 0.80) {
-        anomalies.push({
-          severity: "critical",
-          title: "Sterk achter op verwachting",
-          description: verwachting,
-        });
-      } else if (pf < 0.90 && lastRatio < 0.90) {
-        anomalies.push({
-          severity: "warning",
-          title: "Achter op verwachting",
-          description: verwachting,
-        });
+      if (opVerw.achterstand) {
+        anomalies.push({ ...opVerw.achterstand, description: verwachting });
       }
     }
 
@@ -341,11 +361,19 @@ export function computeHealthScore(
   let budgetScore = 0;
   const spendRatio = budgetBeoordeeld ? spend.ytdRealized / spend.ytdExpected : 0;
 
-  if (spendRatio > 0.90) budgetScore = 20;
+  // Een bovengrens. Hier gaf alles boven 0,90 de volle 20 met "Budget wordt goed benut", ook 150%
+  // en ook een jaarbudget dat in oktober al op was (de demo: € 117.300 van € 117.000, terwijl het
+  // pacingblok eronder "Inefficiënt" zei). Overbesteding is net zo goed een afwijking van het plan.
+  const jaarbudgetOp = budgetBeoordeeld && spend.ytdRealized >= spend.annualTarget;
+  if (spendRatio > 1.50) budgetScore = 4;
+  else if (spendRatio > 1.25) budgetScore = 8;
+  else if (spendRatio > 1.10) budgetScore = 14;
+  else if (spendRatio > 0.90) budgetScore = 20;
   else if (spendRatio > 0.75) budgetScore = 16;
   else if (spendRatio > 0.50) budgetScore = 10;
   else if (spendRatio > 0.25) budgetScore = 4;
   else budgetScore = 0;
+  if (jaarbudgetOp) budgetScore = Math.min(budgetScore, 4);
 
   if (impressionShare && impressionShare.length > 0) {
     const highBudgetLost = impressionShare.filter((is) => is.searchBudgetLostIS > 0.30);
@@ -365,7 +393,9 @@ export function computeHealthScore(
     maxScore: 20,
     description: !budgetBeoordeeld
       ? "Geen budgetdoel ingesteld — niet beoordeeld"
-      : spendRatio > 0.85 ? "Budget wordt goed benut" : `${Math.round(spendRatio * 100)}% van budget besteed`,
+      : jaarbudgetOp ? `Jaarbudget is al op: ${fmt(spend.ytdRealized)} van ${fmt(spend.annualTarget)} besteed`
+      : spendRatio > 1.10 ? `Overbesteding: ${Math.round((spendRatio - 1) * 100)}% boven het budgettempo`
+      : spendRatio > 0.85 ? "Budget loopt op tempo" : `Onderbesteding: ${Math.round(spendRatio * 100)}% van het budgettempo besteed`,
     assessed: budgetBeoordeeld,
   });
 
@@ -373,13 +403,37 @@ export function computeHealthScore(
   // Zonder besteding is er niets om te verspillen. Een leeg account kreeg hier de volle 20
   // punten met de tekst "Weinig verspilling" — een uitspraak over een account waar niets in
   // omgaat.
+  //
+  // Teller en noemer over HETZELFDE venster. De verspillingslijsten gaan over de laatste 30 dagen;
+  // de noemer was de besteding van het hele jaar tot nu. Dezelfde verspilling gaf zo in februari
+  // 10% (score 10) en in november 1% (score 17, "Weinig verspilling"): de score werd in de loop
+  // van het jaar vanzelf groener. Zonder besteding over die 30 dagen geen oordeel.
+  //
+  // En geen dubbeltelling: een advertentiegroep zonder conversies bevat alleen zoektermen zonder
+  // conversies, en die stonden ook in de zoektermlijst. Hun kosten tellen nu een keer, via de groep.
+  //
+  // Zonder verspillingsdata (de lijsten zijn niet meegegeven) is er niet gekeken: dat is geen
+  // "weinig verspilling". Zo gaf de kanaalkaart Google 57 en het tabblad 66, voor hetzelfde account.
   let hygieneScore = 20;
 
   const wasteAmount = wastefulTerms?.reduce((s, t) => s + t.cost, 0) ?? 0;
   const bleederAmount = adGroupBleeders?.reduce((s, b) => s + b.cost, 0) ?? 0;
-  const totalWaste = wasteAmount + bleederAmount;
-  const totalSpend = spend.ytdRealized;
-  const wasteRatio = totalSpend > 0 ? totalWaste / totalSpend : 0;
+  const bleederGroepen = new Set((adGroupBleeders ?? []).map((b) => JSON.stringify([b.campaignName, b.adGroupName])));
+  const wasteBuitenBleeders = (wastefulTerms ?? [])
+    .filter((t) => !bleederGroepen.has(JSON.stringify([t.campaignName, t.adGroupName])))
+    .reduce((s, t) => s + t.cost, 0);
+  const totalWaste = wasteBuitenBleeders + bleederAmount;
+  // Alleen voor de verhouding: verspilling in campagnes buiten de noemer telt daar niet, maar blijft
+  // in de meldingen hieronder en wordt in de omschrijving genoemd.
+  const inNoemer = (c: string) => !noemerCampagnes || noemerCampagnes.has(c);
+  const wasteInNoemer = (wastefulTerms ?? [])
+    .filter((t) => inNoemer(t.campaignName) && !bleederGroepen.has(JSON.stringify([t.campaignName, t.adGroupName])))
+    .reduce((s, t) => s + t.cost, 0)
+    + (adGroupBleeders ?? []).filter((b) => inNoemer(b.campaignName)).reduce((s, b) => s + b.cost, 0);
+  const wasteBuitenNoemer = totalWaste - wasteInNoemer;
+  const verspillingBekend = wastefulTerms !== undefined || adGroupBleeders !== undefined;
+  const totalSpend = typeof besteding30d === "number" && Number.isFinite(besteding30d) ? besteding30d : 0;
+  const wasteRatio = totalSpend > 0 ? Math.min(wasteInNoemer / totalSpend, 1) : 0;
 
   if (wasteRatio > 0.15) hygieneScore = 4;
   else if (wasteRatio > 0.08) hygieneScore = 10;
@@ -401,14 +455,17 @@ export function computeHealthScore(
     });
   }
 
-  const hygieneBeoordeeld = totalSpend > 0;
+  const hygieneBeoordeeld = verspillingBekend && totalSpend > 0;
   factors.push({
     name: "Hygiëne",
     score: hygieneBeoordeeld ? hygieneScore : 0,
     maxScore: 20,
-    description: !hygieneBeoordeeld
-      ? "Geen besteding in de periode — niet beoordeeld"
-      : hygieneScore >= 17 ? "Weinig verspilling" : `${Math.round(wasteRatio * 100)}% spend naar 0-conversie items`,
+    description: !verspillingBekend
+      ? "Geen verspillingsdata (zoektermen, ad groups) — niet beoordeeld"
+      : !hygieneBeoordeeld
+      ? "Geen besteding in de laatste 30 dagen bekend — niet beoordeeld"
+      : (hygieneScore >= 17 ? `Weinig verspilling (${formatPercent(wasteRatio, 1)} van de besteding, 30d)` : `${Math.round(wasteRatio * 100)}% van de besteding naar 0-conversie items (30d)`)
+        + (wasteBuitenNoemer > 0.5 ? `; ${fmt(wasteBuitenNoemer)} in campagnes die nu niet aan staan telt niet mee` : ""),
     assessed: hygieneBeoordeeld,
   });
 
@@ -458,15 +515,29 @@ export function samenvatFactoren(factors: readonly HealthFactor[]): Pick<HealthS
 }
 
 /**
- * Voor kanalen zonder Google-specifieke verspillingsdata (Meta, LinkedIn): computeHealthScore's
- * Hygiëne-factor valt bij ontbrekende wastefulTerms/adGroupBleeders terug op "geen verspilling
- * gevonden" zodra er besteding is -- een bewuste keuze, vastgelegd in __health_score_test.ts
- * ("hygiene is beoordeeld zodra er besteding is"). Voor Google betekent dat "geen bewijs van
- * verspilling gevonden"; voor een kanaal waar nooit naar verspilling is GEKEKEN is dezelfde volle
- * score misleidend -- geen groen signaal maar een onbeantwoorde vraag die eruitziet als een.
+ * De health-score van Google uit de toestand van de klantdata, voor ELKE plek die hem toont.
  *
- * Haalt de factor er daarom achteraf uit en herschaalt het totaal opnieuw, zonder de gedeelde
- * computeHealthScore (en zijn geteste Google-gedrag) aan te raken.
+ * De kanaalkaart en de ranking riepen computeHealthScore zonder verspillingsdata aan en haalden
+ * Hygiëne er daarna uit (57); het tabblad en Doelen & voortgang gaven de lijsten wel mee (66).
+ * Twee getallen voor hetzelfde account en hetzelfde jaar, die als een rekenfout lazen. Met een
+ * aanroep met dezelfde invoer is er een getal: met Hygiëne als de lijsten er zijn, zonder (en dan
+ * "niet beoordeeld") als ze er niet zijn.
+ */
+export type GoogleHealthInvoer = Pick<ClientDataState, "impressionShare" | "wastefulSearchTerms" | "adGroupBleeders" | "accountStructure">;
+
+export function googleHealthScore(forecast: ClientForecast, staat?: GoogleHealthInvoer | null): HealthScore {
+  const campagnes = staat?.accountStructure?.campaigns;
+  const besteding30d = campagnes ? campagnes.reduce((s, c) => s + (Number.isFinite(c.cost30d) ? c.cost30d : 0), 0) : null;
+  const noemer = campagnes ? new Set(campagnes.map((c) => c.name)) : null;
+  return computeHealthScore(forecast, staat?.impressionShare, staat?.wastefulSearchTerms, staat?.adGroupBleeders, besteding30d, noemer);
+}
+
+/**
+ * Voor kanalen zonder Google-specifieke verspillingsdata (Meta, LinkedIn). computeHealthScore zet
+ * Hygiëne zonder lijsten al op "niet beoordeeld" ("Geen verspillingsdata"); dit vervangt alleen de
+ * omschrijving, zodat er staat dat dit kanaal zo'n lijst niet kent in plaats van dat hij ontbreekt,
+ * en herschaalt het totaal. Elke aanroep van computeHealthScore zonder lijsten (ook
+ * detecteer-code-rood, dat alleen de anomalieën gebruikt) krijgt dezelfde "niet beoordeeld".
  */
 export function zonderKanaalSpecifiekeHygiene(health: HealthScore): HealthScore {
   const factors = health.factors.map((f) => f.name === "Hygiëne"

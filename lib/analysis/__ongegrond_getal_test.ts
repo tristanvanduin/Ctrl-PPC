@@ -2,8 +2,8 @@ export {};
 // Verificatie van F5 4a (backstop): de containsUngroundedNumber-guard die in de QA een red
 // flag zet als de finale laag een percentage of eurobedrag bevat dat niet herleidbaar is tot
 // de echte finding-data. De finale laag is al kwalitatief; deze guard vangt regressie of
-// LLM-injectie. De helpers zitten in monthly-structured.ts (laadt niet standalone); getrouwe
-// replica's. tsc bevestigde 0 fouten in productiecode.
+// LLM-injectie. De echte functies uit monthly-structured.ts; hier stond een kopie
+// die dezelfde fouten droeg als het origineel en daardoor niets bewaakte.
 // Draaien: npx tsx lib/analysis/__ongegrond_getal_test.ts
 
 let passed = 0, failed = 0;
@@ -12,28 +12,14 @@ function check(name: string, cond: boolean, detail = "") {
   else { failed++; console.log("  FAIL  " + name + "  " + detail); }
 }
 
-// Replica exact zoals in de code
-function containsUngroundedNumber(text: string, allowedNumbers: number[]): boolean {
-  const allowed = new Set(allowedNumbers.map((value) => Math.round(value)));
-  const found: number[] = [];
-  for (const match of text.matchAll(/(\d+(?:[.,]\d+)?)\s*(?:%|procent)/gi)) {
-    found.push(Math.round(parseFloat(match[1].replace(",", "."))));
-  }
-  for (const match of text.matchAll(/(?:€|EUR)\s*(\d+(?:[.,]\d+)?)/gi)) {
-    found.push(Math.round(parseFloat(match[1].replace(",", "."))));
-  }
-  return found.some((value) => !Number.isNaN(value) && !allowed.has(value));
-}
-type Finding = { current_value: number | null; previous_value: number | null; change_pct: number | null };
-function groundedNumbersFromCluster(findings: Finding[]): number[] {
-  const numbers: number[] = [];
-  for (const finding of findings) {
-    if (typeof finding.current_value === "number") numbers.push(finding.current_value);
-    if (typeof finding.previous_value === "number") numbers.push(finding.previous_value);
-    if (typeof finding.change_pct === "number") numbers.push(Math.abs(finding.change_pct));
-  }
-  return numbers;
-}
+import { containsUngroundedNumber, groundedNumbersFromCluster as uitCluster } from "./monthly-structured";
+
+// De metriek bepaalt de soort: een percentage telt alleen als gegrond voor een percentage in de
+// tekst, een bedrag alleen voor een bedrag (zie groundedNumbersFromCluster).
+type Finding = { metric: string; current_value: number | null; previous_value: number | null; change_pct: number | null };
+// De echte functie leest de findings van een cluster; meer heeft hij niet nodig.
+const groundedNumbersFromCluster = (findings: Finding[]): number[] =>
+  uitCluster({ findings } as unknown as Parameters<typeof uitCluster>[0]);
 
 console.log("\n1. Vuurt op een niet-herleidbaar percentage, niet op een gegrond percentage");
 check("'daling van 40 procent' zonder bron -> vuurt", containsUngroundedNumber("daling van 40 procent", []) === true);
@@ -55,8 +41,8 @@ console.log("\n4. De QA-red-flag-scan over de finale aanbevelingen");
 {
   type Rec = { doel: string; voorwaarde: string; risico: string };
   const findings: Finding[] = [
-    { current_value: 23, previous_value: 31, change_pct: -8 }, // Lost IS 23
-    { current_value: 398, previous_value: 420, change_pct: -5 }, // spend 398
+    { metric: "search_budget_lost_is", current_value: 23, previous_value: 31, change_pct: -8 }, // Lost IS 23
+    { metric: "spend", current_value: 398, previous_value: 420, change_pct: -5 }, // spend 398
   ];
   const allowed = groundedNumbersFromCluster(findings);
   const scan = (recs: Rec[]) => recs.some((r) =>
@@ -66,6 +52,10 @@ console.log("\n4. De QA-red-flag-scan over de finale aanbevelingen");
   check("aanbeveling met verzonnen 40 procent -> red flag", scan(fabricated) === true);
   check("aanbeveling met gegronde 23 procent -> geen red flag", scan(grounded) === false);
   check("besparing EUR 398 die in findings staat -> geen red flag", scan([{ doel: "besparing van EUR 398 per maand", voorwaarde: "x", risico: "y" }]) === false);
+  // Over de soort heen grondt niets: 398 is een bedrag in de data, dus "398 procent" is verzonnen,
+  // en 23 is een aandeel, dus "EUR 23" ook.
+  check("398 als bedrag grondt geen 398 procent", scan([{ doel: "een stijging van 398 procent", voorwaarde: "x", risico: "y" }]) === true);
+  check("23 procent als aandeel grondt geen EUR 23", scan([{ doel: "besparing van EUR 23 per maand", voorwaarde: "x", risico: "y" }]) === true);
 }
 
 console.log("\nRESULTAAT: " + passed + " geslaagd, " + failed + " gefaald\n");

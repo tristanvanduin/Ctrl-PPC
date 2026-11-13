@@ -1,4 +1,4 @@
-// Vormt de dag-rijen van Meta en LinkedIn om naar de invoer van de signaal-detectors
+// Vormt de dag-rijen (en voor Meta-frequentie de periode-rijen) van Meta en LinkedIn om naar de invoer van de signaal-detectors
 // (lib/signals/meta-creative en linkedin-signals): per entiteit gesommeerd over een recent
 // venster en een prior venster van gelijke lengte, met ratio's UIT DE VENSTERTOTALEN (dezelfde
 // regel als overal). Puur en los getest; de routes leveren alleen de rijen en de namen.
@@ -37,6 +37,47 @@ export interface LinkedInDailyRow {
   one_click_lead_form_opens?: number | null;
   video_completions?: number | null;
   video_starts?: number | null;
+}
+
+// Een PERIODE-lezing van Meta: vertoningen en bereik over een heel venster in een aanroep, dus
+// met het bereik over die periode ontdubbeld. Dat is de enige grondslag voor een frequentie die
+// tegen een periodedrempel mag: het bereik van losse dagen optellen telt dezelfde persoon elke
+// dag opnieuw. Bron: meta_period_reach (migratie 110), gevuld door syncMetaPeriodReach.
+export interface MetaPeriodRow {
+  entity_id: string;
+  period_start: string;
+  period_end: string;
+  impressions?: number | null;
+  reach?: number | null;
+}
+
+// Een periode-rij hoort bij het recente venster als hij (bijna) hetzelfde venster beslaat.
+// De speling vangt sync-lag: de dagrijen lopen soms een paar dagen voor of achter op de
+// periodelezing, en een venster van 26 dagen is nog steeds een eerlijke maat voor 28.
+const PERIODE_SPELING_DAGEN = 3;
+
+function periodeFrequentie(period: MetaPeriodRow[] | undefined, anchor: string | null, windowDays = WINDOW_DAYS): Map<string, number> {
+  const out = new Map<string, number>();
+  if (!period || !anchor) return out;
+  const dag = 86_400_000;
+  const anker = new Date(anchor).getTime();
+  const best = new Map<string, MetaPeriodRow>();
+  for (const p of period) {
+    const start = new Date(p.period_start).getTime();
+    const eind = new Date(p.period_end).getTime();
+    if (!Number.isFinite(start) || !Number.isFinite(eind)) continue;
+    const lengte = Math.round((eind - start) / dag) + 1;
+    if (Math.abs(lengte - windowDays) > PERIODE_SPELING_DAGEN) continue;
+    if (Math.abs(Math.round((anker - eind) / dag)) > PERIODE_SPELING_DAGEN) continue;
+    const huidig = best.get(p.entity_id);
+    if (!huidig || p.period_end > huidig.period_end) best.set(p.entity_id, p);
+  }
+  for (const [id, p] of best) {
+    const imp = n(p.impressions);
+    const reach = n(p.reach);
+    if (imp > 0 && reach > 0) out.set(id, imp / reach);
+  }
+  return out;
 }
 
 interface Window<R> { recent: R[]; prior: R[] }
@@ -98,11 +139,18 @@ function aggMeta(rows: MetaDailyRow[]): Map<string, MetaAgg> {
   return out;
 }
 
-/** Meta-ad-dagrijen -> MetaAdSignalInput[] (recent venster, met prior-CTR/CPA voor de trend). */
-export function shapeMetaAdInputs(rows: MetaDailyRow[], names: Map<string, { adName: string; campaignName?: string | null }>): MetaAdSignalInput[] {
-  const { recent, prior } = splitWindows(rows);
+/**
+ * Meta-ad-dagrijen -> MetaAdSignalInput[] (recent venster, met prior-CTR/CPA voor de trend).
+ *
+ * `frequency` komt UITSLUITEND uit een periode-rij. Zonder periode-rij is hij null en meldt de
+ * detector dat frequentie niet te beoordelen is; het gemiddelde van de dagwaarden gaat mee als
+ * `dailyFrequency`, alleen om in die melding te noemen.
+ */
+export function shapeMetaAdInputs(rows: MetaDailyRow[], names: Map<string, { adName: string; campaignName?: string | null }>, period?: MetaPeriodRow[]): MetaAdSignalInput[] {
+  const { recent, prior, anchor } = splitWindows(rows);
   const rec = aggMeta(recent);
   const pri = aggMeta(prior);
+  const freq = periodeFrequentie(period, anchor);
   return [...rec.entries()].map(([entityId, a]) => {
     const p = pri.get(entityId);
     const nm = names.get(entityId);
@@ -111,7 +159,10 @@ export function shapeMetaAdInputs(rows: MetaDailyRow[], names: Map<string, { adN
       adName: nm?.adName ?? entityId,
       campaignName: nm?.campaignName ?? null,
       impressions: a.impressions,
-      frequency: a.freqWeight > 0 ? a.freqWeighted / a.freqWeight : null,
+      frequency: freq.get(entityId) ?? null,
+      dailyFrequency: a.freqWeight > 0 ? a.freqWeighted / a.freqWeight : null,
+      conversions: a.conversions,
+      prevConversions: p ? p.conversions : 0,
       hookRate: a.rateWeight > 0 ? a.hookWeighted / a.rateWeight : null,
       holdRate: a.rateWeight > 0 ? a.holdWeighted / a.rateWeight : null,
       linkCtr: ratio(a.linkClicks, a.impressions),
@@ -127,35 +178,55 @@ export function shapeMetaAdInputs(rows: MetaDailyRow[], names: Map<string, { adN
 }
 
 /** Campagne-dagrijen -> frequency-niveaus (recent venster) voor de saturatie-detector. */
-export function shapeMetaLevelInputs(campaignRows: MetaDailyRow[], names: Map<string, { adName: string }>): MetaLevelSignalInput[] {
-  const { recent } = splitWindows(campaignRows);
+export function shapeMetaLevelInputs(campaignRows: MetaDailyRow[], names: Map<string, { adName: string }>, period?: MetaPeriodRow[]): MetaLevelSignalInput[] {
+  const { recent, anchor } = splitWindows(campaignRows);
   const agg = aggMeta(recent);
+  const freq = periodeFrequentie(period, anchor);
   return [...agg.entries()].map(([entityId, a]) => ({
     scope: names.get(entityId)?.adName ?? entityId,
-    frequency: a.freqWeight > 0 ? a.freqWeighted / a.freqWeight : null,
+    frequency: freq.get(entityId) ?? null,
+    dailyFrequency: a.freqWeight > 0 ? a.freqWeighted / a.freqWeight : null,
     impressions: a.impressions,
   }));
 }
 
-interface LiAgg { impressions: number; clicks: number; spend: number; leads: number; formOpens: number; videoStarts: number; videoCompletions: number }
+interface LiAgg { impressions: number; clicks: number; spend: number; leads: number; results: number; formOpens: number; videoStarts: number; videoCompletions: number }
 
-function aggLi(rows: LinkedInDailyRow[]): Map<string, LiAgg> {
+export interface LinkedInShapeOptions {
+  /** Campagnedoel per urn (linkedin_campaigns.objective_type), voor vergelijking binnen hetzelfde doel. */
+  objectives?: Map<string, string | null>;
+  /**
+   * Wat als resultaat telt voor de kosten per resultaat: de ingestelde conversieselectie van de
+   * klant. Zonder deze functie tellen alleen lead-formulieren, en krijgt een campagne die op
+   * websiteconversies stuurt nooit een CPL-signaal, ook niet als de kosten verdubbelen.
+   */
+  results?: (row: LinkedInDailyRow) => number;
+  resultLabel?: string;
+}
+
+function aggLi(rows: LinkedInDailyRow[], results?: (row: LinkedInDailyRow) => number): Map<string, LiAgg> {
   const out = new Map<string, LiAgg>();
   for (const r of rows) {
-    const a = out.get(r.entity_urn) ?? { impressions: 0, clicks: 0, spend: 0, leads: 0, formOpens: 0, videoStarts: 0, videoCompletions: 0 };
+    const a = out.get(r.entity_urn) ?? { impressions: 0, clicks: 0, spend: 0, leads: 0, results: 0, formOpens: 0, videoStarts: 0, videoCompletions: 0 };
     a.impressions += n(r.impressions); a.clicks += n(r.clicks); a.spend += n(r.spend);
     a.leads += n(r.one_click_leads); a.formOpens += n(r.one_click_lead_form_opens);
+    a.results += results ? n(results(r)) : n(r.one_click_leads);
     a.videoStarts += n(r.video_starts); a.videoCompletions += n(r.video_completions);
     out.set(r.entity_urn, a);
   }
   return out;
 }
 
-/** LinkedIn-campagne-dagrijen -> LinkedInEntitySignalInput[] (ratio's uit venstertotalen). */
-export function shapeLinkedInInputs(rows: LinkedInDailyRow[], names: Map<string, string>): LinkedInEntitySignalInput[] {
+/**
+ * LinkedIn-campagne-dagrijen -> LinkedInEntitySignalInput[] (ratio's uit venstertotalen).
+ *
+ * De kosten per resultaat (cpl) volgen `options.results`; de formulier-voltooiing blijft op
+ * lead-formulieren, want alleen die hebben een formulier om af te maken.
+ */
+export function shapeLinkedInInputs(rows: LinkedInDailyRow[], names: Map<string, string>, options: LinkedInShapeOptions = {}): LinkedInEntitySignalInput[] {
   const { recent, prior } = splitWindows(rows);
-  const rec = aggLi(recent);
-  const pri = aggLi(prior);
+  const rec = aggLi(recent, options.results);
+  const pri = aggLi(prior, options.results);
   return [...rec.entries()].map(([urn, a]) => {
     const p = pri.get(urn);
     return {
@@ -164,12 +235,16 @@ export function shapeLinkedInInputs(rows: LinkedInDailyRow[], names: Map<string,
       impressions: a.impressions,
       clicks: a.clicks,
       ctr: ratio(a.clicks, a.impressions),
-      cpl: a.leads > 0 ? a.spend / a.leads : null,
+      objective: options.objectives?.get(urn) ?? null,
+      results: a.results,
+      prevResults: p ? p.results : 0,
+      resultLabel: options.resultLabel ?? null,
+      cpl: a.results > 0 ? a.spend / a.results : null,
       formOpens: a.formOpens,
       formCompletionRate: a.formOpens > 0 ? a.leads / a.formOpens : null,
       videoCompletionRate: a.videoStarts > 0 ? a.videoCompletions / a.videoStarts : null,
       prevCtr: p ? ratio(p.clicks, p.impressions) : null,
-      prevCpl: p && p.leads > 0 ? p.spend / p.leads : null,
+      prevCpl: p && p.results > 0 ? p.spend / p.results : null,
     };
   });
 }

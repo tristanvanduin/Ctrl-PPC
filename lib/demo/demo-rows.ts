@@ -86,9 +86,18 @@ const CAMPAIGNS = [
   // Shopping: klein, merchandise-webshop naast de kern-leadgen — zie de toelichting hierboven.
   { id: "demo-c-shop", name: "GreenTech | Shopping | Merchandise", type: "SHOPPING", imp: 9000, clk: 380, cost: 420, conv: 6, aov: 45, seed: 11 },
 ];
+// De lopende maand als maand-tot-nu, zoals de sync hem levert: de demo gaf hier een volle maand,
+// en de beursanalyse (die de lopende maand over de verstreken dagen verdeelt) zette GRT op
+// 13 november dan ongeveer 14 procentpunt te hoog (+41% tegen +28%).
+const lopendeMaandFractie = (back: number): number => {
+  if (back !== 0) return 1;
+  const n = new Date();
+  const dagen = new Date(Date.UTC(n.getUTCFullYear(), n.getUTCMonth() + 1, 0)).getUTCDate();
+  return n.getUTCDate() / dagen;
+};
 const adsCampaignMonthly: Row[] = CAMPAIGNS.flatMap((c) =>
   Array.from({ length: N_MONTHS }, (_, i) => {
-    const f = monthFactor(i, c.seed);
+    const f = monthFactor(i, c.seed) * lopendeMaandFractie(N_MONTHS - 1 - i);
     const impressions = Math.round(c.imp * f);
     const clicks = Math.round(c.clk * f);
     const cost = Math.round(c.cost * f);

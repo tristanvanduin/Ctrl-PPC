@@ -35,7 +35,11 @@ export interface GeoCloneAnalysisInput {
   // Google komt uit `rows`; deze kanalen krijgen dezelfde event-relatieve forecast en tellen mee
   // in het blended beursbeeld ("hoeveel verwachten we in totaal op de beurs"). Elk kanaal even
   // belangrijk: dezelfde kern, dezelfde tijdas (dagen-tot-beurs).
-  channelConvPoints?: { channel: string; points: DailyPoint[]; target?: number | null }[];
+  /**
+   * historyStart: de eerste datum met data voor dit kanaal in het HELE account, niet in de
+   * beurscampagnes. Zonder wordt de vergelijking niet ingekort.
+   */
+  channelConvPoints?: { channel: string; points: DailyPoint[]; target?: number | null; historyStart?: string | null }[];
 }
 
 export interface GeoCloneAnalysisResult {
@@ -56,6 +60,12 @@ export interface GeoCloneAnalysisResult {
 }
 
 const ACTION_BEHIND_PCT = -0.15; // 15% achter op de vorige editie bij gelijke afstand is materieel
+// Hoeveel een projectie onder het doel mag uitkomen voor het een actiepunt wordt. Het venster van
+// een editie loopt van net na de vorige beurs tot de beurs (bij een jaarlijkse beurs 361 dagen),
+// het doel is een jaardoel: een account dat elke maand precies 100 haalt, projecteert zo 1.190
+// tegen een doel van 1.200 en kreeg elke dag een wachtrij-item. Dat verschil is de vensterlengte,
+// geen achterstand.
+const DOEL_MARGE = 0.03;
 
 // Beursvensters rekenen in UTC. De vorige versie parste met new Date(iso) — UTC-middernacht —
 // en telde er met setDate() LOKAAL bij op. Op een UTC-server valt dat niet op, maar zodra TZ
@@ -100,6 +110,38 @@ function pointsWithin(points: DailyPoint[], edition: AxisEdition): DailyPoint[] 
   return points.filter((p) => isWithinWindow(p.date, edition));
 }
 
+const DAG_MS = 86_400_000;
+const isoDag = (t: number): string => new Date(t).toISOString().slice(0, 10);
+
+/**
+ * Een maandpunt naar rato over de dagen van die maand, zodat het op de dagen-tot-beurs-as op de
+ * juiste plek telt.
+ *
+ * Voorheen kreeg het hele maandtotaal de datum van de 1e. Dan telde de vorige editie op D-x de
+ * hele maand al mee, terwijl de lopende maand pas een paar dagen gevuld is: een volkomen vlak
+ * account stond op de 2e van elke maand 17 tot 19% "achter" en kreeg een wachtrij-item, en de
+ * projectie miste het doel op elke dag behalve de laatste van de maand.
+ *
+ * De maand van de peildatum is een maand-tot-nu (zo levert de sync hem): die wordt verdeeld over
+ * de verstreken dagen, niet over de hele maand. Maanden na de peildatum tellen niet.
+ */
+export function spreidMaandOverDagen(month: string, value: number, asOfDate: string): DailyPoint[] {
+  const m = /^(\d{4})-(\d{2})/.exec(month);
+  const peil = /^(\d{4})-(\d{2})-(\d{2})/.exec(asOfDate);
+  if (!m || !peil) return [];
+  const jaar = Number(m[1]);
+  const maand = Number(m[2]) - 1;
+  const start = Date.UTC(jaar, maand, 1);
+  const dagenInMaand = new Date(Date.UTC(jaar, maand + 1, 0)).getUTCDate();
+  const peilT = Date.UTC(Number(peil[1]), Number(peil[2]) - 1, Number(peil[3]));
+  if (peilT < start) return [];
+  const verstreken = Math.min(dagenInMaand, Math.floor((peilT - start) / DAG_MS) + 1);
+  const perDag = value / verstreken;
+  const out: DailyPoint[] = [];
+  for (let d = 0; d < verstreken; d++) out.push({ date: isoDag(start + d * DAG_MS), value: perDag });
+  return out;
+}
+
 export function analyzeGeoClone(input: GeoCloneAnalysisInput): GeoCloneAnalysisResult {
   const degradations: string[] = [
     "week-tempo overgeslagen: de fijnste per-campagne granulariteit is maanddata; tempo wordt niet uit maandpunten geveinsd",
@@ -128,9 +170,13 @@ export function analyzeGeoClone(input: GeoCloneAnalysisInput): GeoCloneAnalysisR
   // een ander campagnevenster niet de hele sjabloon-projectie laat wegvallen.
   const alleEerdere = priorEditionsFor(editions, current.editionId);
 
-  // Maandpunten -> dagpunten op de maand-datum, per metriek.
-  const convPoints: DailyPoint[] = summary.months.map((m) => ({ date: m.month.slice(0, 10), value: m.conversions }));
-  const costPoints: DailyPoint[] = summary.months.map((m) => ({ date: m.month.slice(0, 10), value: m.cost }));
+  // Maandpunten -> dagpunten, naar rato over de dagen van de maand (zie spreidMaandOverDagen).
+  const convPoints: DailyPoint[] = summary.months.flatMap((m) => spreidMaandOverDagen(m.month, m.conversions, input.asOfDate));
+  const costPoints: DailyPoint[] = summary.months.flatMap((m) => spreidMaandOverDagen(m.month, m.cost, input.asOfDate));
+
+  // Waar de historie van het ACCOUNT begint (niet van deze beurs: een campagne die vorig jaar
+  // pas later startte is een echt verschil, ontbrekende maanden in de data zijn dat niet).
+  const historieBegin = input.rows.map((r) => String(r.month ?? "").slice(0, 10)).filter(Boolean).sort()[0] ?? null;
 
   const curConv = pointsWithin(convPoints, current);
   const prevConv = prev.edition ? pointsWithin(convPoints, prev.edition) : [];
@@ -140,13 +186,20 @@ export function analyzeGeoClone(input: GeoCloneAnalysisInput): GeoCloneAnalysisR
   const conversions = alignEditionsAtEqualDaysOut(
     { edition: current, points: curConv },
     prev.edition ? { edition: prev.edition, points: prevConv } : null,
-    input.asOfDate
+    input.asOfDate,
+    historieBegin
   );
   const cost = alignEditionsAtEqualDaysOut(
     { edition: current, points: curCost },
     prev.edition ? { edition: prev.edition, points: prevCost } : null,
-    input.asOfDate
+    input.asOfDate,
+    historieBegin
   );
+  if (conversions.comparedFromDaysOut != null) {
+    degradations.push(
+      `de data begint op ${historieBegin}, midden in het venster van de vorige editie: beide edities zijn vergeleken vanaf ${conversions.comparedFromDaysOut} dagen voor de beurs, het stuk dat ze allebei hebben`
+    );
+  }
 
   // Universele, event-relatieve forecast over alle kanalen. Google uit de campagne-maanddata,
   // Meta/LinkedIn uit hun (al beurs-gefilterde) dag-conversiepunten. Dezelfde kern, dezelfde
@@ -158,6 +211,7 @@ export function analyzeGeoClone(input: GeoCloneAnalysisInput): GeoCloneAnalysisR
       previous: prev.edition ? { edition: prev.edition, points: prevConv } : null,
       previousEditions: alleEerdere.map((e) => ({ edition: e, points: pointsWithin(convPoints, e) })),
       target: input.conversionsTarget,
+      historyStart: historieBegin,
     },
   ];
   for (const cs of input.channelConvPoints ?? []) {
@@ -167,6 +221,10 @@ export function analyzeGeoClone(input: GeoCloneAnalysisInput): GeoCloneAnalysisR
       previous: prev.edition ? { edition: prev.edition, points: pointsWithin(cs.points, prev.edition) } : null,
       previousEditions: alleEerdere.map((e) => ({ edition: e, points: pointsWithin(cs.points, e) })),
       target: cs.target ?? null,
+      // Niet de eerste datum van deze punten: die zijn al op de beurs gefilterd, dus dat is het begin
+      // van de beurscampagne. Een Meta-campagne die vorig jaar later startte kortte de vergelijking
+      // dan in, of liet de projectie wegvallen, terwijl dat een echt verschil is (zie historieBegin).
+      historyStart: cs.historyStart ?? null,
     });
   }
   const multi = forecastAllChannels(channelInputs, input.asOfDate);
@@ -179,8 +237,14 @@ export function analyzeGeoClone(input: GeoCloneAnalysisInput): GeoCloneAnalysisR
   }
 
   const behindMaterially = conversions.comparable && conversions.deltaPct != null && conversions.deltaPct <= ACTION_BEHIND_PCT;
-  const missesTarget = forecast.willHitTarget === false;
-  const actionNeeded = Boolean(behindMaterially || missesTarget);
+  const missesTarget = forecast.projectedVsTargetPct != null && forecast.projectedVsTargetPct < 1 - DOEL_MARGE;
+  // Na de beursdag valt er aan deze editie niets meer te sturen: wat er dan staat is een
+  // evaluatie, geen actiepunt. GRN kreeg negen dagen na de beurs nog een wachtrij-item.
+  const beursVoorbij = forecast.method === "beurs_bereikt";
+  if (beursVoorbij) {
+    degradations.push("de beurs is voorbij: dit is een evaluatie van de editie, geen actiepunt (actionNeeded staat uit)");
+  }
+  const actionNeeded = !beursVoorbij && Boolean(behindMaterially || missesTarget);
 
   const markdown = renderMarkdown(input, current, prev.edition?.editionId ?? null, prev.gapDays, prev.cadenceMatches, conversions, cost, forecast, multi.perChannel, blendedForecast, degradations);
 
@@ -250,6 +314,9 @@ function renderMarkdown(
   ];
 
   if (conversions.comparable) {
+    if (conversions.comparedFromDaysOut != null) {
+      lines.push(`- Vergeleken vanaf ${conversions.comparedFromDaysOut} dagen voor de beurs: daarvoor heeft de vorige editie geen data.`);
+    }
     // De spend-vergelijking komt uit de Google-maandrijen; de extra kanalen leveren alleen
     // conversiepunten. Zodra die meedoen hoort de regel dat te zeggen in plaats van
     // stilzwijgend een deekbedrag als totaal te presenteren (sloop-audit 1 sep 2026).
@@ -262,7 +329,7 @@ function renderMarkdown(
       lines.push("- De aanloop ligt achter TERWIJL de spend gelijk of hoger ligt: de achterstand is geen investeringskwestie maar een effectiviteitsvraag.");
     }
   } else {
-    lines.push(`- Niet vergelijkbaar: ${conversions.reason ?? "onbekend"}.`);
+    lines.push(`- Niet vergelijkbaar: ${conversions.reason === "onvolledige_historie" ? "de data begint pas na het vergelijkbare punt van de vorige editie" : conversions.reason ?? "onbekend"}.`);
   }
 
   lines.push(
@@ -273,7 +340,7 @@ function renderMarkdown(
   );
   if (forecast.target != null) {
     lines.push(
-      `- Doel: **${fmtNum(forecast.target)}**${forecast.projectedVsTargetPct != null ? ` — projectie komt uit op **${Math.round(forecast.projectedVsTargetPct * 100)}%** van het doel (${forecast.willHitTarget ? "haalt het doel" : "MIST het doel"})` : ""}.`
+      `- Doel: **${fmtNum(forecast.target)}**${forecast.projectedVsTargetPct != null ? ` — projectie komt uit op **${Math.round(forecast.projectedVsTargetPct * 100)}%** van het doel (${forecast.willHitTarget ? "haalt het doel" : forecast.projectedVsTargetPct >= 1 - DOEL_MARGE ? `net onder het doel, binnen de marge van ${Math.round(DOEL_MARGE * 100)}%: geen actie` : "MIST het doel"})` : ""}.`
     );
   }
 

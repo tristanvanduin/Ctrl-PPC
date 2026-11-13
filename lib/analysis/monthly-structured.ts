@@ -29,6 +29,8 @@ import { sanitizeOutput } from "@/lib/analysis/sanitize";
 import { inferActionDomains, isActionAlignedWithStep } from "@/lib/analysis/step-validator";
 import { MONTHLY_FINAL_SOP_SECTIONS, MONTHLY_OPERATING_DETAIL_SECTIONS } from "@/lib/prompts/sop-prompts";
 import { opsomming } from "@/lib/util/tekst";
+import { gateUngroundedNumbers, gegrondeLijst, type GegrondeLijst } from "@/lib/analysis/weekly-number-gate";
+import { isBedragKolom, PERCENTAGE_METRIEK } from "@/lib/analysis/brondata-toets";
 
 export type ActionPhase = "immediate" | "short_term" | "medium_term";
 
@@ -957,6 +959,33 @@ function selectRepresentativeThreadCluster(group: IssueCluster[], allClusters: I
   return top;
 }
 
+// G3 Pad B: twee co-primaire threads als de tweede groep even sterk scoort als de eerste
+// (zelfde severity-klasse critical of high EN executiveScore binnen 10 procent). Maximaal twee,
+// dan worden de prioriteiten [1, 1, 2]; nooit een waaier. Los van createThreads zodat de test
+// deze regel zelf aanroept in plaats van een kopie ervan.
+function threadPrioriteiten(groepen: { executiveScore: number; severity: IssueCluster["dominant_severity"] }[]): (1 | 2 | 3)[] {
+  const topScore = groepen[0]?.executiveScore ?? 0;
+  const secondScore = groepen[1]?.executiveScore ?? 0;
+  const coPrimary =
+    groepen.length >= 2 &&
+    (groepen[0].severity === "critical" || groepen[0].severity === "high") &&
+    groepen[0].severity === groepen[1].severity &&
+    Math.abs(topScore - secondScore) <= Math.abs(topScore) * 0.1;
+  return groepen.map((_, index) => (coPrimary ? (index <= 1 ? 1 : 2) : index + 1) as 1 | 2 | 3);
+}
+
+// G3 Pad A: een afgewezen cluster met materiele business-impact (een echt issue dat wordt
+// gedeprioriteerd) eerlijk als secundaire kans waarderen, niet als kale niet-probleem-regel.
+// De impacttekst komt als functie mee: hij wordt alleen gevraagd waar hij ook getoond wordt.
+function nietProbleemRegel(
+  cluster: Pick<IssueCluster, "action_required" | "dominant_severity" | "display_label" | "evidence_summary">,
+  impactTekst: () => string
+): string {
+  return cluster.action_required && (cluster.dominant_severity === "critical" || cluster.dominant_severity === "high")
+    ? `${impactTekst()} Secundair en geen acuut probleem, maar een gemiste kans die volgende maand aandacht verdient, geen non-issue.`
+    : `${cluster.display_label}: ${cluster.evidence_summary}`;
+}
+
 function createThreads(clusters: IssueCluster[]): {
   threads: AnalysisThread[];
   notProblem: string[];
@@ -992,21 +1021,15 @@ function createThreads(clusters: IssueCluster[]): {
   const topGroups = orderedGroups
     .filter(({ primary }) => primary.dominant_severity !== "positive")
     .slice(0, 3);
-  // G3 Pad B: twee co-primaire threads als de tweede groep even sterk scoort als de eerste
-  // (zelfde severity-klasse critical of high EN executiveScore binnen 10 procent). Maximaal twee,
-  // dan worden de prioriteiten [1, 1, 2]; nooit een waaier.
-  const topScore = topGroups[0]?.executiveScore ?? 0;
-  const secondScore = topGroups[1]?.executiveScore ?? 0;
-  const coPrimary =
-    topGroups.length >= 2 &&
-    (topGroups[0].primary.dominant_severity === "critical" || topGroups[0].primary.dominant_severity === "high") &&
-    topGroups[0].primary.dominant_severity === topGroups[1].primary.dominant_severity &&
-    Math.abs(topScore - secondScore) <= Math.abs(topScore) * 0.1;
+  // G3 Pad B: co-primaire threads, zie threadPrioriteiten.
+  const prioriteiten = threadPrioriteiten(
+    topGroups.map(({ executiveScore, primary }) => ({ executiveScore, severity: primary.dominant_severity }))
+  );
 
   const threads: AnalysisThread[] = topGroups.map(({ group, primary }, index) => ({
     id: `thread_${index + 1}_${primary.cluster_id}`,
     title: threadTitle(primary),
-    priority: (coPrimary ? (index <= 1 ? 1 : 2) : index + 1) as 1 | 2 | 3,
+    priority: prioriteiten[index],
     classification: arbitration.unresolvedClusterIds.has(primary.cluster_id) ? "contextual_shift" : classifyCluster(primary),
     root_cause_summary: dominantRootCause(primary, arbitration.unresolvedClusterIds.has(primary.cluster_id) ? "mixed_evidence" : (arbitration.clusterStates.get(primary.cluster_id) ?? "none")),
     business_impact: unique(group.map((cluster) => businessImpact(cluster))).slice(0, 2).join(" "),
@@ -1032,13 +1055,7 @@ function createThreads(clusters: IssueCluster[]): {
       return classification === "contextual_shift" || classification === "false_positive_alert" || classification === "expected_tradeoff";
     })
     .slice(0, 3)
-    .map((cluster) =>
-      // G3 Pad A: een afgewezen cluster met materiele business-impact (een echt issue dat wordt
-      // gedeprioriteerd) eerlijk als secundaire kans waarderen, niet als kale niet-probleem-regel.
-      cluster.action_required && (cluster.dominant_severity === "critical" || cluster.dominant_severity === "high")
-        ? `${businessImpact(cluster)} Secundair en geen acuut probleem, maar een gemiste kans die volgende maand aandacht verdient, geen non-issue.`
-        : `${cluster.display_label}: ${cluster.evidence_summary}`
-    );
+    .map((cluster) => nietProbleemRegel(cluster, () => businessImpact(cluster)));
 
   if (notProblem.length === 0) {
     const fallbackNotProblem = ranked
@@ -3746,29 +3763,34 @@ function scoreFinalActionability(recommendations: FinalSopRecommendation[], task
   return Math.max(0, Math.min(10, Number(score.toFixed(1))));
 }
 
-function groundedNumbersFromCluster(cluster: IssueCluster | null): number[] {
-  if (!cluster) return [];
-  const numbers: number[] = [];
+// Per soort, zoals de poort ze toetst: een kale lijst gold voor bedragen en percentages tegelijk,
+// en dan was "€ 17" gegrond omdat een change_pct 16,9 was. De soort volgt uit de metriek van de
+// bevinding; change_pct is altijd een percentage.
+export function groundedNumbersFromCluster(cluster: IssueCluster | null): GegrondeLijst {
+  const sets = { procenten: [] as number[], bedragen: [] as number[], aantallen: [] as number[] };
+  if (!cluster) return gegrondeLijst(sets);
   for (const finding of cluster.findings) {
-    if (typeof finding.current_value === "number") numbers.push(finding.current_value);
-    if (typeof finding.previous_value === "number") numbers.push(finding.previous_value);
-    if (typeof finding.change_pct === "number") numbers.push(Math.abs(finding.change_pct));
+    const metric = String(finding.metric ?? "");
+    // Het doel is een vastgelegde waarde, geen meting; een advies mag ernaar verwijzen.
+    const doel = (finding as { target_value?: unknown }).target_value;
+    for (const v of [finding.current_value, finding.previous_value, doel]) {
+      if (typeof v !== "number") continue;
+      if (PERCENTAGE_METRIEK.test(metric)) {
+        // Een fractie (0,28) en een percentage (28) zijn hetzelfde feit.
+        sets.procenten.push(Math.abs(v) <= 1 ? Math.abs(v) * 100 : Math.abs(v));
+      } else if (isBedragKolom(metric)) sets.bedragen.push(Math.abs(v));
+      else sets.aantallen.push(Math.abs(v));
+    }
+    if (typeof finding.change_pct === "number") sets.procenten.push(Math.abs(finding.change_pct));
   }
-  return numbers;
+  return gegrondeLijst(sets);
 }
 
-function containsUngroundedNumber(text: string, allowedNumbers: number[]): boolean {
-  // Vuurt als de tekst een percentage of eurobedrag bevat dat niet herleidbaar is tot de
-  // echte finding-data. Alleen percentages en euro's tellen; vensters als "1-2 weken" niet.
-  const allowed = new Set(allowedNumbers.map((value) => Math.round(value)));
-  const found: number[] = [];
-  for (const match of text.matchAll(/(\d+(?:[.,]\d+)?)\s*(?:%|procent)/gi)) {
-    found.push(Math.round(parseFloat(match[1].replace(",", "."))));
-  }
-  for (const match of text.matchAll(/(?:€|EUR)\s*(\d+(?:[.,]\d+)?)/gi)) {
-    found.push(Math.round(parseFloat(match[1].replace(",", "."))));
-  }
-  return found.some((value) => !Number.isNaN(value) && !allowed.has(value));
+// Dezelfde poort als de korte cadans en de synthesen (weekly-number-gate.ts), niet een eigen
+// kopie van de regexes: die kopie las "€ 1.650" als 2 en gooide percentages en euro's op een
+// hoop, net als het origineel. Eén plek repareren hoort hier ook te helpen.
+function containsUngroundedNumber(text: string, allowedNumbers: GegrondeLijst): boolean {
+  return gateUngroundedNumbers(text, allowedNumbers).hadUngrounded;
 }
 
 function buildFinalQa(
@@ -4023,31 +4045,7 @@ function buildHypothesisProofEntries(opts: {
         : `Volgende maand willen we zien dat ${recommendation.meet_via} stabiel blijft zonder nieuwe escalatie op ${recommendation.object}.`;
     const objectLabel = formatObjectLabel(recommendation.object);
     const successMetrics = uniqueMetricList(normalizeMetrics(recommendation.meet_via), ["ROAS", "Conversies"]);
-    // 4b: guardrails moeten disjunct zijn van de success-metrics, anders worden de
-    // accept/reject-criteria circulair (dezelfde metric bepaalt slagen en falen). Filter
-    // de overlap eruit; valt de set leeg, kies het route-specifieke complement (ook disjunct).
-    const rawGuardrails =
-      recommendation.route === "controlled scale"
-        ? ["ROAS", "CPA"]
-        : recommendation.route === "containment"
-          ? ["ROAS", "Conversies"]
-          : recommendation.route === "recovery"
-            ? ["ROAS", "CPA"]
-            : successMetrics.slice(0, 2);
-    const successKeys = new Set(successMetrics.map((metric) => metric.toLowerCase()));
-    let guardrailMetrics = unique(rawGuardrails.filter((metric) => !successKeys.has(metric.toLowerCase())));
-    if (guardrailMetrics.length === 0) {
-      const complement =
-        recommendation.route === "containment"
-          ? ["CPA", "CVR"]
-          : recommendation.route === "recovery"
-            ? ["CPC", "Spend"]
-            : recommendation.route === "controlled scale"
-              ? ["CVR", "Spend"]
-              : ["CPA", "Spend"];
-      guardrailMetrics = unique(complement.filter((metric) => !successKeys.has(metric.toLowerCase())));
-    }
-    guardrailMetrics = guardrailMetrics.slice(0, 2);
+    const guardrailMetrics = disjunctGuardrails(recommendation.route, successMetrics);
     const evaluationWindow = routeWindow(recommendation.route);
     const expectedChange =
       recommendation.route === "validation"
@@ -4109,15 +4107,53 @@ function buildHypothesisProofEntries(opts: {
     };
   });
 
-  // 4b: dedupe op genormaliseerde interventie; vul NIET aan tot drie als er minder unieke
-  // routes zijn. Twee identieke aanbevelingen mogen niet twee identieke hypotheses geven.
+  return dedupeOpInterventie(hypothesisEntries);
+}
+
+// 4b: guardrails moeten disjunct zijn van de success-metrics, anders worden de
+// accept/reject-criteria circulair (dezelfde metric bepaalt slagen en falen). Filter
+// de overlap eruit; valt de set leeg, kies het route-specifieke complement (ook disjunct).
+function disjunctGuardrails(route: FinalSopRoute, successMetrics: string[]): string[] {
+  const rawGuardrails =
+    route === "controlled scale"
+      ? ["ROAS", "CPA"]
+      : route === "containment"
+        ? ["ROAS", "Conversies"]
+        : route === "recovery"
+          ? ["ROAS", "CPA"]
+          : successMetrics.slice(0, 2);
+  const successKeys = new Set(successMetrics.map((metric) => metric.toLowerCase()));
+  let guardrailMetrics = unique(rawGuardrails.filter((metric) => !successKeys.has(metric.toLowerCase())));
+  if (guardrailMetrics.length === 0) {
+    const complement =
+      route === "containment"
+        ? ["CPA", "CVR"]
+        : route === "recovery"
+          ? ["CPC", "Spend"]
+          : route === "controlled scale"
+            ? ["CVR", "Spend"]
+            : ["CPA", "Spend"];
+    guardrailMetrics = unique(complement.filter((metric) => !successKeys.has(metric.toLowerCase())));
+  }
+  return guardrailMetrics.slice(0, 2);
+}
+
+// 4b: dedupe op genormaliseerde interventie; vul NIET aan tot drie als er minder unieke
+// routes zijn. Twee identieke aanbevelingen mogen niet twee identieke hypotheses geven.
+function dedupeOpInterventie<T extends { route: string; validation_or_exploitation_step: string }>(entries: T[]): T[] {
   const seenInterventions = new Set<string>();
-  return hypothesisEntries.filter((entry) => {
+  return entries.filter((entry) => {
     const key = `${entry.route}::${normalizeText(entry.validation_or_exploitation_step)}`;
     if (seenInterventions.has(key)) return false;
     seenInterventions.add(key);
     return true;
   });
+}
+
+// 4f: het object alleen achter de handeling zetten als de handeling het nog niet noemt; anders
+// stond er "Pauzeer campagne Noord campagne Noord".
+function samenvattingZonderDubbeling(handeling: string, object: string): string {
+  return normalizeText(handeling).includes(normalizeText(object)) ? handeling : `${handeling} ${object}`;
 }
 
 function renderOperatingDetailMarkdown(layer: OperatingDetailLayer): string {
@@ -4221,11 +4257,7 @@ function buildOperatingDetailLayer(opts: {
     return {
       recommendation_number: index + 1,
       route: recommendation.route,
-      recommendation_summary: safePresentationText(
-        normalizeText(recommendation.handeling).includes(normalizeText(recommendation.object))
-          ? recommendation.handeling
-          : `${recommendation.handeling} ${recommendation.object}`
-      ),
+      recommendation_summary: safePresentationText(samenvattingZonderDubbeling(recommendation.handeling, recommendation.object)),
       rationale: safePresentationText(`${recommendation.doel} Beslisregel: ${recommendation.beslisregel}`),
       supporting_evidence: supportingEvidence,
       source_steps: sourceSteps,
@@ -4247,11 +4279,7 @@ function buildOperatingDetailLayer(opts: {
     return {
       task_number: index + 1,
       linked_recommendation: task.linked_recommendation,
-      task_summary: safePresentationText(
-        normalizeText(task.handeling).includes(normalizeText(task.object))
-          ? task.handeling
-          : `${task.handeling} ${task.object}`
-      ),
+      task_summary: safePresentationText(samenvattingZonderDubbeling(task.handeling, task.object)),
       execution_detail: safePresentationText(`Meet via ${task.meet_via}. Voorwaarde: ${task.voorwaarde} Beslisregel: ${task.beslisregel}`),
       supporting_rationale: safePresentationText(
         `${linkedRecommendation?.route ? `Route ${linkedRecommendation.route}: ` : ""}${linkedRecommendation?.doel || routeTrace?.rationale || "Geen aanvullende rationale beschikbaar."}`
@@ -4987,3 +5015,26 @@ export function buildAppendixMarkdown(parsedSteps: ParsedStepOutput[]): string {
 export function buildExecutiveMarkdown(finalSop: FinalSopSynthesis): string {
   return finalSop.markdown;
 }
+
+// Voor de tests, en alleen daarvoor. Dertien testbestanden hielden een eigen kopie van deze
+// functies bij ("getrouwe replica"), in de veronderstelling dat dit bestand niet los te laden was.
+// Dat kan inmiddels wel, en de kopieen bewaakten niets: de replica van containsUngroundedNumber
+// droeg dezelfde duizendtalfout als het origineel en bleef groen, en de kopie van de
+// actionability-score liet de aftrek voor een misvormde beslisregel weg. Een test op een kopie
+// bewaakt de kopie.
+export {
+  containsUngroundedNumber,
+  hasMalformedDecisionRule,
+  scoreFinalWhy,
+  scoreFinalActionability,
+  renderPredicate,
+  buildSuccessScenario,
+  buildFallbackStrategy,
+  buildFinalRecommendationFromStrategy,
+  applyExecutiveRecommendationDependencies,
+  threadPrioriteiten,
+  nietProbleemRegel,
+  disjunctGuardrails,
+  dedupeOpInterventie,
+  samenvattingZonderDubbeling,
+};

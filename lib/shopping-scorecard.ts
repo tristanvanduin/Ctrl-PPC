@@ -28,7 +28,7 @@
 
 import type { HealthScore, HealthFactor } from "./health-score";
 import { samenvatFactoren } from "./health-score";
-import { trendOver } from "./analysis/trend";
+import { trendOver, cpaTrendUitMaanden, cpaFactorTekst } from "./analysis/trend";
 import { aggregateByEntity } from "./analysis/pmax-expert-layer";
 import { trendScoreDalendIsGoed, trendScoreStijgendIsGoed, aandeelScoreOmgekeerd } from "./util/scorecard-scores";
 
@@ -86,17 +86,14 @@ export function computeShoppingScorecard(
   const maanden = perMaand(campMonthlyRows);
 
   // ── 1. CONVERSION EFFICIENCY (20pt) ──
-  const cpaReeks = maanden.filter((m) => m.conversions > 0).map((m) => m.cost / m.conversions);
-  const efficiencyBeoordeeld = cpaReeks.length >= 2;
-  const cpaTrend = efficiencyBeoordeeld ? trendOver(cpaReeks) : 0;
+  // Ratio van sommen met een minimumvolume (cpaTrendUitMaanden), niet het gemiddelde van maand-CPA's.
+  const cpa = cpaFactorTekst(cpaTrendUitMaanden(maanden));
   factors.push({
     name: "Conversion Efficiency",
-    score: efficiencyBeoordeeld ? trendScoreDalendIsGoed(cpaTrend) : 0,
+    score: cpa.beoordeeld ? trendScoreDalendIsGoed(cpa.pct) : 0,
     maxScore: 20,
-    description: efficiencyBeoordeeld
-      ? `CPA-trend ${cpaTrend >= 0 ? "+" : ""}${Math.round(cpaTrend)}% over de laatste maanden`
-      : "Te weinig maanden met conversies voor een CPA-trend — niet beoordeeld",
-    assessed: efficiencyBeoordeeld,
+    description: cpa.tekst,
+    assessed: cpa.beoordeeld,
   });
 
   // ── 2. DEMAND CAPTURE (20pt) ──

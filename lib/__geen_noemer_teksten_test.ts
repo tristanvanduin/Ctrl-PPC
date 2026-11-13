@@ -293,10 +293,15 @@ async function main() {
       g0.f.budgetRecommendation.behindTarget && g0.f.budgetRecommendation.spendIncreasePct > 5 && g0.f.conversions.kpi.diffPct < -25,
       JSON.stringify({ behind: g0.f.budgetRecommendation.behindTarget, pct: g0.f.budgetRecommendation.spendIncreasePct, diff: g0.f.conversions.kpi.diffPct }));
     const zonder = cpaBudgetGetal(g0);
-    check("zonder julimaand: de banner met percentage, maandbedrag en de herkomst van het doel",
-      /Verhoog maandelijks budget met \d+% naar € [\d.]+\/maand om het geschatte jaardoel te halen \(vorig jaar \+10%; er is nog geen doel ingevoerd\)\./.test(g0.banner), g0.banner);
-    check("zonder julimaand: het DGM-budgetadvies met getal (statement of besluit, voorstel, scenario)",
-      (zonder.dgmCpa || zonder.dgmVerhoging) && zonder.dgmVoorstel && /Scenario: Bij een budgetverhoging van \d+%/.test(g0.dgm), JSON.stringify(zonder));
+    // GV0 heeft een CPA boven het CPA-doel (efficiencyBottleneck). Hier stond eerst "Verhoog
+    // maandelijks budget met X%" in de banner en "Scenario: bij een budgetverhoging van X%" op
+    // Doelen, naast "meer budget is niet de oplossing" op diezelfde pagina. Sinds 13 november komen
+    // alle drie uit één regel (budgetAdvies in lib/doel/jaardoel.ts), en die zegt hier: efficiëntie.
+    check("voorwaarde: GV0 heeft een efficiëntie-bottleneck", g0.f.budgetRecommendation.efficiencyBottleneck);
+    check("zonder julimaand, CPA boven doel: de banner zegt efficiëntie eerst, met de herkomst van het doel en zonder percentage",
+      /meer budget is niet de oplossing om het geschatte jaardoel te halen \(vorig jaar \+10%; er is nog geen doel ingevoerd\)\./.test(g0.banner) && !zonder.banner, g0.banner);
+    check("zonder julimaand, CPA boven doel: DGM zegt efficiëntie, zonder budgetvoorstel of scenario met +X%",
+      zonder.dgmCpa && !zonder.dgmVoorstel && !/Scenario: Bij een budgetverhoging van \d+%/.test(g0.dgm), JSON.stringify(zonder));
     check("zonder julimaand: herstelplan (5) en klantbespreking zoals voorheen", zonder.herstelplan && zonder.klantbespreking, JSON.stringify(zonder));
     open = false;
   });

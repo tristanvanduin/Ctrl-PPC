@@ -38,10 +38,11 @@ console.log("\n1. Lead-form drop-off");
 
 console.log("\n2. CPL-druk");
 {
-  const rise = detectLinkedInCplPressure([ent({ name: "Duur", cpl: 60, prevCpl: 40 })]); // +50%
+  // Met volume in beide vensters; onder MIN_RESULTS_CPL is een CPL-verschil toeval.
+  const rise = detectLinkedInCplPressure([ent({ name: "Duur", cpl: 60, prevCpl: 40, results: 20, prevResults: 30 })]); // +50%
   check("CPL-stijging triggert", rise.triggered.length === 1 && rise.triggered[0].scope === "Duur");
   check("stijging zonder target = indicatie", rise.triggered[0].certainty === "indicatie");
-  const over = detectLinkedInCplPressure([ent({ name: "BovenTarget", cpl: 60, prevCpl: 58 })], { cplTarget: 50 });
+  const over = detectLinkedInCplPressure([ent({ name: "BovenTarget", cpl: 60, prevCpl: 58, results: 20, prevResults: 20 })], { cplTarget: 50 });
   check("boven target triggert + bewezen", over.triggered.length === 1 && over.triggered[0].certainty === "bewezen_binnen_platform");
   check("stabiele CPL onder target triggert niet", detectLinkedInCplPressure([ent({ cpl: 40, prevCpl: 40 })], { cplTarget: 50 }).triggered.length === 0);
 }
@@ -74,7 +75,7 @@ console.log("\n4. Video-drop-off (relatief)");
 console.log("\n5. Aggregator");
 {
   const r = buildLinkedInSignals({
-    entities: [ent({ name: "Probleem", formOpens: 200, formCompletionRate: 0.05, cpl: 70, prevCpl: 40 })],
+    entities: [ent({ name: "Probleem", formOpens: 200, formCompletionRate: 0.05, cpl: 70, prevCpl: 40, results: 20, prevResults: 20 })],
     targets: { cplTarget: 50 },
   });
   check("checked bevat alle vier de detectors", r.checked.length === 4);

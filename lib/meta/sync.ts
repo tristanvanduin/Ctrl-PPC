@@ -14,7 +14,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { MetaInsightsRow } from "./types";
 import { mapInsightsRow } from "./transform";
-import { metaDailyToDbRow, metaBreakdownToDbRow, META_DAILY_CONFLICT, META_BREAKDOWN_CONFLICT } from "./rows";
+import { metaDailyToDbRow, metaBreakdownToDbRow, metaPeriodToDbRow, META_DAILY_CONFLICT, META_BREAKDOWN_CONFLICT, META_PERIOD_CONFLICT } from "./rows";
 import { trailingWindow, backfillWindow, monthlyChunks } from "./sync-windows";
 import { logger } from "@/lib/logger";
 import { META_GRAPH_BASE } from "./api-version";
@@ -56,6 +56,9 @@ const INSIGHTS_FIELDS = [
 const UNIQUE_FIELDS = ["reach", "frequency"];
 const isHourlyBreakdown = (b?: string): boolean => !!b && b.includes("hourly");
 
+// De periodelezing vraagt alleen wat een periodefrequentie nodig heeft.
+const PERIOD_FIELDS = "impressions,reach,frequency";
+
 export function fieldsFor(breakdowns?: string): string {
   if (!isHourlyBreakdown(breakdowns)) return INSIGHTS_FIELDS;
   return INSIGHTS_FIELDS.split(",").filter((f) => !UNIQUE_FIELDS.includes(f)).join(",");
@@ -74,7 +77,7 @@ export interface SyncContext {
 // te verifieren; tot dan een dunne, expliciet gemarkeerde grens.
 export async function fetchInsightsAsync(
   ctx: SyncContext,
-  opts: { level: MetaLevel; since: string; until: string; breakdowns?: string; source?: string }
+  opts: { level: MetaLevel; since: string; until: string; breakdowns?: string; source?: string; periode?: boolean }
 ): Promise<MetaInsightsRow[]> {
   // Bron-naam per niveau, niet één "fetchInsightsAsync" voor alle vier: syncMetaLevel moet per
   // niveau kunnen zien of ZIJN ophaal mislukte, anders trekt een mislukte account-pull ook de
@@ -84,11 +87,14 @@ export async function fetchInsightsAsync(
   const source = opts.source ?? `meta:${opts.level}`;
   const params = new URLSearchParams({
     level: opts.level,
-    time_increment: "1",
     time_range: JSON.stringify({ since: opts.since, until: opts.until }),
-    fields: fieldsFor(opts.breakdowns),
+    fields: opts.periode ? PERIOD_FIELDS : fieldsFor(opts.breakdowns),
     access_token: ctx.accessToken,
   });
+  // Zonder time_increment geeft Meta een rij per entiteit over het hele venster, met het bereik
+  // over dat venster ontdubbeld. Met time_increment 1 is het bereik per dag, en een som daarvan
+  // telt dezelfde persoon elke dag opnieuw (zie syncMetaPeriodReach).
+  if (!opts.periode) params.set("time_increment", "1");
   if (opts.breakdowns) params.set("breakdowns", opts.breakdowns);
 
   const createRes = await fetch(`${GRAPH}/${ctx.accountId}/insights`, { method: "POST", body: params });
@@ -182,6 +188,72 @@ export async function syncMetaDaily(ctx: SyncContext, endDate: string): Promise<
       result[level] = await syncMetaLevel(ctx, level, since, until);
     }
     return result;
+  });
+  return result;
+}
+
+// ── Periodelezing (bereik over het venster) ────────────────────────────────
+//
+// LIVE-ONGETEST: de vorm van de aanroep is getest (zonder time_increment), een echte Meta-respons
+// nog niet. Aangesloten op de dagelijkse run in lib/sync/kanaal-runs.ts, maar TOLERANT: de tabel
+// meta_period_reach komt uit migratie 110, en zolang die niet gedraaid is kijkt deze stap eerst of
+// de tabel er is, vraagt dan niets aan Meta, en meldt dat in het sync-verslag zonder de run te
+// laten mislukken.
+//
+// Waarom: de frequentiedrempels van de detectors (3 en 4) zijn periodenormen. De dagtabellen
+// dragen alleen de dagfrequentie, en die haalt de drempel vrijwel nooit: wie in vier weken tien
+// keer dezelfde advertentie ziet, heeft per dag een frequentie rond 1,2. Zonder deze lezing meldt
+// de signaalroute "frequentie niet te beoordelen".
+export const PERIOD_LEVELS: MetaLevel[] = ["campaign", "ad"];
+
+/** Een fout die zegt dat de tabel er niet is (Postgres 42P01, PostgREST PGRST205). */
+export function isOntbrekendeTabel(error: { code?: string; message?: string } | null | undefined): boolean {
+  if (!error) return false;
+  return error.code === "42P01" || error.code === "PGRST205"
+    || /could not find the table|does not exist|schema cache/i.test(error.message ?? "");
+}
+
+export interface PeriodeUitkomst {
+  rows: number;
+  /** De tabel bestaat nog niet (migratie 110): niets gevraagd, niets geschreven. Geen fout. */
+  tabelOntbreekt: boolean;
+  /** Niveaus waarvan het ophalen of schrijven mislukte. */
+  failed: string[];
+}
+
+export async function syncMetaPeriodReach(ctx: SyncContext, endDate: string, days = 28): Promise<PeriodeUitkomst> {
+  // Eerst kijken, dan pas Meta vragen: twee async-jobs per run voor een tabel die er niet is, zijn
+  // verspilde quotum.
+  const probe = await ctx.supabase.from("meta_period_reach").select("client_id").limit(1);
+  if (probe.error) {
+    if (isOntbrekendeTabel(probe.error)) {
+      log.warn("meta_period_reach bestaat nog niet (migratie 110); periodelezing overgeslagen");
+      return { rows: 0, tabelOntbreekt: true, failed: [] };
+    }
+    return { rows: 0, tabelOntbreekt: false, failed: PERIOD_LEVELS.map((l) => `${l}: ${probe.error!.message}`) };
+  }
+  const { result } = await withFetchFailures(async () => {
+    const { since, until } = trailingWindow(endDate, days);
+    let total = 0;
+    const failed: string[] = [];
+    for (const level of PERIOD_LEVELS) {
+      const source = `meta:period:${level}`;
+      const insights = await fetchInsightsAsync(ctx, { level, since, until, source, periode: true });
+      if (hasFetchFailure(source)) { failed.push(level); continue; }
+      const dbRows = insights
+        .map((r) => metaPeriodToDbRow(r, mapInsightsRow(r), ctx.clientId, level))
+        .filter((r): r is Record<string, unknown> => r !== null);
+      const deduped = dedupeByKey(dbRows, ["client_id", "level", "entity_id", "period_start", "period_end"]);
+      if (deduped.length === 0) continue;
+      const { error } = await ctx.supabase.from("meta_period_reach").upsert(deduped, { onConflict: META_PERIOD_CONFLICT, ignoreDuplicates: false });
+      if (error) {
+        log.error("Periode-upsert mislukt voor", level, error.message);
+        failed.push(`${level}: ${error.message}`);
+        continue;
+      }
+      total += deduped.length;
+    }
+    return { rows: total, tabelOntbreekt: false, failed };
   });
   return result;
 }

@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useClientHistoricalData, useForecast } from "@/lib/client-data-provider";
+import { useClientHistoricalData, useForecast, useJaardoelBereik } from "@/lib/client-data-provider";
+import { oordeelOverTekst } from "@/lib/doel/jaardoel";
 import { useBlendedClientData } from "@/lib/use-blended-client-data";
 import { actieveMetrics, computeForecast, jaarprognoseVerhouding, MONTH_LABELS, type ForecastMetric, type ClientForecast } from "@/lib/forecast";
 import { dbSelectOne } from "@/lib/data-access/client-read";
@@ -48,6 +49,7 @@ function useChannelForecast(clientId: string, channel: "google" | "blended"): { 
  */
 export function ForecastSummaryTiles({ clientId, channel = "google" }: { clientId: string; channel?: "google" | "blended" }) {
   const { forecast, loading, error } = useChannelForecast(clientId, channel);
+  const bereik = useJaardoelBereik();
 
   const [hasEvents, setHasEvents] = useState(false);
   useEffect(() => {
@@ -77,7 +79,6 @@ export function ForecastSummaryTiles({ clientId, channel = "google" }: { clientI
   const fmt = metric.format;
   const isInverted = primaryId === "cpa";
 
-  const totalExpected = result.points.reduce((s, p) => s + p.expected, 0);
   const isRatio = primaryId === "roas" || primaryId === "cpa";
   // Null voor een verhouding zonder noemer (jaarprognoseVerhouding): een CPA zonder één verwachte
   // conversie is geen € 0, en dan is er ook geen verschil met het doel om te kleuren.
@@ -113,14 +114,19 @@ export function ForecastSummaryTiles({ clientId, channel = "google" }: { clientI
             </div>
             <div className="flex items-center justify-between">
               <span className="text-muted-foreground">vs. doel</span>
-              {/* Bij een ratio-metriek is totalExpected de som van 12 losse maandratio's -- een
-                  getal zonder betekenis (tot ~12x te hoog). Wat hier hoort te staan is het doel
-                  zelf, dezelfde waarde als diffPct ernaast al tegen afzet. */}
+              {/* Het doel zelf, dezelfde waarde als diffPct ernaast al tegen afzet. Niet de som van
+                  de maandverwachtingen: bij een ratio is dat een getal zonder betekenis, en bij een
+                  volume een afrondingsvariant van het doel (2.595 naast een doel van 2.600). */}
               <span className={`font-semibold ${kpiAdjusted === null ? "text-muted-foreground" : isPositive ? "text-green-600" : "text-red-500"}`}>
-                {fmt(isRatio ? result.kpi.annualTarget : totalExpected)} ({kpiAdjusted === null ? "—" : formatDeltaPercent(totalDiffPct, 0)})
+                {fmt(result.kpi.annualTarget)} ({kpiAdjusted === null ? "—" : formatDeltaPercent(totalDiffPct, 0)})
               </span>
             </div>
           </div>
+          {/* Het doel zelf, waar het percentage tegen gerekend is: hier stond de som van de
+              afgeronde maandverwachtingen (2.595 en 2.601 waar Instellingen 2.600 zegt). En over
+              welke kanalen het oordeel gaat (lib/doel/jaardoel.ts): Alle kanalen zei +53% en Google
+              -51% tegen hetzelfde getal, zonder dat een van beide zei waarover. */}
+          <p className="mt-2 text-micro text-muted-foreground">{oordeelOverTekst(bereik, channel)}</p>
         </div>
 
         <div className="bg-card rounded-xl border border-border shadow-sm p-4">

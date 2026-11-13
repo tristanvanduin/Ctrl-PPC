@@ -115,9 +115,12 @@ async function runGeoCloneAnalysis(
     (liDailyRes.data ?? []).map((r) => ({ entity: r.entity_urn, date: r.date, value: sumSelectedConversions(r as Record<string, unknown>, "linkedin_ads", convConfig) })),
   );
 
-  const channelConvPoints: { channel: string; points: DailyPoint[]; target?: number | null }[] = [];
-  if (metaPoints.length > 0) channelConvPoints.push({ channel: "meta_ads", points: metaPoints, target: null });
-  if (liPoints.length > 0) channelConvPoints.push({ channel: "linkedin_ads", points: liPoints, target: null });
+  // Het begin van de kanaaldata van het hele account, niet van de beurscampagnes (zie analyzeGeoClone).
+  const eersteDatum = (rijen: { date: unknown }[] | null): string | null =>
+    (rijen ?? []).map((r) => String(r.date ?? "").slice(0, 10)).filter(Boolean).sort()[0] ?? null;
+  const channelConvPoints: { channel: string; points: DailyPoint[]; target?: number | null; historyStart?: string | null }[] = [];
+  if (metaPoints.length > 0) channelConvPoints.push({ channel: "meta_ads", points: metaPoints, target: null, historyStart: eersteDatum(metaDailyRes.data) });
+  if (liPoints.length > 0) channelConvPoints.push({ channel: "linkedin_ads", points: liPoints, target: null, historyStart: eersteDatum(liDailyRes.data) });
 
   const asOfDate = today();
   const result = analyzeGeoClone({

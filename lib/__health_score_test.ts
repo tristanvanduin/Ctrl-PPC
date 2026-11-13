@@ -86,13 +86,13 @@ console.log("\nFactoren die wel te beoordelen zijn");
     conversions: { kpi: kpi({ annualTarget: 1000, adjustedAnnual: 1000 }), points: punten([10, 12]) },
     adSpend: { kpi: kpi({ annualTarget: 5000, ytdRealized: 2500, ytdExpected: 2500 }), points: [] },
     cpa: { kpi: kpi(), points: punten([50, 45]) },
-  }));
+  }), [], [], [], 800);
   check("doelstelling is beoordeeld", factor(h, "Doelstelling").assessed);
   check("en scoort vol bij 100 procent", factor(h, "Doelstelling").score === 20);
   check("budget is beoordeeld", factor(h, "Budget").assessed);
   check("efficiency is beoordeeld bij twee CPA-punten", factor(h, "Efficiency").assessed);
   check("trend is beoordeeld bij twee maanden", factor(h, "Trend").assessed);
-  check("hygiene is beoordeeld zodra er besteding is", factor(h, "Hygiëne").assessed);
+  check("hygiene is beoordeeld zodra er verspillingsdata en besteding over 30 dagen is", factor(h, "Hygiëne").assessed);
   check("alle vijf beoordeeld", h.assessedCount === 5, String(h.assessedCount));
   check("en dat is genoeg voor een cijfer", h.grade !== "?", h.grade);
   // Het totaal wordt geschaald over wat beoordeeld is, niet over alle 100 punten.

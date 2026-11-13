@@ -208,6 +208,14 @@ export interface AdFatigueFact {
   ctr_change_pct: number | null; // negatief = daling
   recent_frequency: number | null;
   fatigue: boolean;
+  /**
+   * De CTR-daling van fatigue is er, maar de frequentiepoort niet. `recent_frequency` is een
+   * gemiddelde van DAGfrequenties (de sync haalt per dag op), en die haalt 2,5 vrijwel nooit:
+   * wie in een week vijf keer dezelfde advertentie ziet heeft per dag een frequentie rond 1. Dit
+   * veld zegt dan dat het CTR-patroon er is en de frequentie op periodeschaal niet gemeten is, in
+   * plaats van alleen "fatigue: false".
+   */
+  ctr_daling_frequentie_onbekend: boolean;
 }
 
 const FATIGUE_CTR_DROP = 0.3; // 30%
@@ -232,7 +240,7 @@ export function detectAdFatigue(adRows: MetaComputeRow[]): AdFatigueFact[] {
     const active = rows.filter((r) => (Number(r.impressions) || 0) > 0).sort((a, b) => a.date.localeCompare(b.date));
     const name = rows.find((r) => r.entity_name)?.entity_name;
     if (active.length === 0) {
-      facts.push({ entity_id, entity_name: name, days_live: 0, baseline_link_ctr_pct: null, recent_link_ctr_pct: null, ctr_change_pct: null, recent_frequency: null, fatigue: false });
+      facts.push({ entity_id, entity_name: name, days_live: 0, baseline_link_ctr_pct: null, recent_link_ctr_pct: null, ctr_change_pct: null, recent_frequency: null, fatigue: false, ctr_daling_frequentie_onbekend: false });
       continue;
     }
     const baselineRows = active.slice(0, FATIGUE_WINDOW);
@@ -241,10 +249,10 @@ export function detectAdFatigue(adRows: MetaComputeRow[]): AdFatigueFact[] {
     const recentCtr = safeDiv(sum(recentRows, "link_clicks"), sum(recentRows, "impressions"));
     const recentFreq = avgFrequency(recentRows);
     const ctrChange = baseCtr !== null && recentCtr !== null && baseCtr > 0 ? round(((recentCtr - baseCtr) / baseCtr) * 100) : null;
-    const fatigue =
+    const ctrDaling =
       baseCtr !== null && recentCtr !== null && baseCtr > 0 &&
-      recentCtr <= baseCtr * (1 - FATIGUE_CTR_DROP) &&
-      recentFreq !== null && recentFreq > FATIGUE_FREQ_THRESHOLD;
+      recentCtr <= baseCtr * (1 - FATIGUE_CTR_DROP);
+    const fatigue = ctrDaling && recentFreq !== null && recentFreq > FATIGUE_FREQ_THRESHOLD;
     facts.push({
       entity_id,
       entity_name: name,
@@ -254,6 +262,7 @@ export function detectAdFatigue(adRows: MetaComputeRow[]): AdFatigueFact[] {
       ctr_change_pct: ctrChange,
       recent_frequency: recentFreq,
       fatigue,
+      ctr_daling_frequentie_onbekend: ctrDaling && !fatigue,
     });
   }
   return facts.sort((a, b) => a.entity_id.localeCompare(b.entity_id));

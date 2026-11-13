@@ -9,12 +9,18 @@
 //   - ranking-zwakte: Meta's eigen quality/engagement/conversion-ranking staat BELOW_AVERAGE.
 //   - hook/hold-zwakte: hook- of hold-rate ver onder de accountmediaan (relatief, geen verzonnen norm).
 
-import { type DetectionResult, type SignalStory } from "./types";
+import { mergeDetections, type DetectionResult, type NotAssessable, type SignalStory } from "./types";
 import { renderSignalSection, type SignalSectionResult } from "./render-section";
 import { median } from "@/lib/util/stats";
 
+// PERIODEnormen: hoe vaak dezelfde persoon de uiting in het hele venster van 28 dagen zag
+// (vertoningen gedeeld door het over die periode ONTDUBBELDE bereik). Ze stonden hier naast een
+// gemiddelde van dagfrequenties, en dat is een andere grootheid: wie in vier weken tien keer
+// dezelfde advertentie ziet, heeft per dag een frequentie rond 1,2. Op echte data bleven
+// fatigue en saturatie daardoor stil, en de sectie meldde "gecontroleerd, niets gevonden".
 export const FREQUENCY_FATIGUE = 3.0;       // vanaf hier is herhaling een fatigue-risico
 export const FREQUENCY_SATURATION = 4.0;    // hierboven is de doelgroep aantoonbaar te vaak bereikt
+export const MIN_CONVERSIONS_CPA = 10;      // per venster; daaronder is een CPA-verschil toeval
 export const PERF_DROP = 0.15;              // 15% CTR-daling telt als materieel
 export const CPA_RISE = 0.15;               // 15% CPA-stijging telt als materieel
 export const MIN_IMPRESSIONS = 1000;        // onder dit volume is elke ratio ruis
@@ -26,7 +32,13 @@ export interface MetaAdSignalInput {
   adName: string;
   campaignName?: string | null;
   impressions: number;
+  /** Periodefrequentie: vertoningen / over het venster ontdubbeld bereik. Null = niet gemeten. */
   frequency: number | null;
+  /** Gemiddelde van de dagfrequenties. Alleen ter toelichting; nooit tegen een periodedrempel. */
+  dailyFrequency?: number | null;
+  /** Conversies in het recente en het vorige venster: de CPA-vergelijking eist volume. */
+  conversions?: number | null;
+  prevConversions?: number | null;
   hookRate: number | null;
   holdRate: number | null;
   linkCtr: number | null;
@@ -41,8 +53,27 @@ export interface MetaAdSignalInput {
 
 export interface MetaLevelSignalInput {
   scope: string;          // "account" of een campagnenaam
+  /** Periodefrequentie, zie MetaAdSignalInput.frequency. */
   frequency: number | null;
+  dailyFrequency?: number | null;
   impressions: number;
+}
+
+// De reden die de lezer krijgt als het ontdubbelde bereik ontbreekt. De dagwaarde staat erbij
+// omdat hij wel gemeten is; de zin zegt waarom hij het oordeel niet kan dragen.
+function frequentieOnbekend(id: string, zonder: number, totaal: number, wat: string, dag: number | null): NotAssessable {
+  const dagTekst = dag != null ? ` Het gemiddelde van de dagfrequenties is ${dag.toFixed(1)}, maar dat telt dezelfde persoon elke dag opnieuw en is niet tegen een periodedrempel te leggen.` : "";
+  return {
+    id,
+    reason:
+      `frequentie niet te beoordelen voor ${zonder} van de ${totaal} ${wat}: het over 28 dagen ontdubbelde bereik ontbreekt ` +
+      `(periodelezing nog niet gesynct).${dagTekst}`,
+  };
+}
+
+function grootsteDagFrequentie(items: { dailyFrequency?: number | null }[]): number | null {
+  const waarden = items.map((i) => i.dailyFrequency).filter((v): v is number => typeof v === "number" && Number.isFinite(v));
+  return waarden.length > 0 ? Math.max(...waarden) : null;
 }
 
 
@@ -56,16 +87,26 @@ function scopeLabel(a: MetaAdSignalInput): string {
 
 // ── 1. Creative fatigue ─────────────────────────────────────────────────────────────
 export function detectMetaCreativeFatigue(ads: MetaAdSignalInput[]): DetectionResult {
-  const checked = ["meta_creative_fatigue"];
-  const scored = ads
-    .filter((a) => a.impressions >= MIN_IMPRESSIONS && (a.frequency ?? 0) >= FREQUENCY_FATIGUE)
+  const id = "meta_creative_fatigue";
+  const eligible = ads.filter((a) => a.impressions >= MIN_IMPRESSIONS);
+  const zonderBereik = eligible.filter((a) => a.frequency == null);
+  const notAssessable = zonderBereik.length > 0
+    ? [frequentieOnbekend(id, zonderBereik.length, eligible.length, "advertenties", grootsteDagFrequentie(zonderBereik))]
+    : [];
+  // "Gecontroleerd" alleen als er minstens een advertentie echt beoordeeld is.
+  const checked = eligible.length > 0 && zonderBereik.length === eligible.length ? [] : [id];
+  const scored = eligible
+    .filter((a) => (a.frequency ?? 0) >= FREQUENCY_FATIGUE)
     .map((a) => {
       const ctrDrop =
         a.linkCtr != null && a.prevLinkCtr != null && a.prevLinkCtr > 0
           ? (a.prevLinkCtr - a.linkCtr) / a.prevLinkCtr
           : null;
+      // Twee conversies tegen een gaf "de CPA steeg 100%, het klassieke fatigue-patroon".
+      // Zonder volume in BEIDE vensters is de CPA-vergelijking een muntworp en telt hij niet.
+      const genoegVolume = (a.conversions ?? 0) >= MIN_CONVERSIONS_CPA && (a.prevConversions ?? 0) >= MIN_CONVERSIONS_CPA;
       const cpaRise =
-        a.cpa != null && a.prevCpa != null && a.prevCpa > 0 ? (a.cpa - a.prevCpa) / a.prevCpa : null;
+        genoegVolume && a.cpa != null && a.prevCpa != null && a.prevCpa > 0 ? (a.cpa - a.prevCpa) / a.prevCpa : null;
       return { a, ctrDrop, cpaRise };
     })
     .filter((s) => (s.ctrDrop != null && s.ctrDrop >= PERF_DROP) || (s.cpaRise != null && s.cpaRise >= CPA_RISE))
@@ -86,22 +127,30 @@ export function detectMetaCreativeFatigue(ads: MetaAdSignalInput[]): DetectionRe
         : "") +
       `Dat is het klassieke fatigue-patroon: dezelfde creative op een verzadigde doelgroep.`,
     actionDirection: "ververs de creative of verbreed de doelgroep; meer budget op dezelfde uiting versnelt alleen de uitputting",
-    certainty: "bewezen_binnen_platform" as const,
+    // Bewezen alleen via het CTR-pad: dat rust op duizenden vertoningen. Een CPA-stijging
+    // alleen is een indicatie, ook boven het minimumvolume.
+    certainty: ctrDrop != null && ctrDrop >= PERF_DROP ? "bewezen_binnen_platform" as const : "indicatie" as const,
     evidence: [
-      { metric: "frequentie", value: Math.round((a.frequency ?? 0) * 100) / 100 },
+      { metric: "frequentie (28 dagen, ontdubbeld bereik)", value: Math.round((a.frequency ?? 0) * 100) / 100 },
       { metric: "link-CTR", value: a.linkCtr ?? 0, prev: a.prevLinkCtr ?? null },
       { metric: "CPA", value: a.cpa ?? 0, prev: a.prevCpa ?? null },
     ],
   }));
 
-  return { triggered, checked };
+  return { triggered, checked, ...(notAssessable.length > 0 ? { notAssessable } : {}) };
 }
 
 // ── 2. Frequentie-verzadiging (account/campagne-niveau) ─────────────────────────────
 export function detectMetaFrequencySaturation(levels: MetaLevelSignalInput[]): DetectionResult {
-  const checked = ["meta_frequency_saturation"];
-  const triggered: SignalStory[] = levels
-    .filter((l) => l.impressions >= MIN_IMPRESSIONS && (l.frequency ?? 0) >= FREQUENCY_SATURATION)
+  const id = "meta_frequency_saturation";
+  const eligible = levels.filter((l) => l.impressions >= MIN_IMPRESSIONS);
+  const zonderBereik = eligible.filter((l) => l.frequency == null);
+  const notAssessable = zonderBereik.length > 0
+    ? [frequentieOnbekend(id, zonderBereik.length, eligible.length, "campagnes", grootsteDagFrequentie(zonderBereik))]
+    : [];
+  const checked = eligible.length > 0 && zonderBereik.length === eligible.length ? [] : [id];
+  const triggered: SignalStory[] = eligible
+    .filter((l) => (l.frequency ?? 0) >= FREQUENCY_SATURATION)
     .sort((a, b) => (b.frequency ?? 0) - (a.frequency ?? 0))
     .slice(0, MAX_STORIES)
     .map((l) => ({
@@ -109,13 +158,13 @@ export function detectMetaFrequencySaturation(levels: MetaLevelSignalInput[]): D
       category: "creative" as const,
       scope: l.scope,
       story:
-        `Op ${l.scope === "account" ? "accountniveau" : `"${l.scope}"`} ligt de frequentie op ${(l.frequency ?? 0).toFixed(1)}: ` +
+        `Op ${l.scope === "account" ? "accountniveau" : `"${l.scope}"`} ligt de frequentie over 28 dagen op ${(l.frequency ?? 0).toFixed(1)}: ` +
         `de gemiddelde persoon ziet de advertenties zo vaak dat extra vertoningen weinig toevoegen.`,
       actionDirection: "verbreed de doelgroep of verhoog de creative-variatie; een smalle doelgroep raakt snel verzadigd",
       certainty: "indicatie" as const,
-      evidence: [{ metric: "frequentie", value: Math.round((l.frequency ?? 0) * 100) / 100 }],
+      evidence: [{ metric: "frequentie (28 dagen, ontdubbeld bereik)", value: Math.round((l.frequency ?? 0) * 100) / 100 }],
     }));
-  return { triggered, checked };
+  return { triggered, checked, ...(notAssessable.length > 0 ? { notAssessable } : {}) };
 }
 
 // ── 3. Ranking-zwakte (Meta's eigen diagnose) ───────────────────────────────────────
@@ -197,16 +246,12 @@ export function detectMetaHookHoldWeakness(ads: MetaAdSignalInput[]): DetectionR
 
 // ── Aggregator ──────────────────────────────────────────────────────────────────────
 export function buildMetaCreativeSignals(input: { ads: MetaAdSignalInput[]; levels: MetaLevelSignalInput[] }): DetectionResult {
-  const results = [
+  return mergeDetections([
     detectMetaCreativeFatigue(input.ads),
     detectMetaFrequencySaturation(input.levels),
     detectMetaRankingWeakness(input.ads),
     detectMetaHookHoldWeakness(input.ads),
-  ];
-  return {
-    triggered: results.flatMap((r) => r.triggered),
-    checked: [...new Set(results.flatMap((r) => r.checked))],
-  };
+  ]);
 }
 
 // Wiring: de merged detectie renderen tot een prompt-sectie voor de Meta-analyse. Lege

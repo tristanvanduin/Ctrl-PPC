@@ -47,14 +47,22 @@ export function classifyLossDriver(budgetLost: number, rankLost: number): LossDr
   return "mixed";
 }
 
+// Onder dit aantal conversies in de peilmaand is een CPA te dun om er budget op te verhogen.
+export const MIN_CONVERSIES_BUDGETVERHOGING = 10;
+
 // De actie-kandidaat. No-go uit de spec: geen budgetverhoging voorstellen zonder
 // conversiebewijs, dus een budget-gedreven campagne zonder conversies levert geen
 // budget-actie op (de interpretatie kan hem wel benoemen).
-export function actionForDriver(driver: LossDriver, hasConversions: boolean): ActionCandidate {
+//
+// `efficientGenoeg` (standaard: gelijk aan hasConversions, voor bestaande aanroepers): mag er
+// geld bij? Een conversie was genoeg: een campagne met 1 conversie op € 5.000 en 40% budgetverlies
+// werd "kandidaat voor budgetverhoging". Is de CPA te hoog of het volume te dun, dan is de actie
+// eerst efficiëntie (bod of kwaliteit), niet meer budget.
+export function actionForDriver(driver: LossDriver, hasConversions: boolean, efficientGenoeg = hasConversions): ActionCandidate {
   if (driver === "none") return "none";
-  if (driver === "budget") return hasConversions ? "raise_budget" : "none";
+  if (driver === "budget") return !hasConversions ? "none" : efficientGenoeg ? "raise_budget" : "improve_bid_or_quality";
   if (driver === "rank") return "improve_bid_or_quality";
-  return hasConversions ? "both" : "improve_bid_or_quality";
+  return hasConversions && efficientGenoeg ? "both" : "improve_bid_or_quality";
 }
 
 export interface CampaignISFact {
@@ -72,6 +80,11 @@ export interface CampaignISFact {
   cpa: number | null;
   /** Tegen de échte vorige kalendermaand; null als die maand er niet is. */
   impressionShareMoM: number | null;
+  /**
+   * Waarom een budget-gedreven campagne GEEN budgetkandidaat is, of null. Voor de lezer: de
+   * campagne verliest wel zichtbaarheid door budget, maar meer geld zou duur ingekocht worden.
+   */
+  budgetTegengehouden: string | null;
 }
 
 export interface ImpressionShareSummary {
@@ -99,7 +112,7 @@ function maandKey(month: string): string {
 // Analyseert de campagne-IS-rijen: iedereen in dezelfde peilmaand (de jongste maand in de
 // data), classificeert de oorzaak, bepaalt de actie, rekent de MoM tegen de vorige
 // kalendermaand, en rangschikt op het grootste zichtbaarheidsverlies.
-export function analyzeCampaignImpressionShare(rows: CampaignImpressionShareRow[]): {
+export function analyzeCampaignImpressionShare(rows: CampaignImpressionShareRow[], opts: { cpaTarget?: number | null } = {}): {
   campaigns: CampaignISFact[];
   summary: ImpressionShareSummary;
 } {
@@ -128,6 +141,15 @@ export function analyzeCampaignImpressionShare(rows: CampaignImpressionShareRow[
     if (key === vorigeMaand) inVorige.set(row.campaign_id, row);
   }
 
+  // De maatstaf voor "mag er geld bij": het CPA-doel als dat er is, anders de account-CPA in de
+  // peilmaand (som gedeeld door som over de campagnes).
+  const totKosten = [...inPeilmaand.values()].reduce((s, r) => s + num(r.cost), 0);
+  const totConv = [...inPeilmaand.values()].reduce((s, r) => s + num(r.conversions), 0);
+  const doelCpa = opts.cpaTarget != null && opts.cpaTarget > 0 ? opts.cpaTarget : null;
+  const maatstaf = doelCpa ?? (totConv > 0 ? totKosten / totConv : null);
+  const maatstafNaam = doelCpa != null ? "het CPA-doel" : "de account-CPA";
+  const eur = (v: number) => `€ ${Math.round(v)}`;
+
   const campaigns: CampaignISFact[] = [];
   for (const [campaignId, latest] of inPeilmaand) {
     const prior = inVorige.get(campaignId) ?? null;
@@ -136,6 +158,16 @@ export function analyzeCampaignImpressionShare(rows: CampaignImpressionShareRow[
     const conversions = num(latest.conversions);
     const cost = num(latest.cost);
     const driver = classifyLossDriver(budgetLostIs, rankLostIs);
+    const cpa = conversions > 0 ? cost / conversions : null;
+    const teDun = conversions > 0 && conversions < MIN_CONVERSIES_BUDGETVERHOGING;
+    const teDuur = cpa != null && maatstaf != null && cpa > maatstaf;
+    const efficientGenoeg = conversions > 0 && !teDun && !teDuur;
+    const action = actionForDriver(driver, conversions > 0, efficientGenoeg);
+    const budgetTegengehouden = (driver === "budget" || driver === "mixed") && conversions > 0 && !efficientGenoeg
+      ? teDun
+        ? `${conversions} conversies is te weinig om op te verhogen (minimum ${MIN_CONVERSIES_BUDGETVERHOGING})`
+        : `CPA ${eur(cpa!)} ligt boven ${maatstafNaam} (${eur(maatstaf!)}): eerst efficiëntie, dan budget`
+      : null;
 
     campaigns.push({
       campaignId,
@@ -146,13 +178,14 @@ export function analyzeCampaignImpressionShare(rows: CampaignImpressionShareRow[
       rankLostIs,
       totalLostIs: Math.round((budgetLostIs + rankLostIs) * 10000) / 10000,
       driver,
-      action: actionForDriver(driver, conversions > 0),
+      action,
       conversions,
       cost,
       cpa: conversions > 0 ? Math.round((cost / conversions) * 100) / 100 : null,
       impressionShareMoM: prior
         ? Math.round((num(latest.search_impression_share) - num(prior.search_impression_share)) * 10000) / 10000
         : null,
+      budgetTegengehouden,
     });
   }
 

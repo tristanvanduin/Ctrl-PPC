@@ -81,3 +81,29 @@ export function metaBreakdownToDbRow(
 // in scripts/migrations/007_meta.sql. Zelfde upsert-patroon als de Google-orchestrator.
 export const META_DAILY_CONFLICT = "client_id,date,entity_id";
 export const META_BREAKDOWN_CONFLICT = "client_id,date,level,entity_id,breakdown_type,breakdown_value";
+
+// Mapt een PERIODE-rij (insights zonder time_increment) naar meta_period_reach (migratie 110).
+// Het bereik in zo'n rij is over het hele venster ontdubbeld; dat is precies waarom hij een eigen
+// tabel heeft en niet in de dagtabel past. Begin en eind komen uit de rij zelf (date_start en
+// date_stop), zodat een venster dat Meta inkort niet als het gevraagde venster wordt opgeslagen.
+export function metaPeriodToDbRow(
+  raw: { date_start?: string; date_stop?: string },
+  row: MetaDailyRow,
+  clientId: string,
+  level: string,
+): Record<string, unknown> | null {
+  if (!row.entityId || !raw.date_start || !raw.date_stop) return null;
+  return {
+    client_id: clientId,
+    level,
+    entity_id: row.entityId,
+    period_start: raw.date_start,
+    period_end: raw.date_stop,
+    impressions: row.impressions,
+    reach: row.reach,
+    frequency: row.frequency,
+    updated_at: new Date().toISOString(),
+  };
+}
+
+export const META_PERIOD_CONFLICT = "client_id,level,entity_id,period_start,period_end";

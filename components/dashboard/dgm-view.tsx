@@ -10,15 +10,20 @@ import {
 import { useClientHistoricalData, useClientDataState } from "@/lib/client-data-provider";
 import { isTeamOwner, OWNER_TEAM, ownerLabel } from "@/lib/branding/brand";
 import { computeForecast, jaarprognoseVerhouding, ytdGerealiseerd, type ClientForecast, type ForecastKPI } from "@/lib/forecast";
-import { computeHealthScore, type HealthScore, type Anomaly } from "@/lib/health-score";
-import { getClientSettings } from "@/lib/client-settings";
+import { googleHealthScore, type HealthScore, type Anomaly } from "@/lib/health-score";
+import { getClientSettings, kpiDoelenIngevoerd } from "@/lib/client-settings";
 import { dbSelect } from "@/lib/data-access/client-read";
 import type { ImpressionShareData, WastefulSearchTermData, AdGroupBleederData } from "@/lib/use-client-data";
-import { cpaTrendFrom, cpaTrendVanForecast } from "@/lib/analysis/trend";
+import { cpaPuntenMetSommen, cpaTrendFrom, cpaTrendVanForecast } from "@/lib/analysis/trend";
 import { budgetCpaNaam, formatRoas, formatPercent } from "@/lib/forecast-format";
 import { Tabel, Kop, KolomKop, Body, Rij, NaamCel, GetalCel, AandeelCel, TotaalRij, TotaalCel } from "./data-table";
 import { Kerncijfer } from "@/components/ui/kerncijfer";
 import { metriekLabel } from "@/lib/util/tekst";
+import { useBlendedClientData } from "@/lib/use-blended-client-data";
+import { budgetAdvies, doelOordeel, gebruikteDoelReeks, jaardoelBereik, oordeelOverTekst, reeksVanDoel, scenarioVak, type DoelRichting } from "@/lib/doel/jaardoel";
+import { KANAAL_NAAM, type Kanaal } from "@/lib/kanalen/beschikbaar";
+import { Laadvlak } from "@/components/ui/laadvlak";
+import { geenBeursfilterTekst } from "@/lib/overzicht/beursfilter";
 
 // ─── Account type vocabulary ─────────────────────────────────────────
 
@@ -282,7 +287,7 @@ function computeBusinessCauses(
   const cpaPoints = forecast.cpa.points.filter((p) => p.realized !== null);
   if (cpaPoints.length >= 2 && causes.length < 3) {
     // Gedeelde berekening en drempels; zie lib/analysis/trend.ts.
-    const t = cpaTrendFrom(cpaPoints);
+    const t = cpaTrendFrom(cpaPuntenMetSommen(forecast, cpaPoints));
     const firstCpa = t.vorig;
     const lastCpa = t.huidig;
     const cpaTrend = t.pct ?? 0;
@@ -392,7 +397,7 @@ interface BusinessImpactStatement {
   type: "neutral" | "positive" | "warning" | "critical";
 }
 
-function computeBusinessImpact(forecast: ClientForecast): BusinessImpactStatement[] {
+function computeBusinessImpact(forecast: ClientForecast, doelGeldt: boolean): BusinessImpactStatement[] {
   const statements: BusinessImpactStatement[] = [];
   const conv = forecast.conversions.kpi;
   const rev = forecast.revenue.kpi;
@@ -467,20 +472,22 @@ function computeBusinessImpact(forecast: ClientForecast): BusinessImpactStatemen
   // Inzichten, Aanbevelingen en Taken) geen CPA-budgetgetal: "de CPA (€ 233) ligt boven het doel"
   // en "+825% budget" rekenen met een CPA waar die maand in de teller zit, en stonden op dezelfde
   // pagina naast "pas te berekenen als de conversiemeting klopt".
-  const zonderConversies = cpaTrendVanForecast(forecast).zonderConversies;
-  if (budget.behindTarget && zonderConversies.length > 0) {
+  // Dezelfde uitkomst als de banner op het Overzicht en het scenariovak hieronder (budgetAdvies in
+  // lib/doel/jaardoel.ts): die drie spraken elkaar eerder tegen.
+  const advies = budgetAdvies(budget, cpaTrendVanForecast(forecast).zonderConversies, doelGeldt);
+  if (advies.soort === "meting") {
     statements.push({
-      text: `Hoeveel budget nodig is om het jaardoel te halen, is pas te berekenen als de conversiemeting klopt: in ${zonderConversies.join(", ")} waren er kosten zonder één conversie. Controleer eerst de conversiemeting (tag, import, attributie) voordat je op de CPA stuurt of budget verschuift.`,
+      text: `Hoeveel budget nodig is om het jaardoel te halen, is pas te berekenen als de conversiemeting klopt: in ${advies.maanden.join(", ")} waren er kosten zonder één conversie. Controleer eerst de conversiemeting (tag, import, attributie) voordat je op de CPA stuurt of budget verschuift.`,
       type: "warning",
     });
-  } else if (budget.behindTarget && budget.efficiencyBottleneck) {
+  } else if (advies.soort === "efficientie") {
     statements.push({
-      text: `Meer budget is niet de oplossing: de CPA (${fmt(budget.currentCpa)}) ligt boven het doel${budget.cpaTarget != null ? ` (${fmt(budget.cpaTarget)})` : ""}. Herstel eerst de efficiëntie en herverdeel budget van dure naar rendabele campagnes; schaal pas op als de CPA richting doel beweegt.`,
+      text: `Meer budget is niet de oplossing: de CPA (${fmt(advies.huidigeCpa)}) ligt boven het doel${advies.cpaDoel != null ? ` (${fmt(advies.cpaDoel)})` : ""}. Herstel eerst de efficiëntie en herverdeel budget van dure naar rendabele campagnes; schaal pas op als de CPA richting doel beweegt.`,
       type: "neutral",
     });
-  } else if (budget.behindTarget && budget.spendIncreasePct > 5) {
+  } else if (advies.soort === "budget") {
     statements.push({
-      text: `Met een budgetverhoging van ${Math.round(budget.spendIncreasePct)}% (naar ${fmt(budget.requiredMonthlySpend)}/maand) kan het conversiedoel waarschijnlijk alsnog gehaald worden.`,
+      text: `Met een budgetverhoging van ${Math.round(advies.verhogingPct)}% (naar ${fmt(advies.nodigPerMaand)}/maand) kan het conversiedoel waarschijnlijk alsnog gehaald worden.`,
       type: "neutral",
     });
   }
@@ -624,6 +631,7 @@ interface ActionItem {
 
 function computeActions(
   forecast: ClientForecast,
+  doelGeldt: boolean,
   dbRecs?: DbRecommendation[],
   dbTasks?: DbTask[],
 ): ActionItem[] {
@@ -669,21 +677,30 @@ function computeActions(
     const budget = forecast.budgetRecommendation;
     // Zie computeBusinessImpact: geen "€ 453.833 extra budget" op een CPA met een maand zonder
     // conversies erin.
-    const zonderConversies = cpaTrendVanForecast(forecast).zonderConversies;
-    if (budget.behindTarget) {
-      actions.push(zonderConversies.length > 0
-        ? {
-          title: "Conversiemeting controleren",
-          why: `In ${zonderConversies.join(", ")} waren er kosten zonder één conversie. Een budgetvoorstel op de CPA wacht tot duidelijk is of de meting klopt.`,
-          impact: "hoog",
-          status: "Aanbevolen",
-        }
-        : {
-          title: "Budgetvoorstel voorbereiden",
-          why: `Er is ${fmt(budget.extraSpendNeeded)} extra budget nodig om het jaardoel te halen.`,
-          impact: "hoog",
-          status: "Aanbevolen",
-        });
+    // Uit dezelfde regel als de rest van de pagina (budgetAdvies): bij een efficiëntie-bottleneck
+    // geen "budgetvoorstel voorbereiden" onder "meer budget is niet de oplossing".
+    const advies = budgetAdvies(budget, cpaTrendVanForecast(forecast).zonderConversies, doelGeldt);
+    if (advies.soort === "meting") {
+      actions.push({
+        title: "Conversiemeting controleren",
+        why: `In ${advies.maanden.join(", ")} waren er kosten zonder één conversie. Een budgetvoorstel op de CPA wacht tot duidelijk is of de meting klopt.`,
+        impact: "hoog",
+        status: "Aanbevolen",
+      });
+    } else if (advies.soort === "efficientie") {
+      actions.push({
+        title: "Efficiëntie herstellen vóór budget",
+        why: `De CPA (${fmt(advies.huidigeCpa)}) ligt boven het doel${advies.cpaDoel != null ? ` (${fmt(advies.cpaDoel)})` : ""}: extra budget koopt dure conversies.`,
+        impact: "hoog",
+        status: "Aanbevolen",
+      });
+    } else if (advies.soort === "budget") {
+      actions.push({
+        title: "Budgetvoorstel voorbereiden",
+        why: `Er is ${fmt(budget.extraSpendNeeded)} extra budget nodig om het jaardoel te halen.`,
+        impact: "hoog",
+        status: "Aanbevolen",
+      });
     }
     if (forecast.conversions.kpi.diffPct < -10) {
       actions.push({
@@ -697,7 +714,7 @@ function computeActions(
       const cpaPoints = forecast.cpa.points.filter((p) => p.realized !== null);
       // Stond op 10 procent terwijl de rest van de app 15 aanhoudt: op een stijging van 12
       // procent gaf dit blok een waarschuwing die nergens anders verscheen.
-      const tweede = cpaTrendFrom(cpaPoints);
+      const tweede = cpaTrendFrom(cpaPuntenMetSommen(forecast, cpaPoints));
       const lastCpa = tweede.huidig;
       const firstCpa = tweede.vorig;
       if (tweede.stijgt) {
@@ -770,6 +787,7 @@ function KpiCard({
   diffPct,
   format,
   lagerIsBeter = false,
+  richting,
 }: {
   label: string;
   /** Null voor een verhouding zonder noemer (ytdGerealiseerd): een CPA zonder één conversie is
@@ -790,12 +808,15 @@ function KpiCard({
    * van een kwart is niet een verkeerd kleurtje maar een verkeerde conclusie.
    */
   lagerIsBeter?: boolean;
+  /** Overschrijft lagerIsBeter; "rond" voor budget: zowel eronder als erboven is een afwijking. */
+  richting?: DoelRichting;
 }) {
   const fmtVal = format === "currency" ? fmt : format === "ratio" ? formatRoas : num;
   // Draai het teken om als lager beter is; daarna gelden dezelfde drempels voor alle metrics.
-  const scoreDiff = lagerIsBeter ? -diffPct : diffPct;
-  const isGood = scoreDiff >= -3;
-  const isWarning = scoreDiff < -3 && scoreDiff >= -15;
+  // Eén regel voor het oordeel (doelOordeel): budget boven doel was hier groen.
+  const oordeel = doelOordeel(diffPct, richting ?? (lagerIsBeter ? "lager" : "hoger"));
+  const isGood = oordeel === "goed";
+  const isWarning = oordeel === "let-op";
 
   // Zonder prognose geen oordeel: diffPct staat dan tegen een prognose die er niet is.
   const statusColor = forecastVal === null ? "text-muted-foreground" : isGood ? "text-green-600" : isWarning ? "text-amber-600" : "text-red-600";
@@ -841,17 +862,20 @@ function ForecastBar({
   realized,
   target,
   forecast: forecastVal,
+  richting = "hoger",
 }: {
   label: string;
   realized: number;
   target: number;
   forecast: number;
+  /** "rond" voor budget: een prognose 20% boven het budget is overbesteding, niet "op doel". */
+  richting?: DoelRichting;
 }) {
   const realizedPct = target > 0 ? Math.min((realized / target) * 100, 100) : 0;
   const forecastPct = target > 0 ? Math.min((forecastVal / target) * 100, 120) : 0;
   const diff = forecastVal - target;
   const diffPctVal = target > 0 ? (diff / target) * 100 : 0;
-  const isOnTarget = diffPctVal >= -3;
+  const isOnTarget = doelOordeel(diffPctVal, richting) === "goed";
 
   return (
     <div className="space-y-1.5">
@@ -891,19 +915,36 @@ function ForecastBar({
 
 // ─── Main Component ──────────────────────────────────────────────────
 
-export function DgmView({ clientId }: { clientId: string }) {
+export function DgmView({ clientId, kanalen = null, geoClone = null }: {
+  clientId: string;
+  /** De kanalen van de klant: bepalen over welke reeks het jaardoel gaat (lib/doel/jaardoel.ts). */
+  kanalen?: readonly Kanaal[] | null;
+  /** De gekozen beurs. Dit tabblad filtert er niet op, en zegt dat dan. */
+  geoClone?: string | null;
+}) {
   const data = useClientHistoricalData(clientId);
   const dataState = useClientDataState();
-  const forecast = useMemo(() => computeForecast(data), [data]);
+  const googleForecast = useMemo(() => computeForecast(data), [data]);
   const settings = getClientSettings(clientId);
   const vocab = getVocab(settings);
 
-  const health = useMemo(() => computeHealthScore(
-    forecast,
-    dataState?.impressionShare,
-    dataState?.wastefulSearchTerms,
-    dataState?.adGroupBleeders,
-  ), [forecast, dataState]);
+  // Het jaardoel uit Instellingen geldt voor het account. Dit tabblad rekende het altijd op de
+  // Google-reeks, ook bij een klant met vier kanalen: "ACTIE VEREIST, 51% onder doel" waar het
+  // Overzicht over dezelfde 2.600 conversies "+52,8% gunstig" zei. Nu dezelfde reeks als het
+  // Overzicht: alle kanalen samen als de klant er meer heeft, en het scherm zegt welke.
+  const bereik = jaardoelBereik(kanalen, kpiDoelenIngevoerd(settings));
+  const doelReeks = reeksVanDoel(bereik);
+  const blended = useBlendedClientData(clientId, doelReeks === "blended");
+  const blendedNietBeschikbaar = doelReeks === "blended" && !blended.forecast && !blended.loading;
+  const forecast: ClientForecast = doelReeks === "blended" && blended.forecast ? blended.forecast : googleForecast;
+  // Laadt alle kanalen samen niet, dan rekent de pagina op Google, en geldt het doel daar niet:
+  // geen budgetadvies tegen de eigen schatting van Google (gebruikteDoelReeks).
+  const { reeks: gebruikteReeks, doelGeldt } = gebruikteDoelReeks(bereik, !!blended.forecast);
+
+  // De health score en de oorzaken uit zoektermen, vertoningsaandeel en advertentiegroepen zijn
+  // Google-begrippen: die blijven op de Google-reeks, en het scherm zegt dat erbij. Dezelfde
+  // berekening als de kanaalkaart en de ranking (googleHealthScore), zodat Google overal een getal heeft.
+  const health = useMemo(() => googleHealthScore(googleForecast, dataState), [googleForecast, dataState]);
 
   // Fetch DB data
   const [dbInsights, setDbInsights] = useState<DbInsight[]>([]);
@@ -946,7 +987,7 @@ export function DgmView({ clientId }: { clientId: string }) {
   const cpa = forecast.cpa.kpi;
   const roas = forecast.roas.kpi;
 
-  const businessImpact = computeBusinessImpact(forecast);
+  const businessImpact = computeBusinessImpact(forecast, doelGeldt);
   // Voor de scenariotekst onder "Prognose vs jaardoel"; de regel staat bij computeBusinessImpact.
   const zonderConversies = cpaTrendVanForecast(forecast).zonderConversies;
   const causes = computeBusinessCauses(
@@ -956,10 +997,16 @@ export function DgmView({ clientId }: { clientId: string }) {
     dataState?.adGroupBleeders,
     dbInsights,
   );
-  const actions = computeActions(forecast, dbRecs, dbTasks);
+  const actions = computeActions(forecast, doelGeldt, dbRecs, dbTasks);
   const decisions = computeDecisions(forecast, health, dbRecs, dbTasks, dataState?.impressionShare);
 
   const [detailsExpanded, setDetailsExpanded] = useState(false);
+
+  // Alle kanalen samen nog onderweg: niet eerst het Google-oordeel tonen en daarna omslaan.
+  if (doelReeks === "blended" && !blended.forecast && blended.loading) {
+    return <Laadvlak vorm="grafiek" hoogte={320} titel="Doelen en voortgang" />;
+  }
+  const overTekst = oordeelOverTekst(bereik, gebruikteReeks);
 
   // Elk blok op deze pagina is een eigen sectie — snapshot, trajectdoelen, oorzaken, acties,
   // sprintstatus, prognose, beslissingen, verdieping — maar ze stonden allemaal op dezelfde
@@ -1004,6 +1051,18 @@ export function DgmView({ clientId }: { clientId: string }) {
                 Verwachte afwijking op het jaardoel, op basis van de huidige trend — de kaarten
                 hieronder tonen de ruwe voortgang tot nu toe (nog niet tijd-gecorrigeerd).
               </p>
+              {/* Over welke kanalen dit oordeel gaat. Dit tabblad gaat naar de klant, en zei dat
+                  nergens: de cijfers waren Google, het doel was voor het hele account. */}
+              <p className="text-micro text-brand-gray mt-1" data-doel-bereik={gebruikteReeks}>
+                {overTekst}
+                {gebruikteReeks === "blended" && ` De health score en de oorzaken uit zoektermen en vertoningsaandeel gaan over ${KANAAL_NAAM.google}.`}
+                {blendedNietBeschikbaar && " Alle kanalen samen konden niet geladen worden; daarom staat hier alleen Google Ads."}
+              </p>
+              {geoClone && (
+                <p className="text-micro font-medium text-amber-800 mt-1">
+                  {geenBeursfilterTekst(geoClone, "Dit tabblad")}
+                </p>
+              )}
             </div>
           </div>
         </div>
@@ -1063,6 +1122,7 @@ export function DgmView({ clientId }: { clientId: string }) {
               forecast={spend.adjustedAnnual}
               diffPct={spend.diffPct}
               format="currency"
+              richting="rond"
             />
           )}
           {roas.annualTarget > 0 && settings.kpiTargets.roasTarget > 0 && (() => {
@@ -1351,32 +1411,47 @@ export function DgmView({ clientId }: { clientId: string }) {
               realized={spend.ytdRealized}
               target={spend.annualTarget}
               forecast={spend.adjustedAnnual}
+              richting="rond"
             />
           )}
         </div>
 
-        {/* Scenario text */}
-        {forecast.budgetRecommendation.behindTarget && conv.annualTarget > 0 && (
-          <div className="mt-4 p-3 rounded-lg bg-blue-50 border border-blue-100">
-            <p className="text-xs text-blue-800 leading-relaxed">
-              {zonderConversies.length > 0 ? (
-                <>
-                  <strong>Scenario:</strong> hoeveel budget nodig is om het jaardoel
-                  van {num(conv.annualTarget)} {vocab.conversions} te halen, is pas te berekenen als de conversiemeting
-                  klopt: in {zonderConversies.join(", ")} waren er kosten zonder één conversie.
-                  Zonder aanpassing is de verwachting {num(conv.adjustedAnnual)} {vocab.conversions} ({pct(conv.diffPct)} vs doel).
-                </>
-              ) : (
-                <>
-                  <strong>Scenario:</strong> Bij een budgetverhoging van {Math.round(forecast.budgetRecommendation.spendIncreasePct)}%
-                  (naar {fmt(forecast.budgetRecommendation.requiredMonthlySpend)}/maand) is het jaardoel
-                  van {num(conv.annualTarget)} {vocab.conversions} naar verwachting haalbaar.
-                  Zonder aanpassing is de verwachting {num(conv.adjustedAnnual)} {vocab.conversions} ({pct(conv.diffPct)} vs doel).
-                </>
-              )}
-            </p>
-          </div>
-        )}
+        {/* Scenario text: dezelfde uitkomst als "Wat betekent dit" hierboven (budgetAdvies). Hier
+            stond "Bij een budgetverhoging van 635% is het jaardoel haalbaar" onder "Meer budget is
+            niet de oplossing". */}
+        {conv.annualTarget > 0 && (() => {
+          const advies = budgetAdvies(forecast.budgetRecommendation, zonderConversies, doelGeldt);
+          // Bij een kleine achterstand geen advies, wel de verwachting (scenarioVak).
+          const vak = scenarioVak(advies, forecast.budgetRecommendation.behindTarget, doelGeldt);
+          if (vak === null) return null;
+          return (
+            <div className="mt-4 p-3 rounded-lg bg-blue-50 border border-blue-100">
+              <p className="text-xs text-blue-800 leading-relaxed">
+                {advies.soort === "meting" && (
+                  <>
+                    <strong>Scenario:</strong> hoeveel budget nodig is om het jaardoel
+                    van {num(conv.annualTarget)} {vocab.conversions} te halen, is pas te berekenen als de conversiemeting
+                    klopt: in {advies.maanden.join(", ")} waren er kosten zonder één conversie.
+                  </>
+                )}
+                {advies.soort === "efficientie" && (
+                  <>
+                    <strong>Scenario:</strong> extra budget haalt het jaardoel van {num(conv.annualTarget)} {vocab.conversions} niet
+                    tegen deze CPA ({fmt(advies.huidigeCpa)}{advies.cpaDoel != null ? `, doel ${fmt(advies.cpaDoel)}` : ""}): eerst de efficiëntie.
+                  </>
+                )}
+                {advies.soort === "budget" && (
+                  <>
+                    <strong>Scenario:</strong> Bij een budgetverhoging van {Math.round(advies.verhogingPct)}%
+                    (naar {fmt(advies.nodigPerMaand)}/maand) is het jaardoel
+                    van {num(conv.annualTarget)} {vocab.conversions} naar verwachting haalbaar.
+                  </>
+                )}
+                {vak === "advies" ? " Zonder" : "Zonder"} aanpassing is de verwachting {num(conv.adjustedAnnual)} {vocab.conversions} ({pct(conv.diffPct)} vs doel).
+              </p>
+            </div>
+          );
+        })()}
       </div>
 
       {/* ─── 7. Beslissingen nodig ─── */}

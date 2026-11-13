@@ -1,12 +1,16 @@
-export {};
 // Verificatie: de mode-guard in buildFallbackStrategy verwijdert duplicaat-routes
 // voor een vaste-mode cluster (search_budget_cap) dat over meerdere modes wordt gemapt.
 // Draaien: npx tsx lib/analysis/__fallback_mode_test.ts
 
+import { buildFallbackStrategy } from "./monthly-structured";
+
 type Mode = "containment" | "recovery" | "validation";
 type Strategy = { mode: Mode; action: string };
 
-const BUDGET_ACTION = "Vergroot het budgetvenster van Campagne X alleen op rendabele uren";
+// De actie die de echte functie voor dit cluster schrijft; de oude variant hieronder gaf dezelfde
+// actie, maar voor elke mode.
+const BUDGET_ACTION_BEGIN = "Vergroot het budgetvenster van Campagne X";
+let BUDGET_ACTION = "";
 
 // OUDE buildFallbackStrategy voor search_budget_cap: negeert de mode, retourneert altijd recovery.
 function oldFallback(mode: Mode): Strategy | null {
@@ -14,18 +18,29 @@ function oldFallback(mode: Mode): Strategy | null {
   return { mode: "recovery", action: BUDGET_ACTION };
 }
 
-// NIEUWE buildFallbackStrategy voor search_budget_cap: alleen voor de matchende mode.
+// NIEUW: de echte buildFallbackStrategy uit monthly-structured.ts, voor een search_budget_cap-cluster.
+// Hier stond eerst een kopie die "null" teruggaf; nu telt wat de functie werkelijk doet.
+type Cluster = Parameters<typeof buildFallbackStrategy>[0];
+const budgetCluster = { issue_cluster: "search_budget_cap", display_label: "Campagne X", canonical_metric: "Search Lost IS (Budget)" } as unknown as Cluster;
 function newFallback(mode: Mode): Strategy | null {
-  if (mode !== "recovery") return null; // de toegevoegde guard
-  return { mode: "recovery", action: BUDGET_ACTION };
+  return buildFallbackStrategy(budgetCluster, mode, "inferred", "medium") as Strategy | null;
 }
+BUDGET_ACTION = newFallback("recovery")?.action ?? "";
 
-// Replica van call-site 1 (regel 1346): map over modes, filter Boolean.
+// DE TWEE AANROEPVORMEN HIERONDER ZIJN GEEN KOPIE VAN DE CODE ONDER TEST. Getoetst wordt
+// buildFallbackStrategy, en die komt echt uit monthly-structured.ts. Deze twee bootsen alleen na HOE
+// hij aangeroepen wordt (over modes mappen en null weglaten; per mode in een Map zetten), om te
+// laten zien dat de oude functie in beide vormen een dubbele route gaf en de nieuwe niet. De echte
+// aanroepplekken zitten midden in grotere functies die een volledige analysecontext vragen; ze
+// exporteren zou een herschrijving van monthly-structured.ts vragen (een ander spoor). Verandert
+// de vorm van een aanroepplek, dan ziet deze test dat NIET.
+//
+// Aanroepvorm 1: map over modes, filter Boolean.
 function callsiteMapFilter(fallback: (m: Mode) => Strategy | null, modes: Mode[]): Strategy[] {
   return modes.map(fallback).filter(Boolean) as Strategy[];
 }
 
-// Replica van call-site 2 (regel 2790): strategyByMode Map, set per mode als niet-null.
+// Aanroepvorm 2: strategyByMode Map, set per mode als niet-null.
 function callsiteByModeMap(fallback: (m: Mode) => Strategy | null, modes: Mode[]): Strategy[] {
   const byMode = new Map<Mode, Strategy>();
   for (const m of modes) {
@@ -70,7 +85,7 @@ console.log("\n2. Call-site 2 (strategyByMode Map): de oude code zet dezelfde ac
 console.log("\n3. De juiste strategie blijft behouden voor zijn eigen mode");
 {
   const nieuw = callsiteMapFilter(newFallback, dualModes);
-  check("de overgebleven strategie is de recovery-strategie", nieuw[0]?.mode === "recovery" && nieuw[0]?.action === BUDGET_ACTION);
+  check("de overgebleven strategie is de recovery-strategie", nieuw[0]?.mode === "recovery" && nieuw[0]?.action.startsWith(BUDGET_ACTION_BEGIN), String(nieuw[0]?.action));
 }
 
 console.log("\n4. Met alleen de recovery-mode (single-route cluster) blijft gedrag identiek");

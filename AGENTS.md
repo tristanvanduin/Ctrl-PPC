@@ -103,3 +103,130 @@ Zet je er iets ná Kerncijfer in een kaart, wikkel hem dan in een `<div>` met au
 de detector hem vindt. Vindt hij hem niet, dan faalt het script — want dan zei "OK" hierboven
 niets. Dat is geen extraatje: deze codebase heeft eerder een controle gehad die iets anders
 verifieerde dan hij beweerde, en die stond er maanden groen bij.
+
+## Overgeslagen is niet groen
+
+De vier databasepoorten (rpc-rechten, view-dekking, bureaugrens, rls-scheiding) eindigden zonder
+sleutels met exitcode 0, en dan stond er "POORTEN GROEN" terwijl de scheiding tussen bureaus niet
+getoetst was. Nu eindigt een poort die niet draait met **exitcode 3** (`scripts/poort-overslaan.mjs`),
+noemt `scripts/gates.sh` hem bij naam in de slotregel, en eindigt de run dan zelf ook met 3:
+"POORTEN NIET GROEN: 6 gedraaid zonder fout, 5 niet gedraaid: ...". Groen betekent: alles gedraaid
+en alles geslaagd.
+
+De poorten in groepen, zodat je weet wat je wel en niet gedraaid hebt:
+
+```
+scripts/gates.sh code       hygiene, datagrond, tsc, tests, demo-scenario's, build: geen database, geen server
+scripts/gates.sh database   rpc, views, grens, rls, analyses: sleutels nodig
+scripts/gates.sh browser    rookproef en cijfercontrole: een draaiende server nodig
+scripts/gates.sh            alles = code + database; zonder sleutels dus NIET groen, en dat klopt
+```
+
+`alles` bevat de browser NIET. Bouwen mag niet onder een draaiende server en de browserpoorten hebben
+er juist een nodig; toen beide in `alles` zaten, sloten ze elkaar uit en eindigde het standaardcommando
+altijd op 3, ook met sleutels en een server. Een poort die altijd op 3 staat, leert je 3 te negeren.
+
+De volledige ronde is twee runs: `scripts/gates.sh` zonder server (code en database, inclusief de
+build), dan de server starten, dan `scripts/gates.sh browser`. Pas als beide groen zijn, is alles
+gedraaid. De build slaat hardop over als er op `BASIS_URL` een server antwoordt.
+
+Wie een poort toevoegt die soms niet kan draaien: gebruik `slaOver(naam, reden)` en nooit
+`process.exit(0)`. Moet er opgeruimd worden (proefgebruikers), gooi dan `Overslaan` binnen de `try`
+en roep `slaOver` pas na de `finally` aan: `process.exit` slaat de `finally` over, en zo bleef bij een
+mislukte login een proefgebruiker met een echte rol in de database staan.
+
+## De browser-rookproef
+
+`scripts/rookproef.mjs` opent op 390 px elke hoofdpagina van de demo-klant: Vandaag, Portfolio,
+Klanten, en per klant elk tabblad in de vertrouwde en de nieuwe weergave en elk kanaal. Hij faalt op
+een pageerror, een consolefout, een antwoord van 500 of hoger, de foutpagina van Next of een melding
+van een van onze error-grenzen (`data-foutgrens`), een pagina zonder een enkel kerncijfer waar er een
+hoort, zijwaartse scroll, en een tabbladknop die niet te vinden is.
+
+**Wanneer:** na elke wijziging aan een pagina, een tabblad, een datahook of de opmaak, en altijd voor
+een merge. tsc, de tests en de build zien geen van deze fouten: een renderfout in een onderdeel haalde
+de hele klantpagina onderuit terwijl alles groen stond.
+
+```
+npx next build && npx next start -p 3190      # eerst bouwen, zonder draaiende server
+node scripts/rookproef.mjs                     # of scripts/gates.sh browser
+node scripts/rookproef.mjs --zelftest          # alleen de zelftest, geen server nodig
+ALLEEN="nieuw kanaal" node scripts/rookproef.mjs   # alleen pagina's waarvan de naam dit bevat
+```
+
+De zelftest serveert een reeks bewust kapotte pagina's via `page.route` op een nep-adres en eist dat
+elk om de juiste reden wordt afgekeurd, en dat een gezonde pagina wordt goedgekeurd. Faalt de
+zelftest, dan faalt het script.
+
+Welke pagina's een kerncijfer moeten tonen staat in `schermen()` in het script. Die lijst is gemaakt
+uit de code en nog niet tegen een draaiende server gelegd; de eerste echte run kan dus een pagina
+afkeuren die terecht geen groot getal toont. Pas dan de lijst aan, met een reden erbij, en niet de
+detector.
+
+## De error-grenzen
+
+`app/(app)/foutgrens.tsx` heeft de melding en `OnderdeelGrens` (Next's `unstable_catchError`). Er zijn
+drie lagen: om de inhoud van een klanttabblad (kop, navigatie en andere tabbladen blijven werken),
+`error.tsx` per routegroep (de zijbalk blijft), en `app/global-error.tsx` voor een kapotte
+root-layout. De melding zegt wat er misging, waar, de foutcode voor de serverlogs, en heeft een knop
+om opnieuw te proberen. Een nieuw zelfstandig onderdeel dat eigen data ophaalt, kan in een eigen
+`<OnderdeelGrens onderdeel="...">`.
+
+## De cijfercontrole
+
+`scripts/check-cijfers-gelijk.mjs` leest dezelfde cijfers op meerdere pagina's af, allemaal op
+`?periode=last_12m`: Overzicht oud tegen nieuw, de kanaalkaarten opgeteld tegen de totaaltegel,
+Overzicht tegen Campagnes, Prognose tegen Doelen (het jaardoel), Portfolio tegen het Overzicht.
+Elk verschil groter dan de afronding van de minst precieze weergave is een fout, met beide plekken
+erbij. Een cijfer dat op een van de twee plekken niet af te lezen is, is NIET GEMETEN (exit 3).
+Draai hem na elke wijziging aan een totaal, een venster of een conversieselectie. Ook met
+`--zelftest`.
+
+De rij van de klant op Portfolio wordt gekozen op de link naar `/client/<id>`, niet op de tekst: het
+scorebord toont de naam, het id staat alleen in de href. Campagnes wordt gelezen als de som van de
+totaalrijen (`tfoot`) van de tabellen per kanaal. Beide staan in de zelftest met een nep-tabel.
+
+## De evaluatieset van de analyses
+
+`lib/eval/demo-scenarios.ts` legt per demoscenario (S1 tot S20 uit de kop van
+`scripts/demo/seed-demo-client.ts`, plus het stille scenario) vast welke bevinding een analyse hoort
+te geven en waar hij moet zwijgen (GRA op koers, Inkoop onder de volumegrens, "kas kopen
+tweedehands" te vroeg, de gezonde brandcampagne). `scripts/score-evaluatieset.mjs` scoort een
+uitvoer daartegen: gevonden, gemist, vals, per scenario.
+
+```
+node scripts/score-evaluatieset.mjs --bestand analyse.md     # opgeslagen uitvoer, geen model
+node scripts/score-evaluatieset.mjs --uit-db                 # laatste analyses van de demo (alleen lezen)
+node scripts/score-evaluatieset.mjs --vers --bevestig-kosten # VERSE run: kost geld, alleen localhost
+```
+
+Draai hem na elke wijziging aan een prompt, een poort of de modelroutering, en vergelijk met de
+vorige uitslag.
+
+De mag-niet's toetsen op actie of de SLECHTE richting (kosten omhoog, opbrengst omlaag), niet op
+"stijgt" of "daalt" los: een eerdere versie rekende "GRA stijgt +10% in conversies", precies de
+ontworpen uitkomst, als vals af. Een lat die juiste uitvoer afrekent, stuurt prompts de verkeerde
+kant op. Elke tegenvoorbeeldzin staat in `lib/eval/__demo_scenarios_test.ts`; voeg er een toe als
+je een nieuwe vindt. Een verse run legt zijn prompts vast in `eval_fixtures`; `/api/eval/replay` speelt
+ze af tegen een ander model en zet voor een fixture-set van demo-greentech de scenarioscore in de
+scorekaart.
+
+## Slagingspercentage van de analyses
+
+`scripts/check-analyse-slagingen.mjs` (ook `scripts/gates.sh analyses`) leest uit `generation_jobs`
+per cadans hoeveel runs afrondden, mislukten of vastliepen (running zonder update na
+`STALE_RUNNING_MINUTES`), en faalt onder de grens (standaard 80%, `--grens`). Alleen lezen. Een
+vastgelopen run telt als mislukt: hij leverde niets op en zei dat niet.
+
+Hij faalt ook als er in het venster **niets** gestart is (dan noemt hij per cadans de datum van de
+laatste afgeronde run), en als een vaste cadans langer dan zijn termijn niet afrondde
+(`MAX_DAGEN_ZONDER_AFRONDING` in `lib/eval/analyse-slagingen.ts`). Een keten die stilvalt, levert geen
+mislukkingen op maar stilte; een lege tabel mag niet als in orde lezen.
+
+## CI
+
+`.github/workflows/pr-poorten.yml` draait op elke pull request hygiene, datagrond, tsc, de tests en de
+detectorcontrole van de demo (`seed-demo-client.ts --check`).
+Niet de build (geheimen), niet de databasepoorten (echte database), niet de browserpoorten (server)
+en nog niet lint; dat staat in de samenvatting van elke run, zodat groen daar niet gelezen wordt als
+"alle poorten groen".

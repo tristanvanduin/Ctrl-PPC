@@ -45,6 +45,14 @@ export function isMonthlyDue(lastRunDate: string | null, now: Date): boolean {
 
 export type SopCadence = "weekly" | "biweekly" | "monthly";
 
+/**
+ * De sectie in sop_analysis_output die zegt dat een run AF is. Elke stap schrijft zijn eigen rij
+ * zodra hij klaar is, dus "er staat een rij met deze datum" betekent alleen dat stap 1 liep. Wie
+ * wil weten of een cadans gedraaid heeft, telt alleen deze sectie: bij weekly en biweekly komt hij
+ * na opgeslagen bevindingen, bij de monthly na een geslaagde kwaliteitspoort.
+ */
+export const AFRONDINGS_SECTIE = "full";
+
 /** De ene ingang die de drie hierboven samenvat, zodat een aanroeper niet zelf per cadans hoeft
  *  te kiezen welke functie erbij hoort. */
 export function isSopDue(cadence: SopCadence, lastRunDate: string | null, now: Date): boolean {

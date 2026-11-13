@@ -3,8 +3,12 @@
 // Een duur nacht- of vroege-ochtend-venster is stuurbaar via een bod-/budget-schema. Uren in
 // dagdelen van vier gegroepeerd (genoeg volume per blok); CPA per blok uit periodetotalen,
 // drempels op volume; eigen-platform-rekenkunde met het schema-advies als indicatie. Puur.
+//
+// Dezelfde toets op toeval als de weekdag-detector (lib/signals/toeval.ts): een dagdeel heet pas
+// structureel duur bij minstens tien verwachte conversies en een tekort dat niet van toeval komt.
 
-import { type DetectionResult, type SignalStory, type SignalEvidence } from "./types";
+import { type DetectionResult, type NotAssessable, type SignalEvidence } from "./types";
+import { toetsTekort, MIN_VERWACHTE_CONVERSIES } from "./toeval";
 
 export interface HourlyRow { hour: number; spend: number; conversions: number }
 
@@ -44,13 +48,21 @@ export function buildHourlyDaypartingSignals(rows: HourlyRow[], opts: { channelL
   if (totalSpend <= 0 || totalConv < HD_MIN_TOTAL_CONVERSIONS) return { triggered: [], checked: [id] };
   const overallCpa = div(totalSpend, totalConv)!;
 
-  const worst = [...byBlock.entries()]
-    .map(([key, a]) => ({ key, cpa: div(a.spend, a.conversions), share: a.spend / totalSpend }))
-    .filter((d) => d.share >= HD_MIN_BLOCK_SPEND_SHARE)
+  const blokken = [...byBlock.entries()]
+    .map(([key, a]) => ({ key, conversions: a.conversions, cpa: div(a.spend, a.conversions), share: a.spend / totalSpend }))
+    .filter((d) => d.share >= HD_MIN_BLOCK_SPEND_SHARE);
+  const duur = blokken
     .filter((d) => d.cpa == null || d.cpa >= overallCpa * HD_WASTE_CPA_MULT)
-    .sort((a, b) => (b.cpa ?? Infinity) - (a.cpa ?? Infinity))[0];
+    .map((d) => ({ ...d, toets: toetsTekort(d.conversions, d.share, totalConv, blokken.length) }));
+  const worst = duur.filter((d) => d.toets.significant).sort((a, b) => a.toets.p - b.toets.p)[0];
 
-  if (!worst) return { triggered: [], checked: [id] };
+  if (!worst) {
+    const dun = duur.filter((d) => !d.toets.genoegVolume);
+    const notAssessable: NotAssessable[] = dun.length > 0
+      ? [{ id, reason: `${dun.map((d) => labelOf(d.key)).join(", ")} oogt duur, maar met minder dan ${MIN_VERWACHTE_CONVERSIES} verwachte conversies is dat niet van toeval te onderscheiden` }]
+      : [];
+    return { triggered: [], checked: notAssessable.length > 0 ? [] : [id], ...(notAssessable.length > 0 ? { notAssessable } : {}) };
+  }
   const label = labelOf(worst.key);
   const cpaText = worst.cpa == null
     ? `converteert niet (spend zonder conversies)`
@@ -63,7 +75,10 @@ export function buildHourlyDaypartingSignals(rows: HourlyRow[], opts: { channelL
       story: `Op ${opts.channelLabel} draagt het dagdeel ${label} ${pctI(worst.share)} van de spend en ${cpaText}: dat venster is structureel duur.`,
       actionDirection: `overweeg een lager bod/budget-schema in het venster ${label}, of onderzoek waarom die uren slechter converteren (publiek minder actief, andere intentie)`,
       certainty: "indicatie",
-      evidence: [ev("dagdeel", label), ev("blok-CPA", worst.cpa == null ? "geen conversies" : eurS(worst.cpa)), ev("daggemiddelde CPA", eurS(overallCpa)), ev("spend-aandeel", pctI(worst.share))],
+      evidence: [
+        ev("dagdeel", label), ev("blok-CPA", worst.cpa == null ? "geen conversies" : eurS(worst.cpa)), ev("daggemiddelde CPA", eurS(overallCpa)), ev("spend-aandeel", pctI(worst.share)),
+        ev("conversies tegen verwacht", `${Math.round(worst.conversions * 10) / 10} tegen ${Math.round(worst.toets.verwacht * 10) / 10}`),
+      ],
     }],
     checked: [id],
   };

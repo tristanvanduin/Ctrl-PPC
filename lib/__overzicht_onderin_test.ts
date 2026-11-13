@@ -394,7 +394,7 @@ console.log("De beursregel 'Deze week' opent een venster");
   // Een week met kosten zonder conversies is met deze fixture niet te maken (de weken komen uit de
   // maandtotalen); dat de regel dan de reden en een streepje toont, staat hier op de bron vast.
   check("zonder waarde: de reden op de plek van 'gerealiseerd' en een streepje als getal",
-    /geenData \? geenWaardeLabel\(huidige, metric\)\.toLowerCase\(\) : huidige\.realized !== null \? "gerealiseerd" : "prognose"/.test(bron) && /\{geenData \? "—" : format\(waarde\)\}/.test(bron));
+    /geenData \? geenWaardeLabel\(huidige, metric\)\.toLowerCase\(\) : WEEK_SOORT_LABEL\[weekSoort\(huidige, today\(\)\)\]\.toLowerCase\(\)/.test(bron) && /\{geenData \? "—" : format\(waarde\)\}/.test(bron));
 }
 
 console.log("De bedrading: de schakelaar bereikt elk tabblad");

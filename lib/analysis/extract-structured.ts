@@ -28,6 +28,9 @@ import type { DataReliabilityAssessment } from "./data-reliability";
 import type { DroppedItems } from "@/lib/schema/analysis-schema";
 import { logger } from "@/lib/logger";
 import { toPromptTable } from "./prompt-table";
+import { bouwBronFeiten, type BevindingToets, type BronFeiten } from "./brondata-toets";
+import { afgevallenWaarschuwing, bevindingBeschrijving, bevindingTitel, toetsExtractie } from "./bevinding-weergave";
+import { beoordeelMeetbaarheid, meetbaarheidTekst, type Meetbaarheid } from "@/lib/learning/hypothesis-parser";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -43,8 +46,20 @@ export interface ExtractionResult {
    * onderscheiden waren: recsParseOk was true terwijl er taken ontbraken.
    */
   recsDropped: DroppedItems | null;
+  /** Idem voor de bevindingen: wat afviel en waarom, of null. */
+  findingsDropped: DroppedItems | null;
   saved: boolean;
+  /** Waarom het wegschrijven mislukte, als het mislukte. */
+  saveError: string | null;
   steps: StepResult[];
+  /**
+   * De uitkomst van de brondata-toets, of null als de route geen brondata meegaf. Een bevinding
+   * met een niet-herleidbaar kerngetal staat gemarkeerd op het scherm; deze tellingen zeggen
+   * hoeveel, zodat de run het ook in zijn eigen melding kan noemen.
+   */
+  brondata: { bevindingenNietHerleidbaar: number; cijfersNietHerleidbaar: number } | null;
+  /** Waarschuwingen voor de jobmelding en het antwoord: wat de gebruiker van deze run moet weten. */
+  waarschuwingen: string[];
 }
 
 interface ExtractionOptions {
@@ -69,6 +84,13 @@ interface ExtractionOptions {
   reliability?: DataReliabilityAssessment;
   /** Optional: TOP 3 BEVINDINGEN text extracted from analysis steps */
   topFindings?: string;
+  /**
+   * De cijfers die het model kreeg: databaserijen, doelen en door code geschreven context. NOOIT
+   * modeluitvoer (eerdere stappen, het geheugen, de maandoverdracht): de brondata-toets legt elk
+   * getal in de bevindingen en aanbevelingen hiertegen. Zonder dit valt de route terug op de oude
+   * cijferpoort, die model met model vergelijkt.
+   */
+  bronFeiten?: unknown[];
   /**
    * Run-sleutel (jobId) voor de llm_usage-kostenregistratie. Zonder deze sleutel logt runStep
    * niets, en dan stonden de twee extractiestappen -- de enige JSON-stappen van 16.000 tokens --
@@ -96,8 +118,9 @@ export async function extractStructuredData(opts: ExtractionOptions): Promise<Ex
     analysisDate, periodStart, periodEnd,
     analysisOutput, findingsSystemPrompt, recsSystemPrompt,
     stepOffset, analysisId, reliability, topFindings,
-    runKey, onPhase,
+    runKey, onPhase, bronFeiten,
   } = opts;
+  const waarschuwingen: string[] = [];
 
   const shared = { supabase, apiKey, clientId, sopType, periodStart, periodEnd, runKey };
   const steps: StepResult[] = [];
@@ -133,6 +156,15 @@ ${analysisOutput}`;
   const findings: Finding[] = findingsResult.success ? findingsResult.data : [];
   if (!findingsResult.success) {
     logger.error(`[${sopType}] Findings parse failed:`, findingsResult.error);
+    waarschuwingen.push(`De bevindingen konden niet worden ingelezen: ${findingsResult.error.slice(0, 200)}`);
+  }
+  const findingsDropped = findingsResult.success ? (findingsResult.dropped ?? null) : null;
+  const afgevallen = afgevallenWaarschuwing(findingsDropped, findings.length);
+  if (afgevallen) {
+    // Zelfde reden als bij de aanbevelingen hieronder: een schemafout mag niet stil bepalen welke
+    // bevindingen de specialist te zien krijgt.
+    logger.error(`[${sopType}] ${afgevallen} | ${findingsDropped?.reasons.join(" | ")}`);
+    waarschuwingen.push(afgevallen);
   }
 
   // ── Step B: Extract recommendations + tasks (JSON mode) ──────────
@@ -203,10 +235,27 @@ ${analysisOutput}`,
   const voorstelBron = proposalSourceForSopType(sopType);
   recs = applyActionGating(findings, recs, { channel });
 
-  // W2.5 (W2): number-gate voor de korte cadans. Markeert en schrapt percentages en euro's in
-  // aanbevelingen en taken die niet herleidbaar zijn tot de gegronde analyse-output. Alleen
-  // weekly en biweekly; monthly heeft zijn eigen gate in buildStructuredMonthlyOutput.
-  if (sopType.endsWith("weekly") || sopType.endsWith("biweekly")) {
+  // De brondata-toets: elk bedrag, aantal en percentage in bevindingen, aanbevelingen en taken
+  // tegen de cijfers die het model KREEG, niet tegen wat het model schreef. Zonder brondata valt de
+  // route terug op de oude cijferpoort hieronder, die de analysetekst zelf als gegrond neemt.
+  let bevindingToetsen: BevindingToets[] | null = null;
+  let brondata: ExtractionResult["brondata"] = null;
+  if (bronFeiten && bronFeiten.length > 0) {
+    const feiten: BronFeiten = bouwBronFeiten(bronFeiten);
+    const toets = toetsExtractie(findings, recs, tasks, feiten);
+    bevindingToetsen = toets.bevindingen;
+    recs = toets.recommendations;
+    tasks = toets.tasks;
+    brondata = { bevindingenNietHerleidbaar: toets.bevindingenNietHerleidbaar, cijfersNietHerleidbaar: toets.cijfersNietHerleidbaar };
+    if (toets.bevindingenNietHerleidbaar > 0) {
+      waarschuwingen.push(`${toets.bevindingenNietHerleidbaar} van de ${findings.length} bevindingen hebben een kerngetal dat niet in de brondata staat; ze staan gemarkeerd bij Bevindingen.`);
+    }
+    if (toets.cijfersNietHerleidbaar > 0) {
+      waarschuwingen.push(`${toets.cijfersNietHerleidbaar} getallen in aanbevelingen en taken kwamen niet uit de brondata en zijn vervangen door een markering.`);
+    }
+  } else if (sopType.endsWith("weekly") || sopType.endsWith("biweekly")) {
+    // W2.5 (W2): de oude number-gate, als terugval. Vergelijkt met de analysetekst zelf (model
+    // tegen model); alleen nog voor een aanroeper die geen brondata meegeeft.
     const allowed = extractGroundedNumbers(analysisOutput + " " + findings.map((f) => JSON.stringify(f)).join(" "));
     let flaggedNumbers = 0;
     recs = recs.map((rec) => {
@@ -234,24 +283,44 @@ ${analysisOutput}`,
     }
   }
 
+  // ── Meetbaarheid van elk voorstel, bij het wegschrijven ──────────
+  //
+  // Niet pas maanden later in de evaluator: dan is het te laat om de tekst te verbeteren. Een
+  // niet-meetbaar voorstel wordt niet weggegooid (het kan een goed idee zijn), maar staat er
+  // zichtbaar als zodanig: de onderbouwing begint met de reden, en de metadata draagt de uitkomst.
+  const meetbaarheden: Meetbaarheid[] = recs.map((r) => beoordeelMeetbaarheid({
+    expectedResult: r.expected_result, measurementMetric: r.measurement_metric, timeframe: r.timeframe, bron: voorstelBron,
+  }));
+  const nietMeetbaar = meetbaarheden.filter((m) => !m.meetbaar).length;
+  if (nietMeetbaar > 0) {
+    waarschuwingen.push(`${nietMeetbaar} van de ${recs.length} voorstellen zijn niet meetbaar geformuleerd en staan zo gemarkeerd.`);
+  }
+  const rationaleMetMeetbaarheid = (rec: Recommendation, i: number): string =>
+    meetbaarheden[i]?.meetbaar === false ? `${meetbaarheidTekst(meetbaarheden[i])} ${rec.rationale}` : rec.rationale;
+
   // ── Save to Supabase ─────────────────────────────────────────────
 
   let saved = false;
+  let saveError: string | null = null;
+  // Een insert die door de database geweigerd wordt gaf eerder gewoon saved: true, omdat alleen
+  // data werd uitgelezen en nooit error. Nu breekt een weigering het opslaan af met de reden.
+  const eis = <T>(uitkomst: { data: T | null; error: { message: string } | null }, wat: string): T | null => {
+    if (uitkomst.error) throw new Error(`${wat}: ${uitkomst.error.message}`);
+    return uitkomst.data;
+  };
 
   if (findings.length > 0) {
     try {
       await onPhase?.("save_outputs", "Structured output opslaan...");
       // 1. Insert findings → sop_insights
-      const insightRows = findings.map((f) => ({
+      const insightRows = findings.map((f, i) => ({
         client_id: clientId,
         analysis_id: analysisId,
         sop_type: sopType,
         analysis_date: analysisDate,
         insight_type: f.insight_type,
-        title: `[Stap ${f.step}] ${f.entity_name}: ${f.metric} ${f.change_pct ? `${f.change_pct}%` : ""}`.slice(0, 80),
-        description: f.cause
-          ? `${f.entity_name} — ${f.metric}: ${f.current_value} (was ${f.previous_value}). Oorzaak: ${f.cause}`
-          : `${f.entity_name} — ${f.metric}: ${f.current_value} (was ${f.previous_value})`,
+        title: bevindingTitel(f, bevindingToetsen?.[i]),
+        description: bevindingBeschrijving(f, bevindingToetsen?.[i]),
         severity: f.severity,
         affected_entity: f.entity_name,
         affected_entity_type: f.entity_type,
@@ -264,10 +333,10 @@ ${analysisOutput}`,
         action_required: f.action_required,
       }));
 
-      const { data: insertedInsights } = await supabase
+      const insertedInsights = eis(await supabase
         .from("sop_insights")
         .insert(insightRows)
-        .select("id");
+        .select("id"), "inzichten opslaan");
 
       const insightIds = (insertedInsights ?? []).map((r: { id: string }) => r.id);
 
@@ -277,7 +346,7 @@ ${analysisOutput}`,
       // een aanbeveling in de database zonder de bevinding waar hij uit voortkomt. Juist die
       // koppeling is waar de rest van de tool op steunt om een advies te kunnen verantwoorden.
       let verbrokenKoppelingen = 0;
-      const recRows = recs.map((rec) => {
+      const recRows = recs.map((rec, i) => {
         const findingIdx = rec.finding_index;
         const buitenBereik = findingIdx !== null && (findingIdx < 0 || findingIdx >= insightIds.length);
         if (buitenBereik) verbrokenKoppelingen += 1;
@@ -291,7 +360,7 @@ ${analysisOutput}`,
           expected_result: rec.expected_result,
           measurement_metric: rec.measurement_metric,
           timeframe: rec.timeframe,
-          rationale: rec.rationale,
+          rationale: rationaleMetMeetbaarheid(rec, i),
           ice_impact: rec.ice_impact,
           ice_confidence: rec.ice_confidence,
           ice_ease: rec.ice_ease,
@@ -304,10 +373,10 @@ ${analysisOutput}`,
         logger.error(`[${sopType}] ${verbrokenKoppelingen} van de ${recs.length} aanbevelingen verwees naar een bevinding die niet bestaat (finding_index buiten bereik); die staan nu zonder koppeling in de database`);
       }
 
-      const { data: insertedRecs } = await supabase
+      const insertedRecs = eis(await supabase
         .from("sop_recommendations")
         .insert(recRows)
-        .select("id");
+        .select("id"), "aanbevelingen opslaan");
 
       const recIds = (insertedRecs ?? []).map((r: { id: string }) => r.id);
 
@@ -344,7 +413,27 @@ ${analysisOutput}`,
         logger.error(`[${sopType}] ${verbrokenTaakKoppelingen} van de ${tasks.length} taken verwees naar een aanbeveling die niet bestaat (recommendation_index buiten bereik)`);
       }
 
-      await supabase.from("sop_tasks").insert(taskRows);
+      const insertedTasks = eis(await supabase.from("sop_tasks").insert(taskRows).select("id"), "taken opslaan");
+      const taskIds = (insertedTasks ?? []).map((r: { id: string }) => r.id);
+
+      // Een nieuwe run van dezelfde soort sluit de vorige af. Zonder dit stapelde Bevindingen alle
+      // runs op elkaar: 141 open aanbevelingen en 394 open taken bij demo-greentech, de top 20 uit
+      // dertien verschillende runs, "demo3 pauzeren" zes keer. Wat nog open stond van een eerdere
+      // run van deze sop_type krijgt status "vervangen"; in behandeling, afgerond of afgewezen
+      // blijft staan, dat zijn genomen beslissingen. Faalt dit, dan blijft de run zelf geslaagd:
+      // het is opruimwerk, en het staat in de waarschuwingen.
+      const vervang = async (tabel: "sop_recommendations" | "sop_tasks", nieuw: string[]): Promise<void> => {
+        let q = supabase.from(tabel).update({ status: "vervangen" })
+          .eq("client_id", clientId).eq("sop_type", sopType).eq("status", "open");
+        if (nieuw.length > 0) q = q.not("id", "in", `(${nieuw.join(",")})`);
+        const { error } = await q;
+        if (error) {
+          logger.error(`[${sopType}] vorige ${tabel} afsluiten mislukt: ${error.message}`);
+          waarschuwingen.push(`De open punten van de vorige ${sopType}-run konden niet als vervangen worden gemarkeerd (${error.message}).`);
+        }
+      };
+      await vervang("sop_recommendations", recIds);
+      await vervang("sop_tasks", taskIds);
 
       // 4. Hypothesis-sourced recs naar sprint_hypotheses.
       // SI6: dit liep als enige via een rauwe insert, terwijl second_opinion en
@@ -352,28 +441,39 @@ ${analysisOutput}`,
       // ene writer: dezelfde veilige semantiek (nieuwe rijen eerst inserten, oude pending
       // pas daarna opruimen, geaccepteerde voorstellen blijven altijd staan) en een
       // expliciete bron in plaats van de kolomdefault.
-      const hypotheseRecs = recs.filter((rec) => rec.source === "hypothesis");
-      const hypotheseRows: SprintHypothesisRow[] = hypotheseRecs.map((rec) => ({
-        client_id: clientId,
-        analysis_id: analysisId,
-        hypothesis: rec.hypothesis,
-        expected_result: rec.expected_result,
-        measurement_metric: rec.measurement_metric,
-        timeframe: rec.timeframe,
-        rationale: rec.rationale,
-        ice_impact: rec.ice_impact,
-        ice_confidence: rec.ice_confidence,
-        ice_ease: rec.ice_ease,
-        ice_total: rec.ice_total,
-        status: "pending",
-        source: voorstelBron,
-      }));
+      const hypotheseRows: SprintHypothesisRow[] = recs
+        .map((rec, i) => ({ rec, i }))
+        .filter(({ rec }) => rec.source === "hypothesis")
+        .map(({ rec, i }) => ({
+          client_id: clientId,
+          analysis_id: analysisId,
+          hypothesis: rec.hypothesis,
+          expected_result: rec.expected_result,
+          measurement_metric: rec.measurement_metric,
+          timeframe: rec.timeframe,
+          rationale: rationaleMetMeetbaarheid(rec, i),
+          ice_impact: rec.ice_impact,
+          ice_confidence: rec.ice_confidence,
+          ice_ease: rec.ice_ease,
+          ice_total: rec.ice_total,
+          status: "pending",
+          source: voorstelBron,
+          // Migratie 088 (metadata jsonb): wat de evaluator straks gaat meten, of waarom niet.
+          metadata: { meetbaarheid: meetbaarheden[i] },
+        }));
       await saveProposalsReplacingPending(supabase, clientId, voorstelBron, hypotheseRows);
 
       saved = true;
     } catch (e) {
-      logger.error(`[${sopType}] Failed to save structured data:`, e instanceof Error ? e.message : e);
+      saveError = e instanceof Error ? e.message : String(e);
+      logger.error(`[${sopType}] Failed to save structured data:`, saveError);
+      waarschuwingen.push(`Opslaan van de bevindingen mislukte: ${saveError}`);
     }
+  }
+
+  if (recsResult.success && recsResult.dropped) {
+    const wat = Object.entries(recsResult.dropped.counts).map(([k, v]) => `${v} ${k === "tasks" ? "taken" : "aanbevelingen"}`).join(" en ");
+    waarschuwingen.push(`${wat} vielen af bij het inlezen.`);
   }
 
   return {
@@ -383,7 +483,11 @@ ${analysisOutput}`,
     findingsParseOk: findingsResult.success,
     recsParseOk: recsResult.success,
     recsDropped: recsResult.success ? (recsResult.dropped ?? null) : null,
+    findingsDropped,
     saved,
+    saveError,
     steps,
+    brondata,
+    waarschuwingen,
   };
 }

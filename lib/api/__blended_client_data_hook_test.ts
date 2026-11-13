@@ -86,12 +86,14 @@ globalThis.fetch = ((url: string) => {
 }) as typeof fetch;
 
 const rust = () => new Promise((r) => setTimeout(r, 20));
-// Wachten tot iets waar is (hooguit twee seconden), en dan nog één rust. Met alleen de vaste rust
+// Wachten tot iets waar is (met een bovengrens), en dan nog één rust. Met alleen de vaste rust
 // van 20 ms had de hook onder load (de suite draait vier testbestanden tegelijk, en de eerste mount
 // komt direct na het laden van react-dom) zijn effect soms nog niet gedraaid: dan was er niets te
 // beantwoorden en faalde het hele eerste blok, zonder dat er aan de hook iets mis was.
+// De bovengrens is ruim (tien seconden): hij kost alleen tijd als de test toch al zou falen, en
+// met twee seconden gaf de volle parallelle suite af en toe rood terwijl de test los groen was.
 async function tot(waar: () => boolean): Promise<void> {
-  const eind = Date.now() + 2000;
+  const eind = Date.now() + 10_000;
   while (!waar() && Date.now() < eind) await new Promise((r) => setTimeout(r, 5));
   await rust();
 }

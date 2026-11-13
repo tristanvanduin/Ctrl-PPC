@@ -624,7 +624,11 @@
   --color-purple-700: #cab2ee;
   --color-purple-900: #e8dcf8;
 
+  /* teal-50 en -200 ontbraken: de LinkedIn-kanaalchip (bg-teal-50 border-teal-200 text-teal-700)
+     werd in donker een witte pil met lichte tekst, ongeveer 1,5:1. */
+  --color-teal-50: #10242a;
   --color-teal-100: #14302e;
+  --color-teal-200: #1d4642;
   --color-teal-700: #9adcd6;
 
   --color-cyan-100: #133034;

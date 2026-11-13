@@ -144,7 +144,7 @@ console.log("klok in de geraakte routes en componenten");
     !/new Date\(\)\.toISOString\(\)/.test(cc) && !/setMonth\(/.test(cc) && !/Date\.now\(\)\s*-/.test(cc));
   check("cross-channel: de lopende maand uit today()", cc.includes("const currentMonthStart = `${vandaag.slice(0, 7)}-01`;"));
   const cpc = bron("components/dashboard/campaigns-per-channel.tsx");
-  check("campaigns-per-channel: geen UTC-klok voor het venster", !/Date\.now\(\)/.test(cpc) && cpc.includes("addDays(vandaag, -90)"));
+  check("campaigns-per-channel: geen UTC-klok voor het venster", !/Date\.now\(\)/.test(cpc) && cpc.includes("campagneVensters(today())"));
   const mp = bron("lib/kanalen/maand-pacing.ts");
   check("maand-pacing rekent een maand terug op de tekst", mp.includes("addMonths(dezeMaand, -1)") && !/setMonth\(/.test(mp));
 }
@@ -196,7 +196,7 @@ console.log("stap 4: band, kanalen en de vergeet-ingang");
     /\{activeTab === "dashboard" && !clientData\.error && \(\s*<div[^>]*>\s*<ChannelTabs [^>]*\/>\s*$/.test(voorBand), voorBand.slice(-200));
   // Geen dubbel skelet: de band toont zijn eigen laadvlak, dus het paginavlak begint zonder.
   check("het laadvlak van de pagina begint zonder band-deel", /\{clientData\.loading && <PaginaLaadvlak metBand=\{false\} \/>\}/.test(code));
-  check("ook het wachtvlak van de provider", /<ClientDataProvider clientId=\{client\.id\} wachtvlak=\{<PaginaLaadvlak metBand=\{false\} \/>\}>/.test(code));
+  check("ook het wachtvlak van de provider", /<ClientDataProvider clientId=\{client\.id\}[^>]*wachtvlak=\{<PaginaLaadvlak metBand=\{false\} \/>\}>/.test(code));
   check("de provider gebruikt het meegegeven wachtvlak", bron("lib/client-data-provider.tsx").includes("return wachtvlak ?? <PaginaLaadvlak />;"));
 
   // Na een sync: de ene vergeet-ingang, en niets dat de Google-data op null zet (de syncmelding

@@ -219,7 +219,16 @@ export const FindingSchema = z.object({
   // Evidence model (optional for backward compatibility)
   evidence_level: EvidenceLevelEnum.optional(),
   confidence: ConfidenceEnum.optional(),
-  benchmark_type: BenchmarkTypeEnum.optional(),
+  // Nullable: de weekly- en biweekly-prompt bieden letterlijk `"benchmark_type": null` aan voor een
+  // bevinding zonder maatstaf (een kale verspilling heeft geen doel). Het schema accepteerde wel
+  // "afwezig" maar niet null, en het herstelpad gooide die bevindingen daarna stil weg: op de 23
+  // opgeslagen extracties van demo-greentech 64 van de 219, waaronder alle vijf de
+  // zoekterm-bleeders van de Google-weekly van 1 september (doorlichting 13 november).
+  benchmark_type: BenchmarkTypeEnum.nullable().optional(),
+  // Het doel waartegen de bevinding is afgezet, apart van de vorige waarde. Het model zette het
+  // doel in previous_value ("cpa: 94,84 (was 45)"), en dan leest de specialist een verdubbeling in
+  // een week terwijl het de afstand tot het doel is. normaliseerDoelVeld verhuist het.
+  target_value: z.number().nullable().optional(),
 });
 
 export type Finding = z.infer<typeof FindingSchema>;
@@ -419,6 +428,29 @@ function enrichRawFinding(raw: unknown): unknown {
   return record;
 }
 
+/** Maatstaven die geen eerdere meting zijn, met hoe het scherm ze noemt. */
+export const MAATSTAF_LABEL: Partial<Record<BenchmarkType, string>> = {
+  monthly_target: "maanddoel",
+  pace_target: "benodigd tempo",
+  annual_goal: "jaardoel",
+  sector_benchmark: "sectorbenchmark",
+  account_average: "accountgemiddelde",
+  campaign_average: "campagnegemiddelde",
+};
+
+/**
+ * Scheidt doel en vorige waarde. Bij een bevinding die tegen een doel of benchmark is afgezet is
+ * previous_value geen eerdere meting maar de maatstaf: die hoort in target_value, en previous_value
+ * blijft leeg tot er echt een vorige periode is. Een al gevuld target_value laat het ongemoeid.
+ * Gemeten op de opgeslagen inzichten van demo-greentech: 49 met "was 45", waarvan 43 het CPA-doel.
+ */
+export function normaliseerDoelVeld(f: Finding): Finding {
+  if (!f.benchmark_type || !MAATSTAF_LABEL[f.benchmark_type]) return f;
+  if (typeof f.target_value === "number") return f;
+  if (typeof f.previous_value !== "number") return f;
+  return { ...f, target_value: f.previous_value, previous_value: null };
+}
+
 /**
  * Parse and validate findings from LLM output (step 7).
  * Returns validated findings array or error details.
@@ -435,18 +467,27 @@ export function parseFindings(raw: string): ParseResult<Finding[]> {
     const result = FindingsArraySchema.safeParse(arr);
 
     if (result.success) {
-      return { success: true, data: result.data };
+      return { success: true, data: result.data.map(normaliseerDoelVeld) };
     }
 
-    // Partial recovery: keep items that validate individually
+    // Gedeeltelijk herstel: houd de items die los valideren, en zeg wat er afviel en waarom --
+    // net als parseRecommendations. Dit stond er niet, en dan bepaalt een schemafout welke
+    // bevindingen de specialist te zien krijgt zonder dat iemand het merkt.
     const validItems: Finding[] = [];
+    const reasons: string[] = [];
     for (const item of arr) {
       const single = FindingSchema.safeParse(item);
-      if (single.success) validItems.push(single.data);
+      if (single.success) validItems.push(normaliseerDoelVeld(single.data));
+      else {
+        const r = (item ?? {}) as Record<string, unknown>;
+        const wie = [r.entity_name, r.metric].filter((x) => typeof x === "string").join(" / ") || "onbekende bevinding";
+        reasons.push(`bevinding ${wie}: ${single.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ")}`);
+      }
     }
 
     if (validItems.length > 0) {
-      return { success: true, data: validItems };
+      const dropped = reasons.length > 0 ? { counts: { findings: reasons.length }, reasons } : undefined;
+      return { success: true, data: validItems, dropped };
     }
 
     return {

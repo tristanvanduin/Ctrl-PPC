@@ -49,15 +49,23 @@ export function windowLengthDays(edition: Edition): number | null {
 
 // Cumulatieve waarde tot en met dagen-uit x: de som van alle in-venster punten die x of meer
 // dagen voor de beurs vallen. Zo krijg je "waar stond deze editie op D-x".
-export function cumulativeThroughDaysOut(points: DailyPoint[], edition: Edition, x: number): number {
+//
+// `horizon` (optioneel) telt alleen punten op of na D-horizon: het deel van het venster waar
+// beide edities data hebben, als de historie pas midden in het vorige venster begint.
+//
+// De som wordt op een miljoenste afgerond: maandpunten worden naar rato over de dagen verdeeld
+// (zie spreidMaandOverDagen in geo-clone-analysis.ts), en 31 keer 10/31 optellen geeft anders
+// 9,999999999 in plaats van 10.
+export function cumulativeThroughDaysOut(points: DailyPoint[], edition: Edition, x: number, horizon?: number | null): number {
   let sum = 0;
   for (const p of points) {
     if (!isWithinWindow(p.date, edition)) continue;
     const dtf = daysToFair(edition.fairStartDate, p.date);
     if (dtf == null) continue;
+    if (horizon != null && dtf > horizon) continue;
     if (dtf >= x) sum += p.value;
   }
-  return sum;
+  return Math.round(sum * 1e6) / 1e6;
 }
 
 export interface CurvePoint {
@@ -87,7 +95,7 @@ export function cumulativeCurve(points: DailyPoint[], edition: Edition): CurvePo
 // twee edities meer dan deze fractie verschillen, is een vergelijking niet eerlijk.
 export const MATERIAL_WINDOW_DIFF = 0.2;
 
-export type ComparabilityReason = "eerste_editie" | "geen_vorige_data" | "materieel_ander_venster";
+export type ComparabilityReason = "eerste_editie" | "geen_vorige_data" | "materieel_ander_venster" | "onvolledige_historie";
 
 export interface EditionComparison {
   comparable: boolean;
@@ -96,19 +104,32 @@ export interface EditionComparison {
   currentCumulative: number;
   previousCumulativeAtSameDaysOut: number | null;
   deltaPct: number | null; // (huidig - vorig) / vorig
+  /**
+   * Gezet als de vergelijking is ingekort tot het deel van het venster waar beide edities data
+   * hebben: beide sommen tellen dan pas vanaf D-<dit getal>. currentCumulative is in dat geval
+   * ook ingekort, zodat de twee getallen naast elkaar hetzelfde stuk venster beslaan.
+   */
+  comparedFromDaysOut?: number | null;
 }
 
 // Editie-over-editie op gelijke dagen-uit, cumulatief tot het huidige dagen-uit-punt. Dit is
 // de eerlijke vergelijking die kalender-YoY niet geeft. Markeert expliciet wanneer het niet
 // kan: geen vorige editie, geen vorige data, of een materieel ander campagnevenster. Nooit
 // een stille vergelijking over ongelijke vensters.
+//
+// `historyStart` (optioneel): de eerste datum waarop er überhaupt data is. Begint die binnen
+// het venster van de vorige editie, dan ontbreekt daar een stuk aanloop dat er wel was. Zonder
+// deze inkorting rekende GRA twaalf maanden tegen tien en kwam hij op +38% uit waar +10% gold.
 export function alignEditionsAtEqualDaysOut(
   current: { edition: Edition; points: DailyPoint[] },
   previous: { edition: Edition; points: DailyPoint[] } | null,
-  asOfDate: string
+  asOfDate: string,
+  historyStart?: string | null
 ): EditionComparison {
   const x = daysToFair(current.edition.fairStartDate, asOfDate);
-  const currentCumulative = x == null ? 0 : cumulativeThroughDaysOut(current.points, current.edition, x);
+  const historieH = previous ? historyHorizon(previous.edition, historyStart) : null;
+  const horizon = previous ? gemeenschappelijkeHorizon(current.edition, previous.edition, historieH) : null;
+  const currentCumulative = x == null ? 0 : cumulativeThroughDaysOut(current.points, current.edition, x, horizon);
 
   if (!previous) {
     return { comparable: false, reason: "eerste_editie", daysToFairNow: x, currentCumulative, previousCumulativeAtSameDaysOut: null, deltaPct: null };
@@ -126,8 +147,41 @@ export function alignEditionsAtEqualDaysOut(
     }
   }
 
-  const previousCumulative = x == null ? 0 : cumulativeThroughDaysOut(previous.points, previous.edition, x);
+  // De historie begint pas NA het vergelijkbare punt van de vorige editie: er is geen enkel
+  // stuk venster dat beide edities hebben.
+  if (historieH != null && x != null && historieH < x) {
+    return { comparable: false, reason: "onvolledige_historie", daysToFairNow: x, currentCumulative, previousCumulativeAtSameDaysOut: null, deltaPct: null, comparedFromDaysOut: historieH };
+  }
+
+  const previousCumulative = x == null ? 0 : cumulativeThroughDaysOut(previous.points, previous.edition, x, horizon);
   const deltaPct = previousCumulative > 0 ? Math.round(((currentCumulative - previousCumulative) / previousCumulative) * 1000) / 1000 : null;
 
-  return { comparable: true, daysToFairNow: x, currentCumulative, previousCumulativeAtSameDaysOut: previousCumulative, deltaPct };
+  return { comparable: true, daysToFairNow: x, currentCumulative, previousCumulativeAtSameDaysOut: previousCumulative, deltaPct, comparedFromDaysOut: historieH };
+}
+
+/**
+ * Het deel van de dagen-uit-as dat BEIDE edities beslaan: de kortste van de twee vensters, en
+ * korter als de historie pas midden in het vorige venster begint. Null als er niets te begrenzen is.
+ *
+ * Met maandpunten op de 1e viel dit niet op; nu de punten over de dagen verdeeld zijn wel. De eerste
+ * geconfigureerde editie krijgt een venster van 365 dagen, de volgende begint vier dagen na de
+ * vorige beurs: vlak na een nieuwe start telde de vorige editie zo vier dagen meer aanloop, en
+ * stond de spend 12% "lager" bij een gelijk tempo.
+ */
+export function gemeenschappelijkeHorizon(current: Edition, previous: Edition, historieH: number | null): number | null {
+  const kandidaten = [windowLengthDays(current), windowLengthDays(previous), historieH].filter((v): v is number => v != null);
+  if (kandidaten.length === 0) return null;
+  return Math.min(...kandidaten);
+}
+
+/**
+ * Vanaf welke dagen-uit de vorige editie volledige data heeft, of null als de historie voor het
+ * venster begint (dan is er niets in te korten).
+ */
+export function historyHorizon(previous: Edition, historyStart: string | null | undefined): number | null {
+  if (!historyStart) return null;
+  const startDtf = daysToFair(previous.fairStartDate, previous.campaignStartDate);
+  const historyDtf = daysToFair(previous.fairStartDate, historyStart);
+  if (startDtf == null || historyDtf == null) return null;
+  return historyDtf < startDtf ? historyDtf : null;
 }

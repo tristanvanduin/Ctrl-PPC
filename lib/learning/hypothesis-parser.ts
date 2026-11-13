@@ -10,6 +10,16 @@
 // vertrouwen. Deze parser raadt daarom nooit de richting uit de metric alleen.
 
 import type { Predicate } from "./hypothesis-evaluator";
+import { leesGetal } from "@/lib/analysis/brondata-toets";
+import { isDerivableMetric } from "./weekly-metrics";
+import { kanaalVoorBron } from "./kanaal-weekdata";
+
+/**
+ * Als de hypothese zelf geen bruikbaar tijdvenster noemt. Een plek voor de evaluator en de
+ * meetbaarheid bij het wegschrijven: eerder zei de een "niet meetbaar" en gaf de ander met 28
+ * dagen gewoon een oordeel.
+ */
+export const DEFAULT_WINDOW_DAYS = 28;
 
 // De canonieke metric-sleutels waar baseline en measured op ingaan.
 const METRIC_ALIASES: Array<[RegExp, string]> = [
@@ -81,10 +91,13 @@ export function extractRelativeThreshold(text: string, direction: Predicate["dir
 // De absolute grens bij above en below. Die leest de evaluator wel direct.
 export function extractThreshold(text: string, direction: Predicate["direction"]): number | undefined {
   if (direction === "above" || direction === "below") {
-    const amount = text.match(/(?:€|£|\$)\s?(\d+(?:[.,]\d+)?)|(\d+(?:[.,]\d+)?)\s?(?:euro|procent|%)?/i);
+    // nl-NL: "€ 1.650" is duizendzestighonderdvijftig, niet 1,65. De oude regex las het
+    // duizendtal als decimaal, en dan werd "CPA onder € 1.650" een grens van € 1,65.
+    const amount = text.match(/(?:€|£|\$)\s?(\d{1,3}(?:[.\u00a0 ]\d{3})+(?:,\d+)?|\d+(?:[.,]\d+)?)|(\d{1,3}(?:\.\d{3})+(?:,\d+)?|\d+(?:[.,]\d+)?)\s?(?:euro|procent|%)?/i);
     if (amount) {
       const value = amount[1] ?? amount[2];
-      if (value) return Number.parseFloat(value.replace(",", "."));
+      const gelezen = value ? leesGetal(value) : null;
+      if (gelezen) return gelezen.waarde;
     }
   }
   return undefined;
@@ -161,4 +174,74 @@ export function parseHypothesis(input: {
       ...(relativeThreshold != null ? { relativeThreshold } : {}),
     },
   };
+}
+
+// ── Meetbaarheid bij het wegschrijven ───────────────────────────────────────
+//
+// De evaluator ontdekte pas maanden na het goedkeuren dat een voorstel niets meetbaars beloofde:
+// van de 27 aanvaarde hypotheses bij de echte klanten gaf hij er 22 "unmeasurable", en op de 141
+// opgeslagen aanbevelingen van demo-greentech was 47% niet te ontleden (doorlichting 13
+// november). Het moment om dat te zien is bij het wegschrijven en het goedkeuren, als de tekst
+// nog voor iemand ligt. Deze functie zegt het dan: herkende metriek, richting en venster, of
+// "niet meetbaar" met de reden. Een voorstel zonder drempel IS meetbaar, maar telt pas als de
+// beweging buiten de ruisband van de baseline valt; dat staat er dan bij.
+
+export type Meetbaarheid =
+  | {
+    meetbaar: true;
+    metric: string;
+    richting: Predicate["direction"];
+    drempel: number | null;
+    relatieveDrempel: number | null;
+    vensterDagen: number;
+    /** Het voorstel noemt geen venster; de evaluator meet dan over DEFAULT_WINDOW_DAYS. */
+    vensterStandaard: boolean;
+    /** Geen drempel: de evaluator toetst tegen de ruisband in plaats van "elke beweging telt". */
+    ruisband: boolean;
+  }
+  | { meetbaar: false; reden: string };
+
+export function beoordeelMeetbaarheid(input: {
+  expectedResult: string | null;
+  measurementMetric: string | null;
+  timeframe: string | null;
+  /** sprint_hypotheses.source; dezelfde regel als de evaluator: meer dan een kanaal is niet te meten. */
+  bron?: string | null;
+}): Meetbaarheid {
+  const p = parseHypothesis(input);
+  if (!p.ok) return { meetbaar: false, reden: p.reason };
+  if (input.bron !== undefined && kanaalVoorBron(input.bron) === null) {
+    return { meetbaar: false, reden: `een voorstel over meer dan een kanaal (bron ${input.bron}) heeft geen weektabel die het afzonderlijk meet` };
+  }
+  const { predicate, windowDays, relativeThreshold } = p.parsed;
+  if (!isDerivableMetric(predicate.metric)) {
+    return { meetbaar: false, reden: `de metric ${predicate.metric} zit niet in de weekdata van het kanaal, dus er is niets om tegen te meten` };
+  }
+  const drempel = predicate.threshold ?? null;
+  const relatief = relativeThreshold ?? null;
+  return {
+    meetbaar: true,
+    metric: predicate.metric,
+    richting: predicate.direction,
+    drempel,
+    relatieveDrempel: relatief,
+    vensterDagen: windowDays ?? DEFAULT_WINDOW_DAYS,
+    vensterStandaard: windowDays == null,
+    ruisband: drempel == null && relatief == null && (predicate.direction === "increase" || predicate.direction === "decrease"),
+  };
+}
+
+const RICHTING_TEKST: Record<Predicate["direction"], string> = {
+  increase: "stijgt", decrease: "daalt", above: "boven", below: "onder", stable: "blijft stabiel", no_drop: "daalt niet",
+};
+
+/** Een regel voor het scherm: wat er gemeten gaat worden, of waarom niet. */
+export function meetbaarheidTekst(m: Meetbaarheid): string {
+  if (!m.meetbaar) return `Niet meetbaar: ${m.reden}.`;
+  const grens = m.relatieveDrempel != null
+    ? ` met minimaal ${Math.round(m.relatieveDrempel * 1000) / 10}%`
+    : m.drempel != null ? ` ${m.drempel.toLocaleString("nl-NL")}` : "";
+  const ruis = m.ruisband ? " (geen drempel genoemd: telt pas buiten de ruisband van de baseline)" : "";
+  const venster = m.vensterStandaard ? `binnen ${m.vensterDagen} dagen (geen venster genoemd, dus de standaard)` : `binnen ${m.vensterDagen} dagen`;
+  return `Meetbaar: ${m.metric} ${RICHTING_TEKST[m.richting]}${grens} ${venster}${ruis}.`;
 }

@@ -24,6 +24,7 @@
 
 import { readFileSync } from "node:fs";
 import { sql } from "./supabase-sql.mjs";
+import { slaOver, Overslaan } from "./poort-overslaan.mjs";
 
 let env = "";
 try { env = readFileSync(".env.local", "utf8"); } catch { /* dan de omgeving */ }
@@ -34,10 +35,7 @@ const url = lees("NEXT_PUBLIC_SUPABASE_URL") ?? lees("SUPABASE_URL");
 const anon = lees("NEXT_PUBLIC_SUPABASE_ANON_KEY") ?? lees("SUPABASE_ANON_KEY");
 const svc = lees("SUPABASE_SERVICE_ROLE_KEY") ?? lees("SUPABASE_SECRET_KEY");
 
-if (!url || !anon || !svc || !lees("SUPABASE_ACCESS_TOKEN")) {
-  console.log("rls-scheiding: overgeslagen (sleutels of project-URL ontbreken).");
-  process.exit(0);
-}
+if (!url || !anon || !svc || !lees("SUPABASE_ACCESS_TOKEN")) slaOver("rls-scheiding", "sleutels of project-URL ontbreken");
 
 const adminKop = { apikey: svc, Authorization: `Bearer ${svc}`, "Content-Type": "application/json" };
 const WACHTWOORD = "proef-" + crypto.randomUUID();
@@ -99,14 +97,12 @@ const bureaus = await sql(`
   where exists (select 1 from accounts ac where ac.agency_id = a.id)
   order by a.name`);
 
-if (bureaus.length < 2) {
-  console.log(`rls-scheiding: overgeslagen (${bureaus.length} bureau(s) met accounts).`);
-  process.exit(0);
-}
+if (bureaus.length < 2) slaOver("rls-scheiding", `${bureaus.length} bureau(s) met accounts; er zijn er twee nodig`);
 
 const [A, B] = bureaus;
 const gebruikers = [];
 let fouten = 0;
+let overgeslagen = null;
 const eis = (label, waar, detail = "") => {
   console.log(`  ${waar ? "OK  " : "FOUT"}  ${label}${detail ? `   ${detail}` : ""}`);
   if (!waar) fouten += 1;
@@ -115,7 +111,9 @@ const eis = (label, waar, detail = "") => {
 try {
   for (const [bureau, email] of [[A, "rls-a@voorbeeld.invalid"], [B, "rls-b@voorbeeld.invalid"]]) {
     const id = await maakGebruiker(email);
-    if (!id) { console.log("rls-scheiding: kon geen proefgebruiker maken. Overgeslagen."); process.exit(0); }
+    // Gooien en niet process.exit: dat sloeg de finally over, en een eerder gemaakte proefgebruiker
+    // met de rol performance_marketeer bleef dan in de database staan.
+    if (!id) throw new Overslaan("kon geen proefgebruiker maken");
     gebruikers.push(id);
     await sql(`insert into user_roles (user_id, role) values ('${id}', 'performance_marketeer')
                on conflict (user_id) do update set role = excluded.role`);
@@ -125,7 +123,7 @@ try {
 
   const tokenA = await logIn("rls-a@voorbeeld.invalid");
   const tokenB = await logIn("rls-b@voorbeeld.invalid");
-  if (!tokenA || !tokenB) { console.log("rls-scheiding: inloggen mislukt. Overgeslagen."); process.exit(0); }
+  if (!tokenA || !tokenB) throw new Overslaan("inloggen mislukt");
 
   console.log(`bureau A "${A.name}" (${A.accounts} accounts), bureau B "${B.name}" (${B.accounts} accounts)\n`);
 
@@ -175,9 +173,13 @@ try {
   } else {
     console.log(`  de views doen mee aan RLS: anon krijgt ${vAnon.rijen} van ${totaalCamp} rijen.`);
   }
+} catch (e) {
+  if (!(e instanceof Overslaan)) throw e;
+  overgeslagen = e.reden;
 } finally {
   for (const id of gebruikers) await verwijderGebruiker(id);
 }
+if (overgeslagen) slaOver("rls-scheiding", overgeslagen);
 
 if (fouten === 0) {
   console.log("\n  OK  de bureauscheiding houdt op de tabellen.");

@@ -16,6 +16,14 @@ import { CheckCircle2 } from "lucide-react";
 // H1-evaluator zelf is dus wel degelijk gekoppeld; wat elders "nog niet gekoppeld" heet
 // (lib/analysis/period-evaluation.ts) is een apart, ongebouwd kwartaalrapport dat deze evaluator
 // nog niet aanroept -- geen teken dat de evaluator hier nep is.
+//
+// CORRECTIE (13 november 2026, doorlichting): "live in productie" hierboven klopt niet meer.
+// evaluate-hypotheses staat niet in vercel.json (besluit van 17 augustus), en in sprint_hypotheses
+// heeft geen enkele rij een evaluated_at. De laatste drie punten beloofden een vastgelegde uitkomst
+// en een leereffect die nergens draaien. Ze zeggen nu wat er is: de reviewdatum ligt vast bij het
+// accepteren, de meting is gebouwd maar staat nog niet automatisch aan. Gaat de evaluator draaien
+// (hij doet geen modelaanroep, dus het kostenbezwaar van 17 augustus geldt er niet voor), dan mogen
+// de oude zinnen terug.
 const CHECKLIST = [
   {
     titel: "A measurable prediction",
@@ -27,15 +35,15 @@ const CHECKLIST = [
   },
   {
     titel: "A fixed review date",
-    tekst: "A date the outcome gets checked, not \"whenever someone remembers.\"",
+    tekst: "Set when the change is accepted, from the hypothesis's own timeframe.",
   },
   {
-    titel: "A logged outcome",
-    tekst: "Measured and recorded, whether it worked or not.",
+    titel: "An outcome check",
+    tekst: "Built to measure the result against the criterion. Automatic evaluation is not switched on yet.",
   },
   {
-    titel: "A learning that compounds",
-    tekst: "Feeds that account's next analysis, so nothing gets re-tested from scratch.",
+    titel: "A learning to carry forward",
+    tekst: "Once outcomes are recorded, they feed that account's next analysis. Not live yet.",
   },
 ];
 

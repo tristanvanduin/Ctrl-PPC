@@ -1,4 +1,7 @@
-# W1.5 (Z2): geplande backups en maandelijkse restore-proef. Secrets staan in repo-secrets,
+# W1.5 (Z2): geplande backups en maandelijkse restore-proef. LET OP: beide jobs falen zodra de
+# secrets ingericht zijn, met opzet: de upload en de herstelproef zijn nog niet gebouwd, en een
+# groene back-up die niets bewaart leest als "in orde" (doorlichting 13 november).
+# Secrets staan in repo-secrets,
 # nooit in de repo. Bij een mislukte job gaat er een backup_failed- of
 # backup_restore_failed-event naar het notify-endpoint met CRON_SECRET.
 #
@@ -84,7 +87,13 @@ jobs:
         if: steps.guard.outputs.klaar == 'true'
         env:
           SCRATCH_DATABASE_URL: ${{ secrets.SCRATCH_DATABASE_URL }}
-        run: echo "TODO haal de laatste dump plus manifest uit de bucket en draai scripts/backup/restore-test.sh"
+        # Hier stond `echo "TODO ..."`, en dat is een stap die altijd slaagt: de herstelproef stond
+        # groen zonder dat er iets hersteld was. Tot hij gebouwd is (laatste dump uit de bucket,
+        # scripts/backup/restore-test.sh, en daarna triggers, functies, policies en rechten tellen en
+        # check-rpc-rechten op de herstelde database), faalt deze stap hardop.
+        run: |
+          echo "::error title=Herstelproef bestaat nog niet::Er is geen dump om te herstellen (de upload in scripts/backup/dump.sh is niet gebouwd) en de proef zelf is nog een TODO."
+          exit 1
       - name: Melding bij falen
         if: failure() && steps.guard.outputs.klaar == 'true'
         env:

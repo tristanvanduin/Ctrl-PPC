@@ -6,20 +6,22 @@
 // (demo-greentech) en is met scripts/demo/teardown-demo-client.ts in een keer te verwijderen.
 //
 // De data is deterministisch (geen randomness) en per detector ONTWORPEN:
-//   [S1]  Meta creative fatigue      — "Hero Video A": CTR -42% bij frequency 4.2
-//   [S2]  Meta frequency-saturatie   — campagne Awareness op frequency 4.6
+//   [S1]  Meta creative fatigue      — "Hero Video A": CTR -42% bij een frequentie van 4.2 over 28 dagen
+//   [S2]  Meta frequency-saturatie   — campagne Awareness op 4.6 over 28 dagen
+//         (periodewaarden in meta_period_reach, migratie 110; de dagwaarden zijn realistisch 1.1-1.6)
 //   [S3]  Meta ranking-zwakte        — "Static Banner C": BELOW_AVERAGE quality ranking
 //   [S4]  Meta hook-zwakte           — "Product Carousel D": hook-rate ver onder de mediaan
 //   [S5]  LinkedIn form drop-off     — GRT ABM: 10% completion op 60+ opens
-//   [S6]  LinkedIn CPL-druk          — GRT ABM: CPL +25% recent vs prior venster
+//   [S6]  LinkedIn CPL-druk          — GRT ABM: CPL +25% recent vs prior venster (leads + websiteconversies);
+//                                      "GreenTech Gids Downloads": kosten per websiteconversie +77%
 //   [S7]  Zaai-oogst (cross)         — social-vertoningen juni +40%, brand-klikken +18%
 //   [S8]  Mix-shift/Simpson (cross)  — LinkedIn-spend juni x3 (eigen CPA stabiel) => blended CPA stijgt
 //   [S9]  Doelgroep-tegenspraak      — LinkedIn-leads 75% uit "Education", buiten het Google-ICP
 //   [S10] Beursanalyse GRT           — aanloop 2026 ~35% achter op 2025 bij gelijke spend (effectiviteitsvraag)
 //   [S11] Beursanalyse GRA           — op koers (+10%) => geen actie
 //   [S12] GRN eerste editie          — degradatiepad "eerste editie" zichtbaar
-//   [S13] Impression share           — GRT budget-gelimiteerd, GRA rang-gelimiteerd
-//   stil: "GreenTech | Brand" gezond => detectors horen daar te zwijgen
+//   [S13] Impression share           — GRT budget-gelimiteerd (maar CPA te hoog: eerst efficiëntie), GRA rang-gelimiteerd
+//   stil: "GreenTech | Brand", "Lifestyle Video B", "GreenTech Lead Gen EU" gezond => detectors horen daar te zwijgen
 //
 // Microsoft Ads (Bing), het vierde kanaal, op ~10% van de Google-volumes:
 //   [S14] Import-drift          — "GRT | Search | NL (import)": CPA loopt 12 weken op, native strak
@@ -126,7 +128,18 @@ function googleMonthly(): GMonth[] {
     rows.push({ campaign: "GreenTech | Brand", monthIdx: m, imp: 15000, clicks: brandClicks, cost: 500, conv: 45, value: 45 * GOOGLE_AOV["GreenTech | Brand"] });
     rows.push({ campaign: "GreenTech | Display | Prospecting", monthIdx: m, imp: 90000, clicks: 700, cost: 800, conv: 2, value: 2 * GOOGLE_AOV["GreenTech | Display | Prospecting"] });
   }
-  return rows;
+  // De lopende maand als maand-tot-nu, zoals de Google-sync hem levert. Hij stond hier als volle
+  // maand, en dat verborg in de demo de fout dat de beursanalyse een maandpunt op de 1e als hele
+  // maand telde (doorlichting 13 november 2026). Nu de beursanalyse maandpunten over de verstreken
+  // dagen verdeelt, zou een volle lopende maand juist een voorsprong verzinnen.
+  const dag = Number(TODAY.slice(8, 10));
+  const dagenInMaand = new Date(Date.UTC(Number(TODAY.slice(0, 4)), Number(TODAY.slice(5, 7)), 0)).getUTCDate();
+  const frac = dag / dagenInMaand;
+  return rows.map((r) => r.monthIdx !== 0 ? r : {
+    ...r,
+    imp: Math.round(r.imp * frac), clicks: Math.round(r.clicks * frac), cost: Math.round(r.cost * frac * 100) / 100,
+    conv: Math.round(r.conv * frac * 100) / 100, value: Math.round(r.value * frac * 100) / 100,
+  });
 }
 
 // ── Meta: dag-data met de creative-scenario's [S1-S4, S7, S8] ─────────────
@@ -169,31 +182,71 @@ const META_AOV: Record<string, number> = {
 };
 const metaAov = (entity: string): number => META_AOV[entity] ?? 130;
 
+// De dagfrequenties hieronder zijn wat een dag-sync echt oplevert (1,1 tot 1,6): dezelfde persoon
+// ziet een advertentie zelden vaker dan een keer per dag. Ze stonden op 4,2 en 4,6, en daardoor
+// gingen S1 en S2 in de demo af op een getal dat op een echt account nooit voorkomt; de detector
+// bleef daar stil. De periodewaarde (vertoningen gedeeld door het over 28 dagen ontdubbelde bereik)
+// staat apart in META_PERIODE_FREQUENTIE en gaat als meta_period_reach de database in.
 function metaAdDaily(): MetaDaily[] {
   const rows: MetaDaily[] = [];
   for (let d = 63; d >= 0; d--) {
     const date = addDays(TODAY, -d);
     const recent = d < 28; // recent venster vs prior venster
-    // [S1] Hero A: CTR zakt van 1.2% naar 0.7% terwijl frequency op 4.2 staat; blijft converteren.
-    rows.push({ entity: "demo-ad-hero-a", date, imp: 1600, linkClicks: recent ? 11 : 19, spend: 55, conv: 2, freq: recent ? 4.2 : 3.1, hook: 0.42, hold: 0.3 });
+    // [S1] Hero A: CTR zakt van 1.2% naar 0.7%; over 28 dagen ziet dezelfde persoon hem 4,2 keer.
+    rows.push({ entity: "demo-ad-hero-a", date, imp: 1600, linkClicks: recent ? 11 : 19, spend: 55, conv: 2, freq: recent ? 1.5 : 1.3, hook: 0.42, hold: 0.3 });
     // Lifestyle B: gezond en stabiel (moet stil blijven).
-    rows.push({ entity: "demo-ad-lifestyle-b", date, imp: 1400, linkClicks: 17, spend: 45, conv: 2, freq: 2.2, hook: 0.5, hold: 0.35 });
+    rows.push({ entity: "demo-ad-lifestyle-b", date, imp: 1400, linkClicks: 17, spend: 45, conv: 2, freq: 1.2, hook: 0.5, hold: 0.35 });
     // [S3] Banner C: recent BELOW_AVERAGE quality ranking.
-    rows.push({ entity: "demo-ad-banner-c", date, imp: 900, linkClicks: 8, spend: 25, conv: 1, freq: 2.6, hook: 0.44, hold: 0.3, qr: recent ? "BELOW_AVERAGE_10" : "AVERAGE", er: "AVERAGE", cr: "AVERAGE" });
+    rows.push({ entity: "demo-ad-banner-c", date, imp: 900, linkClicks: 8, spend: 25, conv: 1, freq: 1.3, hook: 0.44, hold: 0.3, qr: recent ? "BELOW_AVERAGE_10" : "AVERAGE", er: "AVERAGE", cr: "AVERAGE" });
     // [S4] Carousel D: hook-rate ver onder de account-mediaan.
-    rows.push({ entity: "demo-ad-carousel-d", date, imp: 1100, linkClicks: 10, spend: 30, conv: 1, freq: 2.4, hook: 0.12, hold: 0.1 });
+    rows.push({ entity: "demo-ad-carousel-d", date, imp: 1100, linkClicks: 10, spend: 30, conv: 1, freq: 1.25, hook: 0.12, hold: 0.1 });
   }
   return rows;
 }
 
+// Frequentie over het recente venster van 28 dagen, per advertentie en campagne: wat een
+// periodelezing (insights zonder time_increment) zou geven. [S1] Hero A 4,2 en [S2] Awareness 4,6
+// liggen boven de drempels (3 en 4); de rest eronder.
+const META_PERIODE_FREQUENTIE: Record<string, { level: "ad" | "campaign"; freq: number }> = {
+  "demo-ad-hero-a": { level: "ad", freq: 4.2 },
+  "demo-ad-lifestyle-b": { level: "ad", freq: 2.2 },
+  "demo-ad-banner-c": { level: "ad", freq: 2.6 },
+  "demo-ad-carousel-d": { level: "ad", freq: 2.4 },
+  "demo-mc-awareness": { level: "campaign", freq: 4.6 },
+  "demo-mc-retargeting": { level: "campaign", freq: 2.5 },
+  "demo-mc-traffic": { level: "campaign", freq: 1.9 },
+  "demo-mc-leads": { level: "campaign", freq: 1.7 },
+  "demo-mc-gra-awareness": { level: "campaign", freq: 2.0 },
+  "demo-mc-grn-leads": { level: "campaign", freq: 1.4 },
+};
+
+/** meta_period_reach (migratie 110): een rij per entiteit over het recente venster van 28 dagen. */
+function metaPeriodReach(dagRijen: MetaDaily[]): Row[] {
+  const start = addDays(TODAY, -27);
+  const imp = new Map<string, number>();
+  for (const r of dagRijen) if (r.date >= start) imp.set(r.entity, (imp.get(r.entity) ?? 0) + r.imp);
+  return Object.entries(META_PERIODE_FREQUENTIE)
+    .filter(([entity]) => (imp.get(entity) ?? 0) > 0)
+    .map(([entity, p]) => {
+      const impressions = imp.get(entity)!;
+      const reach = Math.round(impressions / p.freq);
+      return { client_id: DEMO_CLIENT, level: p.level, entity_id: entity, period_start: start, period_end: TODAY, impressions, reach, frequency: Math.round((impressions / reach) * 100) / 100 };
+    });
+}
+
+// Campagne-dagrijen lopen CAMPAGNE_DAGEN terug in plaats van 64: de objective-analyse (--check)
+// rekent alleen op VOLLE maanden, en met 64 dagen is dat er één. De signaalvensters (2 x 28
+// dagen) liggen ruim binnen dit bereik; alles ouder dan 28 dagen heeft de "prior"-waarden.
+const CAMPAGNE_DAGEN = 125;
+
 function metaCampaignDaily(): MetaDaily[] {
   const rows: MetaDaily[] = [];
-  for (let d = 63; d >= 0; d--) {
+  for (let d = CAMPAGNE_DAGEN - 1; d >= 0; d--) {
     const date = addDays(TODAY, -d);
     const recent = d < 28;
-    // [S2] Awareness-campagne zit recent op frequency 4.6.
-    rows.push({ entity: "demo-mc-awareness", date, imp: 3000, linkClicks: 28, spend: 100, conv: 4, freq: recent ? 4.6 : 3.0, hook: null, hold: null });
-    rows.push({ entity: "demo-mc-retargeting", date, imp: 2000, linkClicks: 18, spend: 55, conv: 2, freq: 2.5, hook: null, hold: null });
+    // [S2] Awareness-campagne: over 28 dagen frequentie 4.6 (META_PERIODE_FREQUENTIE), per dag 1.6.
+    rows.push({ entity: "demo-mc-awareness", date, imp: 3000, linkClicks: 28, spend: 100, conv: 4, freq: recent ? 1.6 : 1.3, hook: null, hold: null });
+    rows.push({ entity: "demo-mc-retargeting", date, imp: 2000, linkClicks: 18, spend: 55, conv: 2, freq: 1.2, hook: null, hold: null });
     // Traffic: CTR zakt van 1,2% naar 0,6% terwijl besteding juist stijgt -- duurdere kliks voor
     // hetzelfde resultaat, het cpc-rising-scenario voor OUTCOME_TRAFFIC.
     rows.push({ entity: "demo-mc-traffic", date, imp: 4000, linkClicks: recent ? 24 : 48, spend: recent ? 220 : 150, conv: 3, freq: null, hook: null, hold: null });
@@ -287,8 +340,9 @@ const LI_CAMPAIGNS = [
 ];
 
 // Gemiddelde orderwaarde per LinkedIn-campagne -- eerder overal conversion_value:0. GRA (VS) sluit
-// grotere deals dan de jonge GRN-markt; de twee content-campagnes (Gids Downloads/Productvideo)
-// converteren per ontwerp niet (altijd conv:0 in liCampaignDaily), dus hun AOV is irrelevant.
+// grotere deals dan de jonge GRN-markt. Productvideo converteert per ontwerp niet; Gids Downloads
+// levert sinds de doorlichting van 13 november websiteconversies ([S6], kosten per conversie
+// lopen op) en valt voor de AOV terug op het accountgemiddelde.
 const LI_AOV: Record<string, number> = {
   "urn:li:sponsoredCampaign:demo1": 260, "urn:li:sponsoredCampaign:demo2": 220,
   "urn:li:sponsoredCampaign:demo5": 300, "urn:li:sponsoredCampaign:demo6": 190,
@@ -318,7 +372,8 @@ function liCampaignDaily(): LiDaily[] {
   const s1 = { leads: { cum: 0, vorig: 0 }, opens: { cum: 0, vorig: 0 }, conv: { cum: 0, vorig: 0 } };
   const s4 = { leads: { cum: 0, vorig: 0 }, opens: { cum: 0, vorig: 0 }, conv: { cum: 0, vorig: 0 } };
   const s5 = { leads: { cum: 0, vorig: 0 }, opens: { cum: 0, vorig: 0 }, conv: { cum: 0, vorig: 0 } };
-  for (let d = 63; d >= 0; d--) {
+  const s2 = { conv: { cum: 0, vorig: 0 } };
+  for (let d = CAMPAGNE_DAGEN - 1; d >= 0; d--) {
     const date = addDays(TODAY, -d);
     const recent = d < 28;
     // [S5]+[S6] GRT ABM: 10% form-completion op ruime opens; spend recent hoger bij gelijke leads => CPL +25%.
@@ -326,8 +381,10 @@ function liCampaignDaily(): LiDaily[] {
     // Lead Gen EU: gezond (completion ~30%, stabiele CPL) — hoort stil te blijven.
     rows.push({ urn: LI_CAMPAIGNS[1].urn, date, imp: 1200, clicks: 26, spend: 90, leads: heelGetal(s1.leads, 0.9), opens: heelGetal(s1.opens, 3), conv: heelGetal(s1.conv, 0.5), vidStart: 35, vidDone: 20 });
     // Gids Downloads (WEBSITE_VISITS): kliks dalen terwijl besteding stijgt — duurdere kliks
-    // voor hetzelfde resultaat, het cpc-issue-scenario.
-    rows.push({ urn: LI_CAMPAIGNS[2].urn, date, imp: 2200, clicks: recent ? 18 : 34, spend: recent ? 140 : 95, leads: 0, opens: 0, conv: 0, vidStart: 0, vidDone: 0 });
+    // voor hetzelfde resultaat, het cpc-issue-scenario. [S6] Hij converteert op de website (geen
+    // lead-formulier): de CPL-druk telde alleen formulieren en zag deze campagne nooit, ook niet nu
+    // de kosten per conversie van ~€ 158 naar ~€ 280 gaan.
+    rows.push({ urn: LI_CAMPAIGNS[2].urn, date, imp: 2200, clicks: recent ? 18 : 34, spend: recent ? 140 : 95, leads: 0, opens: 0, conv: heelGetal(s2.conv, recent ? 0.5 : 0.6), vidStart: 0, vidDone: 0 });
     // Productvideo (VIDEO_VIEWS): lage voltooiing (10%) — de meeste kijkers haken vroeg af.
     rows.push({ urn: LI_CAMPAIGNS[3].urn, date, imp: 3000, clicks: 12, spend: 60, leads: 0, opens: 0, conv: 0, vidStart: 200, vidDone: 20 });
     // [S11-LinkedIn] GRA: aanloop naar september, spend/leads lopen geleidelijk op -- spiegelt
@@ -513,6 +570,8 @@ export function buildAllRows(): Record<string, Row[]> {
     ...metaBase(r), quality_ranking: r.qr ?? null, engagement_rate_ranking: r.er ?? null, conversion_rate_ranking: r.cr ?? null,
   }));
   tables["meta_campaign_daily"] = metaCampaignDaily().map(metaBase);
+  // Na meta_ad_daily en meta_campaign_daily: hun vertoningen zijn de teller van de periodefrequentie.
+  tables["meta_period_reach"] = metaPeriodReach([...metaAdDaily(), ...metaCampaignDaily()]);
   tables["meta_account_daily"] = metaAccountDaily().map(metaBase);
   tables["meta_breakdown_daily"] = metaBreakdownDaily();
 
@@ -741,11 +800,26 @@ const sqlLit = (v: unknown): string => {
   return `'${String(v).replace(/'/g, "''")}'`;
 };
 
+// Tabellen uit een migratie die nog niet overal gedraaid is. De seed slaat ze over als ze niet
+// bestaan, in plaats van halverwege af te breken: de rest van de demo werkt zonder.
+const OPTIONELE_TABELLEN: Record<string, string> = {
+  meta_period_reach: "migratie 110 (Meta-periodelezing); zonder deze tabel meldt de Meta-signaalroute 'frequentie niet te beoordelen'",
+};
+
 function printSql(tables: Record<string, Row[]>) {
   console.log(`-- DEMO-SEED voor ${DEMO_CLIENT} — gegenereerd, niet met de hand bewerken`);
   console.log(`delete from client_settings where client_id='${DEMO_CLIENT}';`);
   for (const [table, rows] of Object.entries(tables)) {
     if (rows.length === 0) continue;
+    if (OPTIONELE_TABELLEN[table]) {
+      // In een plpgsql-blok wordt een statement pas bij uitvoering gepland, dus een tak die niet
+      // loopt raakt een ontbrekende tabel niet.
+      const cols = Object.keys(rows[0]);
+      const values = rows.map((r) => `(${cols.map((c) => sqlLit(r[c])).join(",")})`).join(",\n");
+      console.log(`-- ${table}: ${OPTIONELE_TABELLEN[table]}`);
+      console.log(`do $seed$ begin if to_regclass('public.${table}') is not null then\n  delete from ${table} where client_id='${DEMO_CLIENT}';\n  insert into ${table} (${cols.join(",")}) values\n${values};\nend if; end $seed$;`);
+      continue;
+    }
     // fysiekeTabel(), niet de logische naam: sommige tabellen (bijv. meta_ad_daily ->
     // meta_ad_daily_legacy) zijn hernoemd en "table" is dan geen schrijfbare naam meer. Stond hier
     // eerder als kale "table" terwijl de insert eronder al wel fysiekeTabel() gebruikte -- de
@@ -777,6 +851,10 @@ async function insertViaSupabase(tables: Record<string, Row[]>) {
     // fysiekeTabel(), niet de logische naam -- zie de toelichting bij printSql() hierboven.
     if (table !== "linkedin_urn_labels") {
       const { error: delError } = await db.from(fysiekeTabel(table)).delete().eq("client_id", DEMO_CLIENT);
+      if (delError && OPTIONELE_TABELLEN[table]) {
+        console.warn(`⚠ ${table} overgeslagen (${delError.message}): ${OPTIONELE_TABELLEN[table]}`);
+        continue;
+      }
       if (delError) { console.error(`✗ ${table} (delete): ${delError.message}`); process.exit(1); }
     }
     for (let i = 0; i < rows.length; i += 400) {
@@ -825,34 +903,97 @@ async function check() {
   const { buildLinkedInSignals } = await import("../../lib/signals/linkedin-signals");
   const { buildCrossChannelSignals } = await import("../../lib/signals/cross-channel");
   const { analyzeGeoClone } = await import("../../lib/fair/geo-clone-analysis");
+  const { analyzeCampaignImpressionShare } = await import("../../lib/analysis/impression-share-facts");
+  const { resolveChannelConversionConfig, sumSelectedConversions } = await import("../../lib/analysis/channel-conversion-config");
 
   const tables = buildAllRows();
   let failed = 0;
-  const expect = (cond: boolean, label: string) => { console.log(`${cond ? "✓" : "✗"} ${label}`); if (!cond) failed++; };
+  // Elk scenario moet minstens een assert hebben, en elke assert moet slagen. Tot 13 november
+  // stond hier "Alle gecontroleerde scenario's triggeren" terwijl S3, S4, S8, S13 en het stille
+  // scenario nergens getoetst werden en S8 in werkelijkheid niet afging.
+  const ALLE_SCENARIOS = [...Array.from({ length: 20 }, (_, i) => `S${i + 1}`), "stil"];
+  const gedekt = new Set<string>();
+  const expect = (scenario: string, cond: boolean, label: string) => {
+    gedekt.add(scenario);
+    console.log(`${cond ? "✓" : "✗"} [${scenario}] ${label}`);
+    if (!cond) failed++;
+  };
 
   // De gegenereerde Row-objecten hebben runtime exact de juiste vorm; de cast via
   // unknown overbrugt alleen het statische verschil met de detector-invoertypes.
   type AnyRow = Record<string, unknown>;
   const rowsAs = <T,>(t: Row[]): T[] => t as unknown as T[];
+  const gRow = (r: AnyRow) => r as Record<string, number>;
+  const scopes = (stories: { id: string; scope: string }[], id: RegExp) => stories.filter((s) => id.test(s.id)).map((s) => s.scope);
+
+  // ── Meta [S1-S4]: met de periodelezing, zoals de route hem leest ─────────────
   const adNames = new Map(META_ADS.map((a) => [a.id, { adName: a.name, campaignName: META_CAMPAIGNS.find((c) => c.id === a.campaign)?.name ?? null }]));
+  const campNames = new Map(META_CAMPAIGNS.map((c) => [c.id, { adName: c.name }]));
+  const periode = rowsAs<{ level: string; entity_id: string; period_start: string; period_end: string; impressions: number; reach: number }>(tables["meta_period_reach"]);
+  const metaAds = rowsAs<Parameters<typeof shapeMetaAdInputs>[0][number]>(tables["meta_ad_daily"]);
+  const metaCamps = rowsAs<Parameters<typeof shapeMetaLevelInputs>[0][number]>(tables["meta_campaign_daily"]);
   const meta = buildMetaCreativeSignals({
-    ads: shapeMetaAdInputs(rowsAs(tables["meta_ad_daily"]), adNames),
-    levels: shapeMetaLevelInputs(rowsAs(tables["meta_campaign_daily"]), new Map(META_CAMPAIGNS.map((c) => [c.id, { adName: c.name }]))),
+    ads: shapeMetaAdInputs(metaAds, adNames, periode.filter((p) => p.level === "ad")),
+    levels: shapeMetaLevelInputs(metaCamps, campNames, periode.filter((p) => p.level === "campaign")),
   });
-  const metaIds = meta.triggered.map((s) => s.id).join(",");
-  expect(/fatigue/.test(metaIds), `[S1] Meta fatigue getriggerd (${meta.triggered.length} verhalen)`);
-  expect(/frequency|saturat/.test(metaIds), "[S2] Meta frequency-saturatie getriggerd");
+  const metaVerwacht: [string, RegExp, string][] = [
+    ["S1", /^meta_creative_fatigue$/, "Hero Video A"],
+    ["S2", /^meta_frequency_saturation$/, "GRT | Awareness EU"],
+    ["S3", /^meta_ranking_weakness$/, "Static Banner C"],
+    ["S4", /^meta_hook_hold_weakness$/, "Product Carousel D"],
+  ];
+  for (const [sc, id, naam] of metaVerwacht) {
+    expect(sc, scopes(meta.triggered, id).some((s) => s.includes(naam)), `${id.source.replace(/[\^$]/g, "")} op "${naam}"`);
+  }
+  const dagFreqMax = Math.max(...metaAds.map((r) => Number((r as unknown as AnyRow).frequency ?? 0)), ...metaCamps.map((r) => Number((r as unknown as AnyRow).frequency ?? 0)));
+  expect("S1", dagFreqMax <= 2, `de dagfrequenties zijn realistisch (hoogste ${dagFreqMax}); de 4,2 en 4,6 staan alleen in de periodelezing`);
+  // Zonder periodelezing (migratie 110 niet gedraaid) zegt de detector dat hij het niet weet.
+  const metaZonder = buildMetaCreativeSignals({ ads: shapeMetaAdInputs(metaAds, adNames), levels: shapeMetaLevelInputs(metaCamps, campNames) });
+  const onbekend = (metaZonder.notAssessable ?? []).map((n) => n.id);
+  expect("S2", !metaZonder.triggered.some((s) => /fatigue|saturation/.test(s.id)) && onbekend.includes("meta_creative_fatigue") && onbekend.includes("meta_frequency_saturation"),
+    "zonder periodelezing: frequentie 'niet te beoordelen', niet stil 'niets gevonden'");
+  // Wat hierboven groen staat, rekent met periode-rijen uit deze seed. De app heeft ze pas als
+  // migratie 110 gedraaid is en de dagelijkse Meta-run hem vult; de demo-app (de mock in
+  // lib/demo/demo-rows.ts) heeft de tabel niet. Daar toont het Meta-tabblad bij S1 en S2 dus
+  // "niet te beoordelen". Geen fout van de detector, wel iets wat deze controle niet mag verzwijgen.
+  {
+    const { demoRows: mockRijen } = await import("../../lib/demo/demo-rows");
+    const inMock = ((mockRijen() as Record<string, unknown[]>)["meta_period_reach"] ?? []).length > 0;
+    if (!inMock) console.log("  let op [S1, S2] de demo-app en productie tonen frequentie 'niet te beoordelen' tot migratie 110 gedraaid is (de mock kent meta_period_reach niet)");
+  }
+  const metaVals = meta.triggered.filter((s) => !metaVerwacht.some(([, id, naam]) => id.test(s.id) && s.scope.includes(naam)));
+  expect("stil", metaVals.length === 0, `Meta: geen verhaal buiten S1-S4${metaVals.length ? ` (vals: ${metaVals.map((s) => `${s.id} op ${s.scope}`).join("; ")})` : ""}`);
+  expect("stil", !meta.triggered.some((s) => s.scope.includes("Lifestyle Video B")), "Lifestyle Video B blijft stil");
 
-  const li = buildLinkedInSignals({ entities: shapeLinkedInInputs(rowsAs(tables["linkedin_campaign_daily"]), new Map(LI_CAMPAIGNS.map((c) => [c.urn, c.name]))) });
-  const liIds = li.triggered.map((s) => s.id).join(",");
-  expect(/form/.test(liIds), `[S5] LinkedIn form drop-off getriggerd (${li.triggered.length} verhalen)`);
-  expect(/cpl/.test(liIds), "[S6] LinkedIn CPL-druk getriggerd");
+  // ── LinkedIn [S5, S6]: met doel per campagne en de standaard-conversieselectie, zoals de route ──
+  const liConfig = resolveChannelConversionConfig(null);
+  const li = buildLinkedInSignals({
+    entities: shapeLinkedInInputs(rowsAs(tables["linkedin_campaign_daily"]), new Map(LI_CAMPAIGNS.map((c) => [c.urn, c.name])), {
+      objectives: new Map(LI_CAMPAIGNS.map((c) => [c.urn, c.objective])),
+      results: (r) => sumSelectedConversions(r as unknown as AnyRow, "linkedin_ads", liConfig),
+      resultLabel: "resultaat",
+    }),
+  });
+  const liVerwacht: [string, RegExp, string][] = [
+    ["S5", /^linkedin_form_dropoff$/, "GRT ABM Benelux"],
+    ["S6", /^linkedin_cpl_pressure$/, "GRT ABM Benelux"],
+    ["S6", /^linkedin_cpl_pressure$/, "GreenTech Gids Downloads"],
+  ];
+  for (const [sc, id, naam] of liVerwacht) {
+    expect(sc, scopes(li.triggered, id).includes(naam), `${id.source.replace(/[\^$]/g, "")} op "${naam}"`);
+  }
+  // Ontworpen (objective-dekking, kop van dit bestand): Productvideo heeft 10% video-voltooiing.
+  const liOntworpen: [RegExp, string][] = [...liVerwacht.map(([, id, naam]) => [id, naam] as [RegExp, string]), [/^linkedin_video_dropoff$/, "GreenTech Productvideo"]];
+  const liVals = li.triggered.filter((s) => !liOntworpen.some(([id, naam]) => id.test(s.id) && s.scope === naam));
+  expect("stil", liVals.length === 0, `LinkedIn: geen onontworpen verhaal${liVals.length ? ` (vals: ${liVals.map((s) => `${s.id} op ${s.scope}`).join("; ")})` : ""}`);
+  expect("stil", !scopes(li.triggered, /engagement/).includes("GreenTech Productvideo"), "geen 'CTR onder de mediaan' op de video-views-campagne");
+  expect("stil", !li.triggered.some((s) => s.scope === "GreenTech Lead Gen EU"), "GreenTech Lead Gen EU blijft stil");
 
-  // Cross: maandreeksen uit de account-dagdata afleiden zoals de blended view dat doet.
+  // ── Cross [S7, S8]: maandreeksen uit de account-dagdata, zoals de blended view ──
   const toMonthly = (rows: AnyRow[], channel: string, map: (r: AnyRow) => { imp: number; clicks: number; spend: number; conv: number; leads: number }) => {
     const acc = new Map<string, { impressions: number; clicks: number; spend: number; conversions: number; leads: number }>();
     for (const r of rows) {
-      const m = String((r as Record<string, unknown>).date).slice(0, 7);
+      const m = String(r.date).slice(0, 7);
       const v = map(r); const a = acc.get(m) ?? { impressions: 0, clicks: 0, spend: 0, conversions: 0, leads: 0 };
       a.impressions += v.imp; a.clicks += v.clicks; a.spend += v.spend; a.conversions += v.conv; a.leads += v.leads;
       acc.set(m, a);
@@ -861,9 +1002,8 @@ async function check() {
     // de detectors (en de cross-route) uit.
     return [...acc.entries()].sort().slice(1).filter(([month]) => month < CUR_MONTH).map(([month, a]) => ({ channel, month, ...a }));
   };
-  const gRow = (r: AnyRow) => r as Record<string, number>;
   const channels = [
-    ...(tables["ads_account_monthly"] as AnyRow[]).filter((r) => String(gRow(r).month).slice(0, 7) < CUR_MONTH).slice(-4).map((r) => ({ channel: "google_ads", month: String(gRow(r).month).slice(0, 7), impressions: gRow(r).impressions, clicks: gRow(r).clicks, spend: gRow(r).cost, conversions: gRow(r).conversions, leads: 0 })),
+    ...(tables["ads_account_monthly"] as AnyRow[]).filter((r) => String(gRow(r).month).slice(0, 7) < CUR_MONTH).sort((a, b) => String(a.month).localeCompare(String(b.month))).slice(-4).map((r) => ({ channel: "google_ads", month: String(gRow(r).month).slice(0, 7), impressions: gRow(r).impressions, clicks: gRow(r).clicks, spend: gRow(r).cost, conversions: gRow(r).conversions, leads: 0 })),
     ...toMonthly(tables["meta_account_daily"] as AnyRow[], "meta_ads", (r) => ({ imp: gRow(r).impressions, clicks: gRow(r).link_clicks, spend: gRow(r).spend, conv: gRow(r).conversions, leads: 0 })),
     ...toMonthly(tables["linkedin_account_daily"] as AnyRow[], "linkedin_ads", (r) => ({ imp: gRow(r).impressions, clicks: gRow(r).clicks, spend: gRow(r).spend, conv: gRow(r).external_website_conversions as number, leads: gRow(r).one_click_leads as number })),
   ];
@@ -871,132 +1011,156 @@ async function check() {
     .filter((r) => /brand/i.test(String(gRow(r).campaign_name)) && String(gRow(r).month).slice(0, 7) < CUR_MONTH)
     .map((r) => ({ month: String(gRow(r).month).slice(0, 7), clicks: gRow(r).clicks }));
   const cross = buildCrossChannelSignals({ channels, brand });
-  const crossIds = cross.triggered.map((s) => s.id).join(",");
-  expect(/zaai/.test(crossIds), `[S7] zaai-oogst getriggerd (${cross.triggered.length} cross-verhalen)`);
+  expect("S7", cross.triggered.some((s) => s.id === "cross_zaai_oogst"), "zaai-oogst: social-golf valt samen met meer brand-klikken");
+  const mix = cross.triggered.find((s) => s.id === "cross_mix_shift");
+  expect("S8", mix !== undefined, `mix-shift: ${mix ? mix.evidence.find((e) => /mix-deel/.test(e.metric))?.value + " procentpunt mix / prestatie" : "gaat niet af"}`);
+  expect("S8", mix !== undefined && /linkedin_ads van \d+% naar \d+%/.test(mix.story), "het verhaal noemt de verschuiving naar LinkedIn");
 
-  // [S9] Doelgroep-tegenspraak: LinkedIn-leads vs het Google-ICP.
+  // ── [S9] Doelgroep-tegenspraak: LinkedIn-leads vs het Google-ICP ──
   const { audienceContradiction } = await import("../../lib/cross-channel/audience-coherence");
   const leadsByFn = new Map<string, number>();
   for (const r of tables["linkedin_demographic_daily"] as AnyRow[]) {
-    const rr = r as Record<string, unknown>;
-    leadsByFn.set(String(rr.pivot_value_urn), (leadsByFn.get(String(rr.pivot_value_urn)) ?? 0) + Number(rr.leads));
+    leadsByFn.set(String(r.pivot_value_urn), (leadsByFn.get(String(r.pivot_value_urn)) ?? 0) + Number(r.leads));
   }
   const totalLeads = [...leadsByFn.values()].reduce((s, v) => s + v, 0);
   const labelOf = new Map(LI_DEMO_FUNCTIONS.map((f) => [f.urn, f.label]));
   const segments = [...leadsByFn.entries()].map(([urn, leads]) => ({ dimension: "job_function" as const, value: labelOf.get(urn) ?? urn, conversionShare: leads / totalLeads }));
-  const coherence = audienceContradiction(
-    { channel: "linkedin_ads", segments },
-    { channel: "google_ads", byDimension: AUDIENCE_PROFILE.google_ads }
-  );
-  expect(coherence.flags.length === 1 && coherence.flags[0].outsideProfileSharePct > 50, `[S9] doelgroep-tegenspraak geflagd (${coherence.flags[0]?.outsideProfileSharePct}% buiten ICP)`);
+  const coherence = audienceContradiction({ channel: "linkedin_ads", segments }, { channel: "google_ads", byDimension: AUDIENCE_PROFILE.google_ads });
+  expect("S9", coherence.flags.length === 1 && coherence.flags[0].outsideProfileSharePct > 50, `doelgroep-tegenspraak (${coherence.flags[0]?.outsideProfileSharePct}% buiten ICP)`);
 
-  // Meta/LinkedIn dagpunten per beurs, exact zoals app/api/analysis/geo-clone/route.ts ze opbouwt --
-  // bewijst dat de nieuwe GRA/GRN-campagnes op Meta/LinkedIn ook echt de blended beursprojectie
-  // voeden, niet alleen los in hun eigen kanaaltabel staan.
+  // ── Beursanalyse [S10-S12] ──
+  // Meta/LinkedIn dagpunten per beurs, exact zoals app/api/analysis/geo-clone/route.ts ze opbouwt.
   const { matchGeoCloneByCampaignName } = await import("../../lib/fair/geo-clone-catalog");
   const channelPointsFor = (geoClone: string) => {
     const metaIds = new Set(META_CAMPAIGNS.filter((c) => matchGeoCloneByCampaignName(c.name)?.abbreviation === geoClone).map((c) => c.id));
     const metaByDate = new Map<string, number>();
     for (const r of tables["meta_campaign_daily"] as AnyRow[]) {
-      if (!metaIds.has(String(gRow(r).entity_id))) continue;
-      const d = String((r as Record<string, unknown>).date); metaByDate.set(d, (metaByDate.get(d) ?? 0) + Number(gRow(r).conversions));
+      if (!metaIds.has(String(r.entity_id))) continue;
+      const d = String(r.date); metaByDate.set(d, (metaByDate.get(d) ?? 0) + Number(r.conversions));
     }
     const liIds = new Set(LI_CAMPAIGNS.filter((c) => matchGeoCloneByCampaignName(c.name)?.abbreviation === geoClone).map((c) => c.urn));
     const liByDate = new Map<string, number>();
     for (const r of tables["linkedin_campaign_daily"] as AnyRow[]) {
-      if (!liIds.has(String(gRow(r).entity_urn))) continue;
-      const d = String((r as Record<string, unknown>).date); liByDate.set(d, (liByDate.get(d) ?? 0) + Number(gRow(r).external_website_conversions));
+      if (!liIds.has(String(r.entity_urn))) continue;
+      const d = String(r.date); liByDate.set(d, (liByDate.get(d) ?? 0) + Number(r.external_website_conversions));
     }
-    const points: { channel: string; points: { date: string; value: number }[] }[] = [];
-    if (metaByDate.size > 0) points.push({ channel: "meta_ads", points: [...metaByDate.entries()].map(([date, value]) => ({ date, value })) });
-    if (liByDate.size > 0) points.push({ channel: "linkedin_ads", points: [...liByDate.entries()].map(([date, value]) => ({ date, value })) });
+    // Het begin van de kanaaldata van het hele account, zoals de route het meegeeft.
+    const eerste = (t: string) => (tables[t] as AnyRow[]).map((r) => String(r.date).slice(0, 10)).sort()[0] ?? null;
+    const points: { channel: string; points: { date: string; value: number }[]; historyStart: string | null }[] = [];
+    if (metaByDate.size > 0) points.push({ channel: "meta_ads", points: [...metaByDate.entries()].map(([date, value]) => ({ date, value })), historyStart: eerste("meta_campaign_daily") });
+    if (liByDate.size > 0) points.push({ channel: "linkedin_ads", points: [...liByDate.entries()].map(([date, value]) => ({ date, value })), historyStart: eerste("linkedin_campaign_daily") });
     return points;
   };
-
-  // Beursanalyse GRT: achterstand => actionNeeded; GRA: op koers; GRN: eerste editie (geen vorige
-  // editie om tegen af te zetten, maar draait wel en blend't Meta/LinkedIn mee).
   const grt = analyzeGeoClone({
     geoClone: "GRT", fairLabel: "GreenTech Amsterdam", rows: rowsAs(tables["ads_campaign_monthly"]),
     cadence: "annual", editions: RAI_EVENTS.events[0].editions, conversionsTarget: 320, asOfDate: TODAY,
   });
-  expect(grt.actionNeeded === true, `[S10] GRT-beursanalyse: achterstand gedetecteerd (delta ${grt.conversions?.deltaPct})`);
+  const grtDelta = grt.conversions?.deltaPct ?? null;
+  const grtVoorbij = grt.forecast?.method === "beurs_bereikt";
+  expect("S10", grtDelta != null && grtDelta <= -0.2 && grtDelta >= -0.5, `GRT ligt materieel achter (delta ${grtDelta}, ontworpen ~-35%)`);
+  expect("S10", grt.actionNeeded === !grtVoorbij, `GRT: ${grtVoorbij ? "na de beurs een evaluatie, geen actie" : "actie in de wachtrij"}`);
+  expect("S10", Math.abs(grt.cost?.deltaPct ?? 1) <= 0.05, `GRT: bij gelijke spend (${grt.cost?.deltaPct}), dus een effectiviteitsvraag`);
   const gra = analyzeGeoClone({
     geoClone: "GRA", fairLabel: "GreenTech Americas", rows: rowsAs(tables["ads_campaign_monthly"]),
     cadence: "annual", editions: RAI_EVENTS.events[1].editions, conversionsTarget: 200, asOfDate: TODAY,
     channelConvPoints: channelPointsFor("GRA"),
   });
-  expect(gra.conversions?.comparable === true, `[S11] GRA-beursanalyse vergelijkbaar (delta ${gra.conversions?.deltaPct})`);
-  expect(gra.blendedForecast !== null, `[S11] GRA blend't Meta/LinkedIn mee (${gra.perChannelForecast.length} kanalen)`);
+  const graDelta = gra.conversions?.deltaPct ?? null;
+  const graSpend = gra.cost?.deltaPct ?? null;
+  // Het getal, niet alleen "vergelijkbaar": met een vorige editie waarvan de historie pas in
+  // december begint stond hier +38,1% conversies en +20% spend, en dat kreeg een vinkje.
+  expect("S11", gra.conversions?.comparable === true && graDelta != null && graDelta > 0 && graDelta <= 0.2, `GRA op koers: conversies ${graDelta} (ontworpen +10%)`);
+  expect("S11", graSpend != null && Math.abs(graSpend) <= 0.05, `GRA spend gelijk (${graSpend})`);
+  expect("S11", gra.actionNeeded === false, "GRA: geen actie");
+  expect("S11", gra.blendedForecast !== null, `GRA blend't Meta/LinkedIn mee (${gra.perChannelForecast.length} kanalen)`);
   const grn = analyzeGeoClone({
     geoClone: "GRN", fairLabel: "GreenTech North America", rows: rowsAs(tables["ads_campaign_monthly"]),
     cadence: "custom", editions: RAI_EVENTS.events[2].editions, conversionsTarget: 70, asOfDate: TODAY,
     channelConvPoints: channelPointsFor("GRN"),
   });
-  expect(grn.conversions !== null && grn.previousEditionId === null, `[S12] GRN-beursanalyse: eerste editie, geen vorige om tegen af te zetten`);
-  expect(grn.blendedForecast !== null, `[S12] GRN blend't Meta/LinkedIn mee (${grn.perChannelForecast.length} kanalen)`);
+  expect("S12", grn.conversions !== null && grn.previousEditionId === null, "GRN: eerste editie, geen vorige om tegen af te zetten");
+  expect("S12", grn.blendedForecast !== null, `GRN blend't Meta/LinkedIn mee (${grn.perChannelForecast.length} kanalen)`);
+  expect("S12", grn.forecast?.method !== "beurs_bereikt" || grn.actionNeeded === false, `GRN na de beurs: evaluatie, geen actie (${grn.forecast?.method})`);
 
-  // ── Objective-analyse: bewijs dat de nieuwe Meta/LinkedIn-bevindingen-engines draaien op de
-  // demo-klant, over meerdere objectives heen (masterplan 16.3). Maandaggregatie hier gebeurt
-  // rechtstreeks uit de dag-rijen die ook naar de DB zouden gaan -- geen aparte databron.
+  // ── [S13] Impressieaandeel ──
+  const is = analyzeCampaignImpressionShare(rowsAs(tables["ads_campaign_impression_share"]));
+  const isVan = (naam: string) => is.campaigns.find((c) => c.campaignName === naam);
+  expect("S13", isVan("GRT | Search | NL")?.driver === "budget", "GRT verliest zichtbaarheid aan budget");
+  expect("S13", isVan("GRA | Search | US")?.driver === "rank", "GRA verliest zichtbaarheid aan rang");
+  // Zelfde campagne als S10 ("geen investeringskwestie maar een effectiviteitsvraag"): de CPA ligt
+  // ver boven het account, dus geen budgetverhoging maar eerst efficiëntie.
+  expect("S13", isVan("GRT | Search | NL")?.action !== "raise_budget" && /eerst efficiëntie/.test(isVan("GRT | Search | NL")?.budgetTegengehouden ?? ""),
+    `GRT is geen budgetkandidaat: ${isVan("GRT | Search | NL")?.budgetTegengehouden}`);
+  expect("stil", isVan("GreenTech | Brand")?.driver === "none", "Brand: impressieaandeel gezond");
+  expect("stil", !cross.triggered.some((s) => /brand/i.test(s.scope)), "Brand krijgt geen eigen cross-verhaal");
+
+  // ── Objective-analyse: Meta/LinkedIn-bevindingen-engines over meerdere objectives ─────────
+  // Alleen VOLLE maanden, en gesorteerd op jaar en maand. De lopende maand gaf hier "Conversies
+  // dalen -58%" op drie campagnes met een constante dagwaarde (13 dagen november tegen 31 dagen
+  // oktober), met een vinkje; en sorteren op maandnummer zonder jaar zette januari voor november.
   const { analyzeMetaCampaigns } = await import("../../lib/meta/campaign-analysis");
   const { analyzeLinkedInCampaigns } = await import("../../lib/linkedin/campaign-analysis");
-  const monthOf = (date: string): number => Number(date.slice(5, 7));
+  const volleMaanden = (rows: AnyRow[]): Map<string, AnyRow[]> => {
+    const perMaand = new Map<string, AnyRow[]>();
+    for (const r of rows) {
+      const ym = String(r.date).slice(0, 7);
+      if (ym >= CUR_MONTH) continue;
+      perMaand.set(ym, [...(perMaand.get(ym) ?? []), r]);
+    }
+    // Een maand is vol als hij op de 1e begint (de oudste maand van het venster is dat meestal niet).
+    for (const [ym, rs] of perMaand) if (!rs.some((r) => String(r.date) === `${ym}-01`)) perMaand.delete(ym);
+    return new Map([...perMaand.entries()].sort(([a], [b]) => a.localeCompare(b)));
+  };
+  const n = (v: unknown) => Number(v ?? 0);
 
   const metaCampaignsForAnalysis = META_CAMPAIGNS.map((c) => {
-    const rows = (tables["meta_campaign_daily"] as AnyRow[]).filter((r) => r.entity_id === c.id);
-    const byMonth = new Map<number, { imp: number; clicks: number; spend: number; conv: number; leads: number; atc: number; ic: number; freqSum: number; freqN: number; hookSum: number; hookN: number }>();
-    for (const r of rows) {
-      const mk = monthOf(String(r.date));
-      const a = byMonth.get(mk) ?? { imp: 0, clicks: 0, spend: 0, conv: 0, leads: 0, atc: 0, ic: 0, freqSum: 0, freqN: 0, hookSum: 0, hookN: 0 };
-      a.imp += Number(r.impressions ?? 0); a.clicks += Number(r.link_clicks ?? 0); a.spend += Number(r.spend ?? 0);
-      a.conv += Number(r.conversions ?? 0); a.leads += Number(r.leads ?? 0);
-      a.atc += Number(r.add_to_cart ?? 0); a.ic += Number(r.initiate_checkout ?? 0);
-      if (r.frequency != null) { a.freqSum += Number(r.frequency); a.freqN++; }
-      if (r.hook_rate != null) { a.hookSum += Number(r.hook_rate); a.hookN++; }
-      byMonth.set(mk, a);
-    }
-    const monthly = [...byMonth.entries()].sort(([x], [y]) => x - y).map(([month, a]) => ({
-      month, impressions: a.imp, reach: 0, frequency: a.freqN > 0 ? a.freqSum / a.freqN : 0, linkClicks: a.clicks, spend: a.spend,
-      cpm: a.imp > 0 ? (a.spend / a.imp) * 1000 : 0, cpcLink: a.clicks > 0 ? a.spend / a.clicks : 0, ctrLink: a.imp > 0 ? a.clicks / a.imp : 0,
-      conversions: a.conv, conversionValue: 0, purchaseRoas: 0, cpa: a.conv > 0 ? a.spend / a.conv : 0, leads: a.leads,
-      addToCart: a.atc, initiateCheckout: a.ic, landingPageViews: 0, videoThruplay: 0,
-      hookRate: a.hookN > 0 ? a.hookSum / a.hookN : 0, holdRate: 0, postEngagement: 0,
-    }));
+    const maanden = volleMaanden((tables["meta_campaign_daily"] as AnyRow[]).filter((r) => r.entity_id === c.id));
+    const monthly = [...maanden.entries()].map(([ym, rs]) => {
+      const imp = rs.reduce((s, r) => s + n(r.impressions), 0), clicks = rs.reduce((s, r) => s + n(r.link_clicks), 0);
+      const spend = rs.reduce((s, r) => s + n(r.spend), 0), conv = rs.reduce((s, r) => s + n(r.conversions), 0);
+      const hooks = rs.filter((r) => r.hook_rate != null);
+      return {
+        month: Number(ym.slice(5, 7)), impressions: imp, reach: 0,
+        // Geen maandfrequentie: die vraagt een ontdubbeld bereik over de maand (zie
+        // campaign-analysis.ts). Het gemiddelde van de dagwaarden is een andere grootheid.
+        frequency: 0, linkClicks: clicks, spend,
+        cpm: imp > 0 ? (spend / imp) * 1000 : 0, cpcLink: clicks > 0 ? spend / clicks : 0, ctrLink: imp > 0 ? clicks / imp : 0,
+        conversions: conv, conversionValue: 0, purchaseRoas: 0, cpa: conv > 0 ? spend / conv : 0, leads: rs.reduce((s, r) => s + n(r.leads), 0),
+        addToCart: rs.reduce((s, r) => s + n(r.add_to_cart), 0), initiateCheckout: rs.reduce((s, r) => s + n(r.initiate_checkout), 0), landingPageViews: 0, videoThruplay: 0,
+        hookRate: hooks.length > 0 ? hooks.reduce((s, r) => s + n(r.hook_rate), 0) / hooks.length : 0, holdRate: 0, postEngagement: 0,
+      };
+    });
     return { campaignId: c.id, campaignName: c.name, objective: c.objective as MetaObjective, status: "ACTIVE" as const, monthly };
   });
   const metaAnalysis = analyzeMetaCampaigns({ clientId: DEMO_CLIENT, campaigns: metaCampaignsForAnalysis });
   const metaObjectives = new Set(metaCampaignsForAnalysis.map((c) => c.objective));
-  expect(metaAnalysis.findings.length > 0 || metaAnalysis.manualChecks.length > 0,
-    `[objective-analyse] Meta: ${metaAnalysis.findings.length} bevindingen + ${metaAnalysis.manualChecks.length} manualChecks over ${metaObjectives.size} objectives`);
+  console.log(`  objective-analyse Meta: ${metaAnalysis.findings.length} bevindingen + ${metaAnalysis.manualChecks.length} manualChecks over ${metaObjectives.size} objectives (op ${metaCampaignsForAnalysis[0]?.monthly.length ?? 0} volle maand(en))`);
   for (const f of metaAnalysis.findings.slice(0, 3)) console.log(`  · ${f.campaignName} (${f.objectiveLabel}): ${f.description}`);
+  expect("stil", !metaAnalysis.findings.some((f) => /Conversies dalen/.test(f.description)), "objective-analyse Meta: geen 'Conversies dalen' op een constante dagwaarde");
 
   const linkedinCampaignsForAnalysis = LI_CAMPAIGNS.map((c) => {
-    const rows = (tables["linkedin_campaign_daily"] as AnyRow[]).filter((r) => r.entity_urn === c.urn);
-    const byMonth = new Map<number, { imp: number; clicks: number; spend: number; leads: number; opens: number; conv: number; vidStart: number; vidDone: number }>();
-    for (const r of rows) {
-      const mk = monthOf(String(r.date));
-      const a = byMonth.get(mk) ?? { imp: 0, clicks: 0, spend: 0, leads: 0, opens: 0, conv: 0, vidStart: 0, vidDone: 0 };
-      a.imp += Number(r.impressions ?? 0); a.clicks += Number(r.clicks ?? 0); a.spend += Number(r.spend ?? 0);
-      a.leads += Number(r.one_click_leads ?? 0); a.opens += Number(r.one_click_lead_form_opens ?? 0);
-      a.conv += Number(r.external_website_conversions ?? 0);
-      a.vidStart += Number(r.video_starts ?? 0); a.vidDone += Number(r.video_completions ?? 0);
-      byMonth.set(mk, a);
-    }
-    const monthly = [...byMonth.entries()].sort(([x], [y]) => x - y).map(([month, a]) => ({
-      month, impressions: a.imp, clicks: a.clicks, spend: a.spend,
-      ctr: a.imp > 0 ? a.clicks / a.imp : 0, cpc: a.clicks > 0 ? a.spend / a.clicks : 0, cpm: a.imp > 0 ? (a.spend / a.imp) * 1000 : 0,
-      landingPageClicks: a.clicks, oneClickLeadFormOpens: a.opens, oneClickLeads: a.leads,
-      externalWebsiteConversions: a.conv, conversionValue: 0, cpl: a.leads > 0 ? a.spend / a.leads : 0,
-      formCompletionRate: a.opens > 0 ? a.leads / a.opens : 0, videoStarts: a.vidStart, videoViews: a.vidStart,
-      videoCompletions: a.vidDone, videoCompletionRate: a.vidStart > 0 ? a.vidDone / a.vidStart : 0, totalEngagements: 0,
-    }));
+    const maanden = volleMaanden((tables["linkedin_campaign_daily"] as AnyRow[]).filter((r) => r.entity_urn === c.urn));
+    const monthly = [...maanden.entries()].map(([ym, rs]) => {
+      const som = (k: string) => rs.reduce((s, r) => s + n(r[k]), 0);
+      const imp = som("impressions"), clicks = som("clicks"), spend = som("spend"), leads = som("one_click_leads"), opens = som("one_click_lead_form_opens");
+      const vidStart = som("video_starts"), vidDone = som("video_completions");
+      return {
+        month: Number(ym.slice(5, 7)), impressions: imp, clicks, spend,
+        ctr: imp > 0 ? clicks / imp : 0, cpc: clicks > 0 ? spend / clicks : 0, cpm: imp > 0 ? (spend / imp) * 1000 : 0,
+        landingPageClicks: clicks, oneClickLeadFormOpens: opens, oneClickLeads: leads,
+        externalWebsiteConversions: som("external_website_conversions"), conversionValue: 0, cpl: leads > 0 ? spend / leads : 0,
+        formCompletionRate: opens > 0 ? leads / opens : 0, videoStarts: vidStart, videoViews: vidStart,
+        videoCompletions: vidDone, videoCompletionRate: vidStart > 0 ? vidDone / vidStart : 0, totalEngagements: 0,
+      };
+    });
     return { campaignUrn: c.urn, campaignName: c.name, objective: c.objective as LinkedInObjective, status: "ACTIVE" as const, monthly };
   });
   const linkedinAnalysis = analyzeLinkedInCampaigns({ clientId: DEMO_CLIENT, campaigns: linkedinCampaignsForAnalysis });
   const liObjectives = new Set(linkedinCampaignsForAnalysis.map((c) => c.objective));
-  expect(linkedinAnalysis.findings.length > 0 || linkedinAnalysis.manualChecks.length > 0,
-    `[objective-analyse] LinkedIn: ${linkedinAnalysis.findings.length} bevindingen + ${linkedinAnalysis.manualChecks.length} manualChecks over ${liObjectives.size} objectives`);
+  console.log(`  objective-analyse LinkedIn: ${linkedinAnalysis.findings.length} bevindingen + ${linkedinAnalysis.manualChecks.length} manualChecks over ${liObjectives.size} objectives`);
   for (const f of linkedinAnalysis.findings.slice(0, 3)) console.log(`  · ${f.campaignName} (${f.objectiveLabel}): ${f.description}`);
+  expect("objective-analyse", metaAnalysis.findings.length + metaAnalysis.manualChecks.length > 0 && linkedinAnalysis.findings.length + linkedinAnalysis.manualChecks.length > 0,
+    "de Meta- en LinkedIn-regelmachines draaien over meerdere objectives");
 
   // ── Microsoft [S14-S20]: bewijs dat de prepared-facts-laag de scenario's echt ziet, via
   // dezelfde mappers als de routes -- geen aparte databron, geen tweede waarheid.
@@ -1032,52 +1196,63 @@ async function check() {
   // De pijler-structuren zijn Record<number, unknown> richting de prompt; hier lezen we ze terug
   // met dezelfde vrijheid als de prompt-JSON dat doet.
   type Vrij = Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
-  const feit = (n: number): Vrij => msFacts[n] as Vrij;
+  const feit = (k: number): Vrij => msFacts[k] as Vrij;
 
   const pariteit = feit(2).import_pariteit as Vrij;
-  expect(pariteit.stellig === true && (pariteit.cpa_delta_pct_import_vs_native ?? 0) > 30,
-    `[S14] import-drift: import-CPA ${pariteit.import_benchmark?.cpa} vs native ${pariteit.native_benchmark?.cpa} (+${pariteit.cpa_delta_pct_import_vs_native}%, stellig)`);
+  expect("S14", pariteit.stellig === true && (pariteit.cpa_delta_pct_import_vs_native ?? 0) > 30,
+    `import-drift: import-CPA ${pariteit.import_benchmark?.cpa} vs native ${pariteit.native_benchmark?.cpa} (+${pariteit.cpa_delta_pct_import_vs_native}%, stellig)`);
 
   const netwerk = feit(5).netwerk as Vrij;
   const audience = (netwerk.segments as Vrij[]).find((s) => /audience/i.test(String(s.segment)));
-  expect(audience?.lek === true && (audience.spend_share_pct ?? 0) > 10,
-    `[S15] Audience Network-lek: ${audience?.spend_share_pct}% van spend, CPA ${audience?.cpa_vs_search}x search`);
+  expect("S15", audience?.lek === true && (audience.spend_share_pct ?? 0) > 10,
+    `Audience Network-lek: ${audience?.spend_share_pct}% van spend, CPA ${audience?.cpa_vs_search}x search`);
+  const searchSeg = (netwerk.segments as Vrij[]).find((s) => String(s.segment).toLowerCase() === "search");
+  expect("stil", searchSeg?.lek === false, "Microsoft: het search-netwerk zelf is geen lek");
 
   const profielPivots = (feit(4).profiel as Vrij).pivots as Record<string, Vrij[]>;
   const tuinbouw = profielPivots.industry?.find((s) => s.segment === "Tuinbouw & Agri");
   const inkoop = profielPivots.job_function?.find((s) => s.segment === "Inkoop");
-  expect(tuinbouw?.boven_volumegrens === true && (tuinbouw?.vs_account_cpa?.delta_pct ?? 0) < -15,
-    `[S16] Tuinbouw & Agri: CPA ${tuinbouw?.cpa} (${tuinbouw?.vs_account_cpa?.delta_pct}% vs account, boven de volumegrens)`);
-  expect(inkoop != null && inkoop.boven_volumegrens === false && (inkoop.cpa ?? 99) < (tuinbouw?.cpa ?? 0),
-    `[S16] Inkoop oogt beter (CPA ${inkoop?.cpa}) maar zit onder de grens van ${VOLUME_GRENS_CONVERSIES}`);
+  expect("S16", tuinbouw?.boven_volumegrens === true && (tuinbouw?.vs_account_cpa?.delta_pct ?? 0) < -15,
+    `Tuinbouw & Agri: CPA ${tuinbouw?.cpa} (${tuinbouw?.vs_account_cpa?.delta_pct}% vs account, boven de volumegrens)`);
+  expect("S16", inkoop != null && inkoop.boven_volumegrens === false && (inkoop.cpa ?? 99) < (tuinbouw?.cpa ?? 0),
+    `Inkoop oogt beter (CPA ${inkoop?.cpa}) maar zit onder de grens van ${VOLUME_GRENS_CONVERSIES}`);
 
   const device = feit(4).demografie_device as Vrij;
   const desktop = (device.segments as Vrij[]).find((s) => s.segment === "Desktop");
   const mobiel = (device.segments as Vrij[]).find((s) => s.segment === "Mobile");
-  expect((desktop?.spend_share_pct ?? 0) > 55 && (desktop?.cpa ?? 99) < (mobiel?.cpa ?? 0),
-    `[S17] desktop ${desktop?.spend_share_pct}% van spend, CPA ${desktop?.cpa} vs mobile ${mobiel?.cpa}`);
+  expect("S17", (desktop?.spend_share_pct ?? 0) > 55 && (desktop?.cpa ?? 99) < (mobiel?.cpa ?? 0),
+    `desktop ${desktop?.spend_share_pct}% van spend, CPA ${desktop?.cpa} vs mobile ${mobiel?.cpa}`);
 
   const isFeiten = feit(5).impressieaandeel as Vrij;
   const importIs = (isFeiten.campagnes as Vrij[]).find((c) => c.campaign_name === MS_CAMPAIGNS[0].name);
   const brandIs = (isFeiten.campagnes as Vrij[]).find((c) => c.campaign_name === MS_CAMPAIGNS[2].name);
-  expect((importIs?.budget_lost_trend ?? 0) > 0.1,
-    `[S18] budgetverlies import loopt op (+${importIs?.budget_lost_trend} over ${importIs?.maanden?.length} maanden)`);
-  expect((brandIs?.maanden?.at(-1)?.impression_share ?? 0) >= 0.9,
-    `[S18] brand vrijwel vol (IS ${brandIs?.maanden?.at(-1)?.impression_share})`);
+  expect("S18", (importIs?.budget_lost_trend ?? 0) > 0.1,
+    `budgetverlies import loopt op (+${importIs?.budget_lost_trend} over ${importIs?.maanden?.length} maanden)`);
+  expect("S18", (brandIs?.maanden?.at(-1)?.impression_share ?? 0) >= 0.9,
+    `brand vrijwel vol (IS ${brandIs?.maanden?.at(-1)?.impression_share})`);
 
   const kw = (feit(3).keywords ?? {}) as Vrij;
-  expect((kw.bleeders as Vrij[]).some((b) => b.keyword === "greenhouse solutions"),
-    `[S19] bleeder gevonden (${kw.bleeders?.length} bleeder(s), account-CPA ${kw.account_cpa})`);
-  expect(!(kw.bleeders as Vrij[]).some((b) => b.keyword === "kas kopen tweedehands"),
-    "[S19] de EUR 25-tegenhanger is GEEN bleeder");
-  expect((kw.lage_quality_score as Vrij[]).length >= 3,
-    `[S19] laag-QS-cluster (${kw.lage_quality_score?.length} keywords onder QS 5)`);
+  expect("S19", (kw.bleeders as Vrij[]).some((b) => b.keyword === "greenhouse solutions"),
+    `bleeder gevonden (${kw.bleeders?.length} bleeder(s), account-CPA ${kw.account_cpa})`);
+  expect("S19", !(kw.bleeders as Vrij[]).some((b) => b.keyword === "kas kopen tweedehands"),
+    "de EUR 25-tegenhanger is GEEN bleeder");
+  expect("S19", (kw.lage_quality_score as Vrij[]).length >= 3,
+    `laag-QS-cluster (${kw.lage_quality_score?.length} keywords onder QS 5)`);
 
   const termen = (feit(3).zoektermen ?? {}) as Vrij;
-  expect((termen.vervuilers as Vrij[]).some((t) => t.search_term === "greenhouse jobs"),
-    `[S20] zoektermvervuiling op de import (${termen.vervuilers?.length} vervuilers, EUR ${termen.totale_verspilling} verspild)`);
+  expect("S20", (termen.vervuilers as Vrij[]).some((t) => t.search_term === "greenhouse jobs"),
+    `zoektermvervuiling op de import (${termen.vervuilers?.length} vervuilers, EUR ${termen.totale_verspilling} verspild)`);
 
-  console.log(failed > 0 ? `\n${failed} scenario('s) NIET getriggerd` : "\nAlle gecontroleerde scenario's triggeren zoals ontworpen.");
+  // ── Dekking: elk scenario heeft een assert gehad ──
+  const ongedekt = ALLE_SCENARIOS.filter((s) => !gedekt.has(s));
+  if (ongedekt.length > 0) {
+    console.log(`✗ niet getoetst: ${ongedekt.join(", ")}`);
+    failed += ongedekt.length;
+  }
+  const gedektAantal = ALLE_SCENARIOS.length - ongedekt.length;
+  console.log(failed > 0
+    ? `\n${failed} controle(s) mislukt; ${gedektAantal} van de ${ALLE_SCENARIOS.length} scenario's (S1-S20 en stil) getoetst.`
+    : `\nAlle ${ALLE_SCENARIOS.length} scenario's (S1-S20 en stil) getoetst: elk gaat af zoals ontworpen en niets gaat vals af.`);
   if (failed > 0) process.exit(1);
 }
 

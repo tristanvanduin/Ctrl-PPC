@@ -33,14 +33,15 @@ import type { ClientHistoricalData } from "@/lib/types";
 import { MONTH_LABELS, computeForecast, type ClientForecast, type ForecastMetric } from "@/lib/forecast";
 import { formatCurrency, formatDeltaPercent, formatNumber, formatterFor } from "@/lib/forecast-format";
 import { formatMonth, formatRange } from "@/lib/period/period-range";
-import { doelHerkomstZin, gemiddeldPerMaand, pacingJaarRijen, verschilTekst, zichtbareMetriek, type PacingJaarRij } from "@/lib/overzicht/pacing-jaar";
+import { doelVoetregel, gemiddeldPerMaand, pacingJaarRijen, verschilTekst, vergelijkbaarDeelTekst, zichtbareMetriek, type PacingJaarRij } from "@/lib/overzicht/pacing-jaar";
 import type { BlendedKanaalReeks } from "@/lib/api/blended-historical";
 import { Vensterlabel } from "@/components/ui/vensterlabel";
 import { Lade } from "@/components/ui/disclosure";
-import { useBlendedPacing, type PacingDataStand } from "./blended-pacing";
+import { useBlendedPacing, type BlendedPacingCijfers, type PacingDataStand } from "./blended-pacing";
 import { BudgetAdvies, PerformanceChartView } from "./performance-chart";
 import { useKanaalData } from "./channel-data-provider";
-import { useClientHistoricalData, useForecast } from "@/lib/client-data-provider";
+import { useClientHistoricalData, useForecast, useJaardoelBereik } from "@/lib/client-data-provider";
+import type { DoelReeks } from "@/lib/doel/jaardoel";
 import { useCountryFilteredData } from "@/lib/use-country-filtered-data";
 import { Laadvlak } from "@/components/ui/laadvlak";
 import { KANAAL_NAAM, type Kanaal } from "@/lib/kanalen/beschikbaar";
@@ -49,7 +50,16 @@ const formaat = (rij: PacingJaarRij): ((v: number) => string) =>
   rij.sleutel === "adSpend" ? formatCurrency : formatterFor(rij.sleutel);
 const ofStreep = (v: number | null, f: (v: number) => string) => (v === null ? "—" : f(v));
 
-export function PacingJaaroverzicht({ data, forecast, perKanaal = null, dataStand = null, metric, onMetricChange, uitgesloten = null, kanaalNaam, titelToevoeging, grafiekBegin }: {
+/** De getallen achter het percentage als dat over een deel van de kanalen gaat (pacing-jaar.ts). */
+function vergelijkbaarDeelCel(rij: PacingJaarRij, c: BlendedPacingCijfers | null): string | null {
+  return vergelijkbaarDeelTekst(rij.sleutel, c ? {
+    gepaard: c.gepaard,
+    vergeleken: c.vergeleken.map((k) => KANAAL_NAAM[k]),
+    nietVolledig: c.buiten.length + c.deels.length,
+  } : null, formaat(rij));
+}
+
+export function PacingJaaroverzicht({ data, forecast, perKanaal = null, dataStand = null, metric, onMetricChange, uitgesloten = null, kanaalNaam, titelToevoeging, grafiekBegin, reeks = "blended" }: {
   /** De blended historie en de prognose erop: dezelfde twee als het jaaroverzicht altijd las. */
   data: ClientHistoricalData;
   forecast: ClientForecast;
@@ -72,7 +82,10 @@ export function PacingJaaroverzicht({ data, forecast, perKanaal = null, dataStan
   titelToevoeging?: string;
   /** Waar de grafiek in de lade op begint; zonder deze per maand (zie PerformanceChartView). */
   grafiekBegin?: "weekly" | "monthly";
+  /** Over welke reeks dit blok gaat: bepaalt of het jaardoel uit Instellingen hier geldt. */
+  reeks?: DoelReeks;
 }) {
+  const bereik = useJaardoelBereik();
   const pacing = useBlendedPacing(kanaalNaam === undefined ? perKanaal : null, dataStand, { naastJaardoel: true });
   // De metriek van de grafiek, geklemd op een metriek die deze klant heeft: een kanaal met alleen
   // een omzetdoel heeft geen rij Conversies, en dan opende de grafiek op een reeks waar geen knop
@@ -101,7 +114,7 @@ export function PacingJaaroverzicht({ data, forecast, perKanaal = null, dataStan
         </div>
 
         {/* Een signaal dat om actie vraagt staat in de kaart, niet in de lade. */}
-        <BudgetAdvies forecast={forecast} className="mb-3" />
+        <BudgetAdvies forecast={forecast} reeks={reeks} className="mb-3" />
 
         {/* Zes kolommen passen niet op een telefoon: de tabel schuift dan binnen zijn eigen vak in
             plaats van de pagina breder te maken. */}
@@ -138,7 +151,18 @@ export function PacingJaaroverzicht({ data, forecast, perKanaal = null, dataStan
                     <td className="px-3 py-2 text-right font-semibold tabular-nums text-brand-gray">{ofStreep(rij.ytd, f)}</td>
                     {/* Grijs en zonder oordeel: meer of minder dan vorig jaar is een feit, geen doel.
                         Voor een verhouding (ROAS, CPA) heeft de pacing geen paren: dan een streepje. */}
-                    {metVorigJaar && <td className="px-3 py-2 text-right tabular-nums text-muted-foreground">{vj ?? "—"}</td>}
+                    {metVorigJaar && (
+                      <td className="px-3 py-2 text-right tabular-nums text-muted-foreground">
+                        {vj ?? "—"}
+                        {/* Gaat het percentage over minder kanalen dan het getal links ervan, dan de
+                            twee getallen waar het wél over gaat in de cel zelf. Hier stond "3.072 |
+                            −8%", met de 1.091 tegen 1.180 van alleen Google in een hover-titel. */}
+                        {vj && (() => {
+                          const deel = vergelijkbaarDeelCel(rij, c);
+                          return deel ? <span className="block text-micro">{deel}</span> : null;
+                        })()}
+                      </td>
+                    )}
                     <td className="px-3 py-2 text-right tabular-nums text-brand-gray">{ofStreep(rij.doel, f)}</td>
                     <td className="px-3 py-2 text-right font-semibold tabular-nums text-brand-blue-ink">{ofStreep(rij.prognose, f)}</td>
                     {/* relative: het sr-only woord blijft dan in zijn cel als de tabel opzij schuift. */}
@@ -168,8 +192,9 @@ export function PacingJaaroverzicht({ data, forecast, perKanaal = null, dataStan
           {convPerMaand !== null && spendPerMaand !== null && c && (
             <>Gemiddeld per maand: {formatNumber(convPerMaand)} conversies en {formatCurrency(spendPerMaand)} kosten over {c.maanden} {c.maanden === 1 ? "maand" : "maanden"}. </>
           )}
-          {/* Waar het doel vandaan komt, in plaats van een voetnoot die zegt dat er geen is. */}
-          {doelHerkomstZin(forecast, rijen.map((r) => r.sleutel))}
+          {/* Waar het doel vandaan komt, in plaats van een voetnoot die zegt dat er geen is, en over
+              welke kanalen het oordeel gaat (lib/doel/jaardoel.ts). */}
+          {doelVoetregel(bereik, reeks, forecast, rijen.map((r) => r.sleutel))}
           {" "}Kosten hebben geen doel en dus geen oordeel.
           {metVorigJaar && " De conversies zijn de som over de kanalen, elk met zijn eigen attributievenster: een bovengrens, geen exacte telling."}
           {uitgesloten && ` ${uitgesloten}`}
@@ -177,7 +202,7 @@ export function PacingJaaroverzicht({ data, forecast, perKanaal = null, dataStan
       </div>
 
       <Lade id={ladeId} label="Verloop en prognose" labelOpen="Verberg verloop en prognose">
-        <PerformanceChartView clientData={data} forecast={forecast} metric={getoondeMetriek} onMetricChange={onMetricChange} inLade beginWeergave={grafiekBegin} />
+        <PerformanceChartView clientData={data} forecast={forecast} metric={getoondeMetriek} onMetricChange={onMetricChange} inLade beginWeergave={grafiekBegin} reeks={reeks} />
         {c && pacing && (
           <div className="border-t border-border px-5 py-4">
             <h4 className="text-meta font-semibold uppercase tracking-wider text-muted-foreground">
@@ -257,6 +282,7 @@ export function PacingJaaroverzichtGoogle({ clientId, countryFilter, titelToevoe
       metric={metric}
       onMetricChange={setMetric}
       kanaalNaam={KANAAL_NAAM.google}
+      reeks="google"
       titelToevoeging={titelToevoeging}
       // De weken van Google zijn echte weekcijfers, en de grafiek opende hier altijd per week. Per
       // maand is de beginstand voor "Alle kanalen", waar de weken verdeelde maandtotalen zijn.
@@ -282,6 +308,7 @@ export function PacingJaaroverzichtKanaal({ kanaal }: { kanaal: Kanaal }) {
       metric={metric}
       onMetricChange={setMetric}
       kanaalNaam={KANAAL_NAAM[kanaal]}
+      reeks={kanaal}
     />
   );
 }

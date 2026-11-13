@@ -1,21 +1,13 @@
-export {};
-// Verificatie van G3 Pad B (co-primaire threads), pure logica. Getrouwe replica van de co-primaire-
-// detectie en priority-toekenning uit createThreads (monthly-structured.ts, niet geexporteerd),
-// met contrast oud versus nieuw. Draaien: npx tsx lib/analysis/__g3_coprimary_test.ts
+// Verificatie van G3 Pad B (co-primaire threads), pure logica. Getoetst op threadPrioriteiten, de
+// regel die createThreads (monthly-structured.ts) gebruikt; hier stond eerst een kopie ervan. Met
+// contrast oud versus nieuw. Draaien: npx tsx lib/analysis/__g3_coprimary_test.ts
+
+import { threadPrioriteiten } from "./monthly-structured";
 
 type Group = { executiveScore: number; severity: "critical" | "high" | "medium" | "low" | "positive" };
 
-const computeCoPrimary = (groups: Group[]) =>
-  groups.length >= 2 &&
-  (groups[0].severity === "critical" || groups[0].severity === "high") &&
-  groups[0].severity === groups[1].severity &&
-  Math.abs(groups[0].executiveScore - groups[1].executiveScore) <= Math.abs(groups[0].executiveScore) * 0.1;
-
 const prioritiesOld = (groups: Group[]) => groups.map((_, index) => index + 1);
-const prioritiesNew = (groups: Group[]) => {
-  const co = computeCoPrimary(groups);
-  return groups.map((_, index) => (co ? (index <= 1 ? 1 : 2) : index + 1));
-};
+const prioritiesNew = (groups: Group[]): number[] => threadPrioriteiten(groups);
 
 let passed = 0, failed = 0;
 function check(name: string, cond: boolean, detail = "") {

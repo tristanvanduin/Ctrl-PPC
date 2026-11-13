@@ -1,5 +1,7 @@
 "use client";
 
+import { bronInGewoneTaal, ouderdom } from "@/lib/voorstel-herkomst";
+import { getoondeIce } from "@/lib/ice-score";
 import { useState, useEffect, useCallback } from "react";
 import { Inbox, Check, X, ChevronDown, ChevronUp, Loader2 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
@@ -73,7 +75,9 @@ export function planVoorWachtrij(voorstellen: Proposal[]) {
       iceImpact: p.ice_impact ?? 0,
       iceConfidence: p.ice_confidence ?? 0,
       iceEase: p.ice_ease ?? 0,
-      iceTotal: p.ice_total ?? 0,
+      // Het totaal uit de delen, zoals Aanbevelingen het toont en sorteert (lib/ice-score.ts): het
+      // opgeslagen totaal van het modelpad hoort niet altijd bij zijn delen.
+      iceTotal: getoondeIce(p) ?? 0,
     })),
     { sprintCapacity: SPRINT_CAPACITEIT }
   );
@@ -219,8 +223,27 @@ export function ProposalQueue({ clientId, refreshKey, channel, onWorkflowChange 
                     #{plaatsing.get(p.id)?.rank}
                   </span>
                   <ChannelBadge channel={channelOfSource(p.source)} />
-                  <span className="text-micro text-muted-foreground">{p.source ?? "onbekend"}</span>
-                  {p.ice_total != null && <span className="text-micro font-semibold text-brand-blue-ink">ICE {p.ice_total.toFixed(1)}</span>}
+                  {/* De bron in gewone taal, en wanneer en hoe oud: een voorstel van tien weken
+                      geleden zag er hier uit als van vandaag (lib/voorstel-herkomst.ts). */}
+                  <span className="text-micro text-muted-foreground" title={p.source ?? undefined}>{bronInGewoneTaal(p.source)}</span>
+                  {(() => {
+                    const o = ouderdom(p.created_at, new Date());
+                    if (!o) return null;
+                    return (
+                      <span className={`text-micro ${o.verouderd ? "font-semibold text-amber-700" : "text-muted-foreground"}`}>
+                        {o.datum} · {o.dagen === 0 ? "vandaag" : `${o.dagen} ${o.dagen === 1 ? "dag" : "dagen"} oud`}{o.verouderd ? " · verouderd, cijfers nagaan" : ""}
+                      </span>
+                    );
+                  })()}
+                  {getoondeIce(p) != null && (
+                    <span className="text-micro font-semibold text-brand-blue-ink">
+                      {/* Uit de delen ernaast, niet het opgeslagen totaal: "ICE 10.0 · I:8 C:6 E:6". */}
+                      ICE {getoondeIce(p)!.toFixed(1)}
+                      {p.ice_impact != null && p.ice_confidence != null && p.ice_ease != null && (
+                        <span className="font-normal text-muted-foreground"> · I:{p.ice_impact} C:{p.ice_confidence} E:{p.ice_ease}</span>
+                      )}
+                    </span>
+                  )}
                   {p.metadata?.confidence_recalibration && (
                     <span
                       className="text-micro px-1.5 py-0.5 rounded bg-brand-blue-ink/10 text-brand-blue-ink font-medium cursor-help"
@@ -234,12 +257,20 @@ export function ProposalQueue({ clientId, refreshKey, channel, onWorkflowChange 
                   )}
                 </div>
                 <p className="text-body text-brand-gray font-medium mt-1">{p.hypothesis}</p>
+                {/* De cijfers waar het besluit op rust, op de kaart en niet achter "Detail". */}
+                {(p.expected_result || p.measurement_metric) && (
+                  <p className="text-meta text-muted-foreground mt-0.5">
+                    {p.expected_result && <>Verwacht: {p.expected_result}</>}
+                    {p.expected_result && p.measurement_metric && " · "}
+                    {p.measurement_metric && <>gemeten op {metriekLabel(p.measurement_metric)}</>}
+                  </p>
+                )}
               </div>
               <div className="flex items-center gap-1.5 shrink-0">
                 <button
                   onClick={() => decide(p, "accept")}
                   disabled={busyId === p.id}
-                  className="flex items-center gap-1 px-2.5 py-1 text-micro font-medium rounded-md bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50"
+                  className="flex items-center gap-1 px-2.5 py-1 text-micro font-medium rounded-md bg-emerald-600 text-white dark:text-emerald-50 hover:bg-emerald-700 disabled:opacity-50"
                 >
                   {busyId === p.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />} Accepteer
                 </button>

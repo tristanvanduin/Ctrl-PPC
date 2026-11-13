@@ -14,6 +14,9 @@ import { useGenerationProgress } from "@/lib/use-generation-progress";
 import { GenerationProgressCard } from "@/components/ui/generation-progress-card";
 import { Raster, AsX, AsY, Tip, BALK_RADIUS } from "./chart-chrome";
 import { formatPercent } from "@/lib/forecast-format";
+import { useAccess } from "@/lib/auth/use-access";
+import { isDemoClient } from "@/lib/demo/demo-mode";
+import { rapportBevestigVraag, sopStartBeleid } from "@/lib/sop-start";
 
 // ── Types (matching API output) ────────────────────────────────────────────
 
@@ -96,6 +99,13 @@ function MiniChart({ data, type, label, color = "#E87722", height = 180 }: { dat
 
 export function ClientReporting({ clientId }: { clientId: string }) {
   const clientName = getAllClients().find((c) => c.id === clientId)?.name ?? clientId;
+  // Een rapport genereren is een betaalde modelaanroep, net als een SOP-run: dezelfde regel
+  // (lib/sop-start.ts). Op 13 november schreef één verkenningsklik op "Nieuw rapport" een concept
+  // en 12.439 tokens weg.
+  const toegang = useAccess();
+  const [demoKlant, setDemoKlant] = useState(false);
+  useEffect(() => { setDemoKlant(isDemoClient(clientId)); }, [clientId]);
+  const startBeleid = sopStartBeleid({ demoKlant, ingelogd: toegang.ingelogd, laden: toegang.loading, blokkadeVlag: process.env.NEXT_PUBLIC_SOP_DEMO_BLOKKADE === "1" });
 
   const [reports, setReports] = useState<ReportSummary[]>([]);
   const [report, setReport] = useState<ReportData | null>(null);
@@ -169,6 +179,8 @@ export function ClientReporting({ clientId }: { clientId: string }) {
   // ── Generate ───────────────────────────────────────────────────
 
   async function generateReport() {
+    if (!startBeleid.mag) { alert(startBeleid.reden); return; }
+    if (typeof window !== "undefined" && !window.confirm(rapportBevestigVraag())) return;
     const jobId = crypto.randomUUID();
     setActiveJobId(jobId);
     setGenerating(true);

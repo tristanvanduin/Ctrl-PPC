@@ -51,10 +51,17 @@ export function retryDecision(
   return minuten >= RETRY_DELAY_MINUTES ? "requeue" : "none";
 }
 
-// Stale-detectie voor de pump-claim: running zonder voortgang sinds updatedAt.
-export function isStaleRunning(status: RunStatus, updatedAt: Date | null, now: Date): boolean {
+// Een run die zo lang niets meer van zich laat horen is niet traag maar dood: de langste route
+// (monthly) heeft een maxDuration van 600 seconden, dus na een uur kan er geen proces meer zijn
+// dat hem afmaakt. Ruimer dan STALE_RUNNING_MINUTES, want dat is de drempel om een stap opnieuw
+// te mogen claimen, niet om een run definitief als mislukt af te sluiten.
+export const VASTGELOPEN_RUN_MINUTEN = 60;
+
+// Stale-detectie: running zonder voortgang sinds updatedAt. De drempel is voor de pump-claim
+// STALE_RUNNING_MINUTES; voor het afsluiten van een vastgelopen run VASTGELOPEN_RUN_MINUTEN.
+export function isStaleRunning(status: RunStatus, updatedAt: Date | null, now: Date, minuten: number = STALE_RUNNING_MINUTES): boolean {
   if (status !== "running" || !updatedAt) return false;
-  return now.getTime() - updatedAt.getTime() >= STALE_RUNNING_MINUTES * 60_000;
+  return now.getTime() - updatedAt.getTime() >= minuten * 60_000;
 }
 
 // Idempotente stap-overslag: de eerste stap zonder opgeslagen sectie is de volgende;

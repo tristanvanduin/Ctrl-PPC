@@ -16,6 +16,27 @@ function dedupKey(entity: string, metric: string): string {
   return `${entity.toLowerCase()}::${metric.toLowerCase()}`;
 }
 
+/** Het model-label waarmee een stap zonder data wordt weggeschreven (geen modelaanroep). */
+export const GEEN_DATA_MODEL = "runtime-fallback";
+
+/** De stappen die zonder data zijn "uitgevoerd": weggeschreven zonder modelaanroep. */
+export function stappenZonderData(narrativeSteps: StepResult[]): StepResult[] {
+  return narrativeSteps.filter((step) => step.model === GEEN_DATA_MODEL);
+}
+
+/**
+ * De dekkingsregel bovenaan de maandanalyse: op hoeveel stappen de conclusie rust en welke niet
+ * bekeken zijn. Null als elke stap data had. Op 19 augustus hadden demo-grt, demo-gra en demo-grn
+ * elk 5 van 12 stappen zonder data, en de eindtekst noemde een hoofdoorzaak met een why-score van
+ * 9,2 zonder te zeggen dat bijna de helft van de dimensies niet bekeken was.
+ */
+export function dekkingsRegel(narrativeSteps: StepResult[]): string | null {
+  const leeg = stappenZonderData(narrativeSteps);
+  if (leeg.length === 0) return null;
+  const metData = narrativeSteps.length - leeg.length;
+  return `> **Dekking:** gebaseerd op ${metData} van de ${narrativeSteps.length} stappen met data. Niet bekeken, want geen data: ${leeg.map((s) => s.stepName).join(", ")}. Een oorzaak in die dimensies is met deze analyse niet uitgesloten.`;
+}
+
 export function validateMonthlyAcceptance(opts: {
   narrativeSteps: StepResult[];
   recommendations: ThreadRecommendation[];
@@ -34,9 +55,30 @@ export function validateMonthlyAcceptance(opts: {
   // draait na het bundelen van stap 1-3 nog maar 2 checkpoints (B, C) -- Checkpoint A's
   // consolidatiewerk zit nu in stap 1 zelf.
   expectedCheckpointCount?: number;
+  /**
+   * De eindtekst zoals de lezer hem krijgt. AC-19 eist dat elke stap zonder data daarin bij naam
+   * genoemd wordt. Ontbreekt dit veld terwijl er lege stappen zijn, dan faalt AC-19: zwijgen over
+   * ontbrekende dekking is precies wat de poort moet tegenhouden.
+   */
+  deliverableMarkdown?: string;
 }): AcceptanceReport {
-  const { narrativeSteps, recommendations, tasks, coverage, findings, checkpointsRun, stepValidations = [], finalSop, stepCount = 13, expectedStepNumbers, expectedCheckpointCount = 3 } = opts;
+  const { narrativeSteps, recommendations, tasks, coverage, findings, checkpointsRun, stepValidations = [], finalSop, stepCount = 13, expectedStepNumbers, expectedCheckpointCount = 3, deliverableMarkdown } = opts;
   const criteria: AcceptanceCriterionResult[] = [];
+
+  // AC-01 hieronder telt een stap zonder data als uitgevoerd. Dat mag, maar alleen als de
+  // uitvoer het zegt: anders leest een conclusie op 7 van 12 dimensies als een volledige analyse.
+  const leeg = stappenZonderData(narrativeSteps);
+  const nietGenoemd = leeg.filter((s) => !(deliverableMarkdown ?? "").includes(s.stepName));
+  criteria.push({
+    id: "AC-19",
+    label: "Stappen zonder data staan in de uitvoer benoemd",
+    passed: nietGenoemd.length === 0,
+    detail: leeg.length === 0
+      ? "Alle stappen hadden data."
+      : nietGenoemd.length === 0
+        ? `${leeg.length} stap(pen) zonder data, alle benoemd: ${leeg.map((s) => s.stepName).join(", ")}.`
+        : `${nietGenoemd.length} stap(pen) zonder data niet benoemd in de uitvoer: ${nietGenoemd.map((s) => s.stepName).join(", ")}.`,
+  });
 
   const stepNumberSet = expectedStepNumbers ?? Array.from({ length: stepCount }, (_, i) => i + 1);
   const deepDiveSteps = narrativeSteps.filter((step) => stepNumberSet.includes(step.stepNumber));

@@ -1,6 +1,7 @@
 import { type ClientHistoricalData, type DoelHerkomst } from "./types";
 import { getClientSettings, kpiDoelenIngevoerd, type KpiMode } from "./client-settings";
 import { GROEI_CONVERSIES, GROEI_OMZET } from "./analysis/standaard-jaardoel";
+import { doelGeldtVoor, type DoelReeks, type JaardoelBereik } from "./doel/jaardoel";
 
 /**
  * Merget de door de gebruiker ingestelde KPI-doelen (Instellingen → doelen) in
@@ -74,6 +75,24 @@ export function mergeKpiTargets(clientId: string, data: ClientHistoricalData): C
     conversionOverrides: kpi.conversionOverrides,
     doelHerkomst,
   };
+}
+
+/**
+ * mergeKpiTargets voor één reeks, met de regel van lib/doel/jaardoel.ts: het ingevoerde doel komt
+ * alleen op een reeks die alle kanalen van de klant bevat. Op een los kanaal van een klant met meer
+ * kanalen blijft het eigen doel van de route (vorig jaar +10%) staan, met zijn herkomst. De rest
+ * van de samenvoeging (de handmatige conversiecorrecties) gaat wel door: die horen bij de meting,
+ * niet bij het doel.
+ */
+export function mergeKpiTargetsVoorReeks(
+  clientId: string,
+  data: ClientHistoricalData,
+  reeks: DoelReeks,
+  bereik: JaardoelBereik | null,
+): ClientHistoricalData {
+  const samen = mergeKpiTargets(clientId, data);
+  if (doelGeldtVoor(bereik, reeks) || samen === data) return samen;
+  return { ...samen, targetCurrentYear: data.targetCurrentYear, doelHerkomst: data.doelHerkomst };
 }
 
 /**

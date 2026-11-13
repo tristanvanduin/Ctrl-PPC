@@ -20,16 +20,17 @@ import { checkDataFreshness } from "@/lib/sync/freshness";
 import { weekstandVoorKlant, weekstandBlokkade } from "@/lib/sync/datastand";
 import { kanaalDataOntbreekt } from "@/lib/analysis/kanaal-datapoort";
 import { extractStructuredData } from "@/lib/analysis/extract-structured";
+import { rondExtractieAf } from "@/lib/analysis/run-afronding";
 import { today, addDays } from "@/lib/reporting-date";
 import { buildMonthlyHandoff, buildOpenPointsBlock } from "@/lib/analysis/monthly-handoff";
 import { toPromptTable } from "@/lib/analysis/prompt-table";
+import { laatsteZoektermStand, zoektermKop } from "@/lib/analysis/zoekterm-stand";
 import { fetchNameMap, fetchDaily as fetchMetaDaily } from "@/lib/meta/analysis-data";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 const amsterdamseMaand = () => Number(today().slice(5, 7));
 import {
   createProgressJob,
-  markProgressCompleted,
   markProgressFailed,
   updateProgressPhase,
 } from "@/lib/progress/server";
@@ -40,6 +41,7 @@ import { vereisKlantToegangUitBody } from "@/lib/auth/server";
 import { controleerPlafond, schatSopRunKosten } from "@/lib/analysis/uitgavenplafond";
 import { klantVanId } from "@/lib/tenancy/klanten";
 import { logger } from "@/lib/logger";
+import { ruimVastgelopenRunsOp } from "@/lib/scheduler/vastgelopen-runs";
 import { triggerLiteCrossChannelSynthesisIfReady } from "@/lib/analysis/auto-cross-channel-trigger";
 
 // Zelfde reden als app/api/analysis/monthly/route.ts: zonder dit valt de route terug op Vercel's
@@ -50,21 +52,6 @@ import { triggerLiteCrossChannelSynthesisIfReady } from "@/lib/analysis/auto-cro
 // als app/api/analysis/monthly/route.ts, waar de kale Google-hoofdanalyse al 284-313s bleek
 // te duren op de oude 300s-grens.
 export const maxDuration = 600;
-
-// cross-channel-synthesis-lite.ts leest section="full" puur als bestaanscheck ("is deze cyclus
-// voor dit kanaal afgerond"), niet voor de inhoud -- zie de toelichting daar. Vóór de opsplitsing
-// in losse runStep-calls (masterplan 17.11x) schreef runAnalysis() die rij vanzelf; runStep()
-// slaat elke stap apart op (section = stepName), dus zonder deze extra rij verdwijnt dat signaal.
-async function saveFullOutputMarker(supabase: SupabaseClient, result: AnalysisResult): Promise<void> {
-  await saveAnalysisOutputSection({
-    supabase,
-    row: {
-      client_id: result.clientId, sop_type: result.sopType, analysis_date: result.analysisDate,
-      period_start: result.periodStart, period_end: result.periodEnd,
-      section: "full", output: result.output, model_used: result.model, tokens_used: result.tokensUsed,
-    },
-  });
-}
 
 async function runGoogleWeeklyAnalysis(supabase: SupabaseClient, apiKey: string, clientId: string, jobId: string): Promise<Response> {
   await createProgressJob(supabase, {
@@ -88,7 +75,10 @@ async function runGoogleWeeklyAnalysis(supabase: SupabaseClient, apiKey: string,
     clientCtx, targetResult, campaignMetaResult, impressionShareResult,
   ] = await Promise.all([
     supabase.from("ads_account_weekly").select("*").eq("client_id", clientId).gte("week_start", periodStart).order("week_start"),
-    supabase.from("ads_search_terms_wasteful").select("*").eq("client_id", clientId).order("cost", { ascending: false }).limit(500),
+    // Nieuwste stand eerst, dan op kosten: zo zijn de eerste rijen de top van de laatste stand.
+    // Zonder de eerste sortering kwamen rijen uit alle standen door elkaar (zie zoektermRijen).
+    supabase.from("ads_search_terms_wasteful").select("*").eq("client_id", clientId)
+      .order("week_start", { ascending: false }).order("cost", { ascending: false }).limit(500),
     supabase.from("ads_campaign_monthly").select("*").eq("client_id", clientId).gte("month", daysAgo(60)).order("month"),
     supabase.from("ads_account_monthly").select("*").eq("client_id", clientId).gte("month", daysAgo(90)).order("month"),
     fetchClientContext(supabase, clientId),
@@ -165,6 +155,12 @@ async function runGoogleWeeklyAnalysis(supabase: SupabaseClient, apiKey: string,
   const lopendeWeekBlok = lopendeWeek.length > 0 && volledigeWeken.length > 0
     ? `\n\n## Lopende week (NOG NIET COMPLEET -- niet gebruiken voor de week-over-week-vergelijking)\nDeze week is nog bezig; de cijfers dekken alleen de dagen tot nu toe. Gebruik hem hooguit om een acuut signaal te noemen, nooit als vergelijkingsbasis.\n\`\`\`\n${toPromptTable(lopendeWeek)}\n\`\`\``
     : "";
+
+  // De zoektermtabel krijgt de periode die de kop belooft: alleen de nieuwste stand, de dertig
+  // duurste, en een kop die zegt welke stand dat is (lib/analysis/zoekterm-stand.ts).
+  const zoektermStand = laatsteZoektermStand((searchResult.data ?? []) as Array<Record<string, unknown>>, 30);
+  const zoektermRijen = zoektermStand.rijen;
+  const zoektermKopTekst = zoektermKop(zoektermStand, periodStart, periodEnd);
 
   // Phase 2: Build enrichment context via matrix (parallel)
   await updateProgressPhase(supabase, {
@@ -244,7 +240,8 @@ BELANGRIJK: Gebruik dit maandtarget als benchmark, NIET het jaardoel.`
     // geheugenblok hierboven gebruikt hem om de taken tot dit kanaal te begrenzen.
     supabase.from("sop_recommendations").select("hypothesis, expected_result, measurement_metric, timeframe, analysis_date, status")
       .eq("client_id", clientId).eq("sop_type", "weekly")
-      .order("analysis_date", { ascending: false }).limit(25),
+      // Vier weken runs: buildOpenPointsBlock leest ook de vervangen punten, voor "sinds wanneer".
+      .order("analysis_date", { ascending: false }).limit(60),
   ]);
   const maandRijen = (maandSecties.data ?? []) as Array<{ output?: string; analysis_date?: string; section?: string }>;
   const maandStructured = maandRijen.find((r) => r.section === "structured_monthly_v2");
@@ -303,9 +300,9 @@ Periode: ${periodStart} t/m ${periodEnd}.${sharedContext}
 ## Conclusie stap 1 (Account Health Check)
 ${step1.output}
 
-## Wasteful Search Terms (laatste 30 dagen, top 30 op cost)
+${zoektermKopTekst}
 \`\`\`
-${toPromptTable(searchResult.data ?? [])}
+${toPromptTable(zoektermRijen)}
 \`\`\``,
   });
 
@@ -365,7 +362,6 @@ ${step3.output}`),
     latencyMs: step1.latencyMs + step2.latencyMs + step3.latencyMs,
     retries: step1.retries + step2.retries + step3.retries,
   };
-  await saveFullOutputMarker(supabase, result);
 
   // ── Structured extraction (findings + recommendations + tasks) ──
   const extraction = await extractStructuredData({
@@ -383,22 +379,18 @@ ${step3.output}`),
     stepOffset: 3, // 3 analyse-stappen (masterplan 17.11x); findings = step 4, recs = step 5
     analysisId: null, // weekly is losse runStep-calls, niet gekoppeld aan een analysis_id
     reliability: weeklyReliability,
+    // Wat het model aan cijfers KREEG, voor de brondata-toets. Geen modeluitvoer: niet de
+    // eerdere stappen, niet het geheugen of de maandoverdracht.
+    bronFeiten: [goalsSection, targetText, dimAvailText, reliabilityText, enrichment.strategicContext, enrichment.leadingIndicators, enrichment.sectorBenchmarks, enrichment.changeHistory, enrichment.geoContext, weekTabel, lopendeWeek, zoektermRijen, campaignResult.data, campaignMetaResult.data, impressionShareResult.data],
     onPhase: async (phaseKey, message) => {
       await updateProgressPhase(supabase, { jobId, phaseKey, message });
     },
   });
 
-  await markProgressCompleted(supabase, {
-    jobId,
-    message: "Wekelijkse SOP-analyse gereed.",
-    metadata: {
-      analysis_date: result.analysisDate,
-      sop_type: "weekly",
-      findings: extraction.findings.length,
-      recommendations: extraction.recommendations.length,
-      tasks: extraction.tasks.length,
-    },
-  });
+  // Een run telt pas als gedraaid als zijn bevindingen er staan; het afrondingsteken (section
+  // "full") komt daarna. Zie lib/analysis/run-afronding.ts.
+  const afgebroken = await rondExtractieAf(supabase, { jobId, result, extraction, gereedTekst: "Wekelijkse SOP-analyse gereed." });
+  if (afgebroken) return afgebroken;
 
   // Faalt zacht, blokkeert nooit deze respons -- zie lib/analysis/auto-cross-channel-trigger.ts.
   // Via after(): draait NA het versturen van de respons, telt dus niet meer mee in de tijd die de
@@ -418,6 +410,7 @@ ${step3.output}`),
       saved: extraction.saved,
       findingsParseOk: extraction.findingsParseOk,
       recsParseOk: extraction.recsParseOk,
+      waarschuwingen: extraction.waarschuwingen,
     },
   });
 }
@@ -551,7 +544,8 @@ BELANGRIJK: Gebruik dit maandtarget als benchmark, NIET het jaardoel.`
     // geheugenblok hierboven gebruikt hem om de taken tot dit kanaal te begrenzen.
     supabase.from("sop_recommendations").select("hypothesis, expected_result, measurement_metric, timeframe, analysis_date, status")
       .eq("client_id", clientId).eq("sop_type", "meta_weekly")
-      .order("analysis_date", { ascending: false }).limit(25),
+      // Vier weken runs: buildOpenPointsBlock leest ook de vervangen punten, voor "sinds wanneer".
+      .order("analysis_date", { ascending: false }).limit(60),
   ]);
   const maandRijen = (maandSecties.data ?? []) as Array<{ output?: string; analysis_date?: string; section?: string }>;
   const maandStructured = maandRijen.find((r) => r.section === "structured_monthly_v2");
@@ -655,7 +649,6 @@ ${step3.output}`),
     latencyMs: step1.latencyMs + step2.latencyMs + step3.latencyMs,
     retries: step1.retries + step2.retries + step3.retries,
   };
-  await saveFullOutputMarker(supabase, result);
 
   const extraction = await extractStructuredData({
     supabase, apiKey, runKey: jobId, clientId, sopType: "meta_weekly",
@@ -666,17 +659,16 @@ ${step3.output}`),
     stepOffset: 3, // 3 analyse-stappen; findings = step 4, recs = step 5
     analysisId: null,
     reliability: metaReliability,
+    // Wat het model aan cijfers KREEG, voor de brondata-toets. Geen modeluitvoer: niet de
+    // eerdere stappen, niet het geheugen of de maandoverdracht.
+    bronFeiten: [goalsSection, targetText, dimAvailText, reliabilityText, enrichment.strategicContext, enrichment.leadingIndicators, enrichment.sectorBenchmarks, enrichment.changeHistory, enrichment.geoContext, accountResult, adsetRows, adRows, campaignRows, adsetMetaResult.data],
     onPhase: async (phaseKey, message) => { await updateProgressPhase(supabase, { jobId, phaseKey, message }); },
   });
 
-  await markProgressCompleted(supabase, {
-    jobId,
-    message: "Wekelijkse Meta SOP-analyse gereed.",
-    metadata: {
-      analysis_date: result.analysisDate, sop_type: "meta_weekly",
-      findings: extraction.findings.length, recommendations: extraction.recommendations.length, tasks: extraction.tasks.length,
-    },
-  });
+  // Een run telt pas als gedraaid als zijn bevindingen er staan; het afrondingsteken (section
+  // "full") komt daarna. Zie lib/analysis/run-afronding.ts.
+  const afgebroken = await rondExtractieAf(supabase, { jobId, result, extraction, gereedTekst: "Wekelijkse Meta SOP-analyse gereed." });
+  if (afgebroken) return afgebroken;
 
   // Faalt zacht, blokkeert nooit deze respons -- zie lib/analysis/auto-cross-channel-trigger.ts.
   // Via after(): draait NA het versturen van de respons, telt dus niet meer mee in de tijd die de
@@ -696,6 +688,7 @@ ${step3.output}`),
       saved: extraction.saved,
       findingsParseOk: extraction.findingsParseOk,
       recsParseOk: extraction.recsParseOk,
+      waarschuwingen: extraction.waarschuwingen,
     },
   });
 }
@@ -841,7 +834,8 @@ BELANGRIJK: Gebruik dit maandtarget als benchmark, NIET het jaardoel.`
     // geheugenblok hierboven gebruikt hem om de taken tot dit kanaal te begrenzen.
     supabase.from("sop_recommendations").select("hypothesis, expected_result, measurement_metric, timeframe, analysis_date, status")
       .eq("client_id", clientId).eq("sop_type", "linkedin_weekly")
-      .order("analysis_date", { ascending: false }).limit(25),
+      // Vier weken runs: buildOpenPointsBlock leest ook de vervangen punten, voor "sinds wanneer".
+      .order("analysis_date", { ascending: false }).limit(60),
   ]);
   const maandRijen = (maandSecties.data ?? []) as Array<{ output?: string; analysis_date?: string; section?: string }>;
   const maandStructured = maandRijen.find((r) => r.section === "structured_monthly_v2");
@@ -945,7 +939,6 @@ ${step3.output}`),
     latencyMs: step1.latencyMs + step2.latencyMs + step3.latencyMs,
     retries: step1.retries + step2.retries + step3.retries,
   };
-  await saveFullOutputMarker(supabase, result);
 
   const extraction = await extractStructuredData({
     supabase, apiKey, runKey: jobId, clientId, sopType: "linkedin_weekly",
@@ -956,17 +949,16 @@ ${step3.output}`),
     stepOffset: 3, // 3 analyse-stappen; findings = step 4, recs = step 5
     analysisId: null,
     reliability: linkedinReliability,
+    // Wat het model aan cijfers KREEG, voor de brondata-toets. Geen modeluitvoer: niet de
+    // eerdere stappen, niet het geheugen of de maandoverdracht.
+    bronFeiten: [goalsSection, targetText, dimAvailText, reliabilityText, enrichment.strategicContext, enrichment.leadingIndicators, enrichment.sectorBenchmarks, enrichment.changeHistory, enrichment.geoContext, accountRows, campaignRows, creativeRows, campaignSpendRowsNamed, campaignMetaResult.data],
     onPhase: async (phaseKey, message) => { await updateProgressPhase(supabase, { jobId, phaseKey, message }); },
   });
 
-  await markProgressCompleted(supabase, {
-    jobId,
-    message: "Wekelijkse LinkedIn SOP-analyse gereed.",
-    metadata: {
-      analysis_date: result.analysisDate, sop_type: "linkedin_weekly",
-      findings: extraction.findings.length, recommendations: extraction.recommendations.length, tasks: extraction.tasks.length,
-    },
-  });
+  // Een run telt pas als gedraaid als zijn bevindingen er staan; het afrondingsteken (section
+  // "full") komt daarna. Zie lib/analysis/run-afronding.ts.
+  const afgebroken = await rondExtractieAf(supabase, { jobId, result, extraction, gereedTekst: "Wekelijkse LinkedIn SOP-analyse gereed." });
+  if (afgebroken) return afgebroken;
 
   // Faalt zacht, blokkeert nooit deze respons -- zie lib/analysis/auto-cross-channel-trigger.ts.
   // Via after(): draait NA het versturen van de respons, telt dus niet meer mee in de tijd die de
@@ -986,6 +978,7 @@ ${step3.output}`),
       saved: extraction.saved,
       findingsParseOk: extraction.findingsParseOk,
       recsParseOk: extraction.recsParseOk,
+      waarschuwingen: extraction.waarschuwingen,
     },
   });
 }
@@ -1107,7 +1100,8 @@ BELANGRIJK: Gebruik dit maandtarget als benchmark, NIET het jaardoel.`
       .order("analysis_date", { ascending: false }).limit(6),
     supabase.from("sop_recommendations").select("hypothesis, expected_result, measurement_metric, timeframe, analysis_date, status")
       .eq("client_id", clientId).eq("sop_type", "microsoft_weekly")
-      .order("analysis_date", { ascending: false }).limit(25),
+      // Vier weken runs: buildOpenPointsBlock leest ook de vervangen punten, voor "sinds wanneer".
+      .order("analysis_date", { ascending: false }).limit(60),
   ]);
   const maandRijen = (maandSecties.data ?? []) as Array<{ output?: string; analysis_date?: string; section?: string }>;
   const maandStructured = maandRijen.find((r) => r.section === "structured_monthly_v2");
@@ -1221,7 +1215,6 @@ ${step3.output}`),
     latencyMs: step1.latencyMs + step2.latencyMs + step3.latencyMs,
     retries: step1.retries + step2.retries + step3.retries,
   };
-  await saveFullOutputMarker(supabase, result);
 
   const extraction = await extractStructuredData({
     supabase, apiKey, runKey: jobId, clientId, sopType: "microsoft_weekly",
@@ -1232,17 +1225,16 @@ ${step3.output}`),
     stepOffset: 3,
     analysisId: null,
     reliability: microsoftReliability,
+    // Wat het model aan cijfers KREEG, voor de brondata-toets. Geen modeluitvoer: niet de
+    // eerdere stappen, niet het geheugen of de maandoverdracht.
+    bronFeiten: [goalsSection, targetText, dimAvailText, reliabilityText, enrichment.strategicContext, enrichment.leadingIndicators, enrichment.sectorBenchmarks, enrichment.changeHistory, enrichment.geoContext, accountResult, adgroupRows, keywordResult.data, netwerkWeek, campaignRows, campaignMetaResult.data, impressionShareResult.data],
     onPhase: async (phaseKey, message) => { await updateProgressPhase(supabase, { jobId, phaseKey, message }); },
   });
 
-  await markProgressCompleted(supabase, {
-    jobId,
-    message: "Wekelijkse Microsoft SOP-analyse gereed.",
-    metadata: {
-      analysis_date: result.analysisDate, sop_type: "microsoft_weekly",
-      findings: extraction.findings.length, recommendations: extraction.recommendations.length, tasks: extraction.tasks.length,
-    },
-  });
+  // Een run telt pas als gedraaid als zijn bevindingen er staan; het afrondingsteken (section
+  // "full") komt daarna. Zie lib/analysis/run-afronding.ts.
+  const afgebroken = await rondExtractieAf(supabase, { jobId, result, extraction, gereedTekst: "Wekelijkse Microsoft SOP-analyse gereed." });
+  if (afgebroken) return afgebroken;
 
   after(async () => {
     await triggerLiteCrossChannelSynthesisIfReady(supabase, clientId, "weekly", periodStart, periodEnd);
@@ -1258,6 +1250,7 @@ ${step3.output}`),
       saved: extraction.saved,
       findingsParseOk: extraction.findingsParseOk,
       recsParseOk: extraction.recsParseOk,
+      waarschuwingen: extraction.waarschuwingen,
     },
   });
 }
@@ -1317,6 +1310,10 @@ export async function POST(request: NextRequest) {
   if (automatisch && !(await magSopDraaien(supabase, clientId))) {
     return Response.json({ error: "Automatische SOP's staan uit voor dit account (dekking). Handmatig triggeren kan wel." }, { status: 403 });
   }
+
+  // Wat van een eerdere run van deze klant nog op "running" staat zonder update na een uur, is
+  // vastgelopen: afsluiten met de reden, zodat hij niet als lopend of gedraaid blijft gelden.
+  await ruimVastgelopenRunsOp(supabase, { clientId });
 
   try {
     if (channel === "meta_ads") {

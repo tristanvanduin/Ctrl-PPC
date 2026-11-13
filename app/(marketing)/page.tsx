@@ -131,15 +131,23 @@ export default async function HomePage() {
         </div>
       </section>
 
-      <section className="mx-auto max-w-6xl px-6 pb-16">
-        <h2 className="text-center font-marketing-heading text-2xl font-bold text-off-white">
-          Global Platform Pulse
-        </h2>
-        <p className="mx-auto mt-2 max-w-xl text-center text-sm text-off-white/50">
-          Live numbers across every connected account. Not simulated.
-        </p>
-        <div className="dark terminal mt-5">
-          <PlatformPulse />
+      {/* De kop staat in PlatformPulse: zonder actieve klant verdwijnt het hele blok, kop en al,
+          in plaats van "Not simulated" boven tellers die niets waars tellen. */}
+      <section className="mx-auto max-w-6xl px-6">
+        <div className="dark terminal">
+          <PlatformPulse
+            ruimteOnder="pb-16"
+            kop={(
+              <div className="mb-5">
+                <h2 className="text-center font-marketing-heading text-2xl font-bold text-off-white">
+                  Global Platform Pulse
+                </h2>
+                <p className="mx-auto mt-2 max-w-xl text-center text-sm text-off-white/50">
+                  Live numbers across every account with a successful sync in the last 7 days. Not simulated.
+                </p>
+              </div>
+            )}
+          />
         </div>
       </section>
 

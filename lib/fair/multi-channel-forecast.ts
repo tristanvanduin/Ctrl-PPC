@@ -27,6 +27,8 @@ export interface ChannelForecastInput {
   /** Alle eerdere edities, meest recente eerst; de projectie neemt hier de mediaan over. */
   previousEditions?: { edition: Edition; points: DailyPoint[] }[];
   target: number | null;
+  /** Eerste datum met data voor dit kanaal; zie forecastStream. */
+  historyStart?: string | null;
 }
 
 export interface ChannelForecastResult {
@@ -67,7 +69,7 @@ const ATTRIBUTIE_VOETNOOT =
 export function forecastAllChannels(inputs: ChannelForecastInput[], asOfDate: string): MultiChannelForecast {
   const perChannel: ChannelForecastResult[] = inputs.map((input) => ({
     channel: input.channel,
-    forecast: forecastStream({ current: input.current, previous: input.previous, previousEditions: input.previousEditions, target: input.target, asOfDate }),
+    forecast: forecastStream({ current: input.current, previous: input.previous, previousEditions: input.previousEditions, target: input.target, asOfDate, historyStart: input.historyStart }),
   }));
 
   // Alleen kanalen met een echte projectie dragen bij aan het totaal; de rest degradeert expliciet.

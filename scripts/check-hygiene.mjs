@@ -193,6 +193,25 @@ for (const [f, tekst] of inhoud) {
     else if (s.startsWith("@/")) doorProd.add(normalize(s.slice(2)));
   }
 }
+// De poortscripts uit scripts/gates.sh tellen apart als afnemer. Een poort die een zuivere module
+// uit lib/ laadt (node haalt de typen eraf, zie scripts/check-analyse-slagingen.mjs) is een echte
+// afnemer, maar ALLEEN de poorten: een eerdere versie telde elk .mjs-bestand, en dan viel een module
+// die alleen een los hulpscript gebruikt niet meer op. En apart, omdat een poort die een constante
+// leest een wees niet van TOEGESTANE_WEZEN haalt (2b hieronder kijkt alleen naar productiecode):
+// lib/scheduler/core.ts ging zo cosmetisch van de lijst, terwijl isStaleRunning in de app nog
+// steeds geen aanroeper heeft.
+const doorPoort = new Set();
+{
+  const poorten = new Set();
+  for (const m of readFileSync("scripts/gates.sh", "utf8").matchAll(/node (scripts\/[\w.-]+\.mjs)/g)) poorten.add(m[1]);
+  for (const f of poorten) {
+    let tekst;
+    try { tekst = readFileSync(f, "utf8"); } catch { continue; }
+    for (const m of tekst.matchAll(SPEC)) {
+      if (m[1].startsWith(".")) doorPoort.add(normalize(join(dirname(f), m[1])));
+    }
+  }
+}
 
 // Next.js roept deze bestanden zelf aan; die hebben per definitie geen importeur. robots.ts,
 // sitemap.ts en opengraph-image.tsx kwamen erbij toen die conventie voor het eerst gebruikt
@@ -239,7 +258,6 @@ const TOEGESTANE_WEZEN = new Map([
   ["lib/fair/edition-evaluation.ts", "editie-evaluatie op de event-relatieve tijdas; wacht op een plek in de beurs-UI"],
   ["lib/fair/event-status.ts", "stoplicht en budgetpacing per stream; zelfde plek als edition-evaluation"],
   ["lib/scheduler/pump-plan.ts", "hervatbare maandrun; wacht op runNextSteps, de IO-orkestratie"],
-  ["lib/scheduler/core.ts", "hoort bij pump-plan"],
   ["lib/meta/vision/attribute-source.ts", "bewaakt dat kleurclaims uit de pixel-laag komen; wacht op de vision-pijplijn"],
   ["lib/context/context-types.ts",
     "EXECUTION_PLAN.md Stap 5: businessEventsUitRaiEvents() plus de herexport van BusinessEvent/" +
@@ -296,6 +314,7 @@ for (const f of bestanden) {
   if (isTest(f) || isIngang(f)) continue;
   const stam = f.replace(/\.tsx?$/, "");
   if (doorProd.has(normalize(stam)) || doorProd.has(normalize(f))) continue;
+  if (doorPoort.has(normalize(stam)) || doorPoort.has(normalize(f))) continue;
   if (basename(stam) === "index" && doorProd.has(normalize(dirname(stam)))) continue;
   if (TOEGESTANE_WEZEN.has(f)) continue;
 

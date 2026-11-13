@@ -124,6 +124,23 @@ console.log("\nOpenstaande punten van de vorige runs");
   check("lege lijst geeft geen blok", buildOpenPointsBlock([]) === "");
 }
 {
+  // Herstelronde: een nieuwe run zet de open punten van de vorige op "vervangen". Las dit blok
+  // alleen open, dan zag het model nog een run terug en was "sinds wanneer" weg.
+  const rijen = [
+    { hypothesis: "Sluit 'gratis kas bouwen' uit", analysis_date: "2026-08-31", status: "open" },
+    { hypothesis: "Sluit 'gratis kas bouwen' uit", analysis_date: "2026-08-24", status: "vervangen" },
+    { hypothesis: "Sluit  'gratis kas bouwen' uit", analysis_date: "2026-08-17", status: "vervangen" },
+    { hypothesis: "Pauzeer demo3", analysis_date: "2026-08-24", status: "vervangen" },
+    { hypothesis: "Verhoog budget NL", analysis_date: "2026-08-17", status: "afgewezen" },
+  ];
+  const blok = buildOpenPointsBlock(rijen);
+  check("een terugkerend punt draagt zijn eerste datum", blok.includes("[sinds 2026-08-17, 3 runs, laatst 2026-08-31] Sluit 'gratis kas bouwen' uit"), blok);
+  check("en staat er een keer", (blok.match(/gratis kas bouwen/g) ?? []).length === 1);
+  check("een vervangen punt dat niet terugkwam blijft zichtbaar, met die kanttekening", blok.includes("Pauzeer demo3") && blok.includes("in de laatste run niet meer genoemd"));
+  check("een afgewezen punt niet", !blok.includes("Verhoog budget NL"));
+  check("wat nog open staat komt eerst", blok.indexOf("gratis kas") < blok.indexOf("demo3"));
+}
+{
   const veel = Array.from({ length: 20 }, (_, i) => ({ hypothesis: `punt ${i}`, status: "open" }));
   const blok = buildOpenPointsBlock(veel, 5);
   check("begrensd op het maximum", (blok.match(/^- /gm) ?? []).length === 5);

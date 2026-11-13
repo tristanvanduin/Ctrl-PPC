@@ -4,7 +4,7 @@ import { useMemo, type ReactNode } from "react";
 import { AlertTriangle, CheckCircle2, Info, Activity } from "lucide-react";
 import { useClientHistoricalData, useClientDataState } from "@/lib/client-data-provider";
 import { computeForecast } from "@/lib/forecast";
-import { computeHealthScore, type HealthScore } from "@/lib/health-score";
+import { googleHealthScore, type HealthScore } from "@/lib/health-score";
 import { magRadarTonen } from "@/lib/health-radar";
 import { HealthRadar } from "./health-radar";
 import { Vensterlabel } from "@/components/ui/vensterlabel";
@@ -14,12 +14,9 @@ export function HealthBadge({ clientId }: { clientId: string }) {
   const dataState = useClientDataState();
   const forecast = useMemo(() => computeForecast(data), [data]);
 
-  const health = useMemo(() => computeHealthScore(
-    forecast,
-    dataState?.impressionShare,
-    dataState?.wastefulSearchTerms,
-    dataState?.adGroupBleeders,
-  ), [forecast, dataState]);
+  // Dezelfde aanroep als de kanaalkaart en de ranking (googleHealthScore), zodat Google overal
+  // hetzelfde getal heeft.
+  const health = useMemo(() => googleHealthScore(forecast, dataState), [forecast, dataState]);
 
   // De score komt uit de jaarprognose (tempo tegen het jaardoel, efficiëntie tegen het doel), dus
   // dit is een jaarblok: de periodekiezer verandert hem niet, en dat staat in de kop.

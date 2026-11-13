@@ -26,9 +26,10 @@ import { grafiekMaanden, kaartCijfers, kaartStand } from "@/lib/overzicht/bovenk
 import { opbouwVertraging, useEersteOpbouw } from "@/lib/beweging";
 import { heeftGecachteInstellingen, loadClientSettings } from "@/lib/client-settings";
 import { INSTELLINGEN_WACHT_MS } from "@/lib/client-data-provider";
-import { mergeKpiTargets } from "@/lib/kpi-target-merge";
+import { mergeKpiTargetsVoorReeks } from "@/lib/kpi-target-merge";
+import { jaardoelBereik } from "@/lib/doel/jaardoel";
 import { computeForecast } from "@/lib/forecast";
-import { computeHealthScore, zonderKanaalSpecifiekeHygiene, type HealthScore } from "@/lib/health-score";
+import { googleHealthScore, type GoogleHealthInvoer, type HealthScore } from "@/lib/health-score";
 import { today } from "@/lib/reporting-date";
 import { kanaalScores } from "./kanaal-health-ranking";
 import { Kanaalkaarten, KAARTENRIJ_HOOGTE, type KaartHealth, type Kanaalkaart } from "./kanaalkaarten";
@@ -41,14 +42,13 @@ import { OverzichtLogboek } from "./overzicht-logboek";
  *
  * De ranking leest de prognose uit ClientDataProvider; dit blok staat daarbuiten. Daarom dezelfde
  * stappen op dezelfde invoer: de Google-data met de KPI-doelen van de klant erin (mergeKpiTargets),
- * de prognose, en de score zonder de Google-specifieke hygiëne (die de vergelijking tussen kanalen
- * scheef trekt). En pas NA het lezen van de instellingen: met de standaarddoelen kwam er eerst een
+ * de prognose, en googleHealthScore met de verspillingsdata van dezelfde Google-route. En pas NA het lezen van de instellingen: met de standaarddoelen kwam er eerst een
  * ander cijfer te staan dan de ranking eronder toont, dat daarna versprong.
  *
  * `herlees` is een waarde die verandert als de instellingen opnieuw gelezen horen te worden (een
  * nieuwe ophaalronde van de blended route, na het opslaan van een doel).
  */
-function useGoogleHealth(clientId: string, googleData: ClientHistoricalData | null, aan: boolean, herlees: unknown): { health: HealthScore | null; laadt: boolean } {
+function useGoogleHealth(clientId: string, googleData: ClientHistoricalData | null, googleStaat: GoogleHealthInvoer | null | undefined, aan: boolean, herlees: unknown, kanalen: readonly Kanaal[] | null): { health: HealthScore | null; laadt: boolean } {
   const [instellingenVoor, setInstellingenVoor] = useState<string | null>(null);
   useEffect(() => {
     if (!aan) return;
@@ -62,15 +62,23 @@ function useGoogleHealth(clientId: string, googleData: ClientHistoricalData | nu
     return () => { weg = true; clearTimeout(opgegeven); };
   }, [clientId, aan]);
   const klaar = instellingenVoor === clientId || heeftGecachteInstellingen(clientId);
+  // Dezelfde invoer als de ranking en het tabblad (googleHealthScore): met de verspillingsdata.
+  // Die komt als prop van het klantdashboard en niet uit useClientDataState: dit blok staat buiten
+  // ClientDataProvider, daar geeft die hook null, en dan stond Hygiëne hier op "niet beoordeeld"
+  // terwijl de ranking direct eronder hem wel meetelde (57 tegen 66 op dezelfde pagina).
   const health = useMemo(() => {
     if (!aan || !googleData || !klaar) return null;
-    return zonderKanaalSpecifiekeHygiene(computeHealthScore(computeForecast(mergeKpiTargets(clientId, googleData))));
+    // Met dezelfde regel voor het jaardoel als de provider (lib/doel/jaardoel.ts), anders zou de
+    // kaart Google tegen het accountdoel zetten en het tabblad eronder niet. En met dezelfde
+    // verspillingsdata als de ranking (googleStaat), anders gaf de kaart een ander getal.
+    return googleHealthScore(computeForecast(
+      mergeKpiTargetsVoorReeks(clientId, googleData, "google", jaardoelBereik(kanalen))), googleStaat);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- herlees: mergeKpiTargets leest de instellingen zelf
-  }, [aan, googleData, klaar, clientId, herlees]);
+  }, [aan, googleData, googleStaat, klaar, clientId, herlees, kanalen]);
   return { health, laadt: aan && (!googleData || !klaar) };
 }
 
-function OverzichtBovenkantRuw({ clientId, channel, kanalen, onKies, onBeoordeel, googleData, route, band, bandKlaar, demo, reserveerKaarten = false }: {
+function OverzichtBovenkantRuw({ clientId, channel, kanalen, onKies, onBeoordeel, googleData, googleStaat, route, band, bandKlaar, demo, reserveerKaarten = false }: {
   clientId: string;
   /** Wat er getoond wordt: een kanaal, of "blended" voor alle kanalen. */
   channel: Kanaalkeuze;
@@ -81,6 +89,11 @@ function OverzichtBovenkantRuw({ clientId, channel, kanalen, onKies, onBeoordeel
   /** Naar het tabblad Bevindingen: daar wordt beslist, het logboek wijst er alleen naar. */
   onBeoordeel: () => void;
   googleData: ClientHistoricalData | null;
+  /**
+   * De verspillingsdata en de accountstructuur van de Google-route (useClientData), voor Hygiëne in
+   * de health van Google. Hetzelfde object dat de ranking uit de provider leest.
+   */
+  googleStaat?: GoogleHealthInvoer | null;
   /** De blended route: de health per dagkanaal, en de stand van de bronnen. */
   route: Pick<BlendedClientDataState, "perKanaalTab" | "dataStand" | "loading" | "error">;
   /** De maandreeksen van de band (useChannelPeriodData), voor het gekozen kanaal en per kanaal. */
@@ -99,7 +112,7 @@ function OverzichtBovenkantRuw({ clientId, channel, kanalen, onKies, onBeoordeel
   const periode = usePeriod();
   const lijst = useMemo(() => ALLE_KANALEN.filter((k) => (kanalen ?? []).includes(k)), [kanalen]);
   const toonKaarten = zichtbareTabs(lijst).length > 0;
-  const google = useGoogleHealth(clientId, googleData, lijst.includes("google"), route.perKanaalTab);
+  const google = useGoogleHealth(clientId, googleData, googleStaat, lijst.includes("google"), route.perKanaalTab, kanalen);
 
   // De opbouw van het eerste bezoek begint pas als de cijfers er staan; een laadvlak bouwt niet op.
   const inhoudKlaar = bandKlaar && band.data !== null;

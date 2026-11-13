@@ -36,9 +36,19 @@ export interface SignalStory {
   evidence: SignalEvidence[];
 }
 
+// Een verhaal dat de detector WEL wilde onderzoeken maar niet kon, met de reden. Zonder dit
+// derde bakje kwam zo'n verhaal in `checked` terecht en las de lezer "gecontroleerd, niets
+// gevonden" terwijl de meting ontbrak om er iets over te zeggen (Meta-frequentie zonder een
+// over de periode ontdubbeld bereik was het eerste geval).
+export interface NotAssessable {
+  id: string;
+  reason: string;
+}
+
 export interface DetectionResult {
   triggered: SignalStory[];
   checked: string[]; // de ids van alle verhalen die deze detector heeft onderzocht
+  notAssessable?: NotAssessable[]; // gewild maar niet te beoordelen; staat dan NIET in checked
 }
 
 // Hulpfuncties die elke detector nodig heeft.
@@ -53,8 +63,12 @@ export function pct(v: number): string {
 }
 
 export function mergeDetections(results: DetectionResult[]): DetectionResult {
+  const notAssessable = results.flatMap((r) => r.notAssessable ?? []);
   return {
     triggered: results.flatMap((r) => r.triggered),
     checked: [...new Set(results.flatMap((r) => r.checked))],
+    // Alleen aanwezig als er iets te melden is: een detectie zonder dit veld blijft
+    // gelijk aan vroeger voor wie het resultaat serialiseert.
+    ...(notAssessable.length > 0 ? { notAssessable } : {}),
   };
 }

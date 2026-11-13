@@ -75,5 +75,10 @@ export function voorbehoudenUitDekking(dekking: unknown): string[] {
     uit.push(`${d.beeindigdeCampagnes} beëindigde campagne(s) buiten beschouwing gelaten.`);
   }
   if (d.uurdata === false) uit.push("Geen uurdata beschikbaar: dagdeel-analyse niet uitgevoerd.");
+  // Meta: zonder periodelezing (migratie 110) kan frequentie niet beoordeeld worden. Dat stond
+  // alleen in de detectoruitvoer; op de kaart leek een run zonder fatigue een run zonder fatigue.
+  if (d.periodeBereik === false) {
+    uit.push("Geen bereik over de periode beschikbaar: creative fatigue en frequentie-saturatie zijn niet beoordeeld (de dagfrequentie is daar geen maat voor).");
+  }
   return uit;
 }

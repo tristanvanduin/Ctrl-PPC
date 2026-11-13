@@ -13,6 +13,18 @@ import { Sectie } from "@/components/ui/sectie";
 import { CHART_CATEGORICAL } from "@/lib/branding/chart-colors";
 import { Laadvlak } from "@/components/ui/laadvlak";
 import { addDays, today } from "@/lib/reporting-date";
+import { Vensterlabel } from "@/components/ui/vensterlabel";
+import { formatMonth } from "@/lib/period/period-range";
+
+/** De vensters van dit blok, in één functie zodat kop en query hetzelfde zeggen. */
+export function campagneVensters(vandaag: string): { sinceDay: string; sinceMonth: string; dagLabel: string; maandLabel: string } {
+  const sinceDay = addDays(vandaag, -89);
+  // Google heeft alleen maandrijen per campagne. Dezelfde 90 dagen, afgerond op hele maanden: vanaf
+  // de maand waarin het dagvenster begint. Hier stonden 200 dagen naast 90 voor de andere kanalen,
+  // zonder label, en dan leest Google € 83.950 naast Meta € 35.305 als een verdeling over één periode.
+  const sinceMonth = `${sinceDay.slice(0, 7)}-01`;
+  return { sinceDay, sinceMonth, dagLabel: "laatste 90 dagen", maandLabel: `${formatMonth(sinceMonth.slice(0, 7), true)} t/m nu, hele maanden` };
+}
 
 // Campagne-overzicht over alle kanalen: op welke kanalen zijn we actief en welke campagnes
 // draaien er per kanaal (beurs-gescoped op de afkorting in de campagnenaam). Leest de campagne-
@@ -86,9 +98,7 @@ export function CampaignsPerChannel({ clientId, geoClone }: { clientId: string; 
     let cancelled = false;
     setBlocks(null); setError(null);
     // Vanaf de Amsterdamse kalenderdag, niet de UTC-datum van de browserklok.
-    const vandaag = today();
-    const sinceMonth = addDays(vandaag, -200);
-    const sinceDay = addDays(vandaag, -90);
+    const { sinceMonth, sinceDay } = campagneVensters(today());
 
     // Eén niet-Google-kanaal: de namen en de dagrijen van het venster, met alle conversievelden.
     const kanaal = (channel: ChannelConversionChannel) => {
@@ -156,6 +166,7 @@ export function CampaignsPerChannel({ clientId, geoClone }: { clientId: string; 
   }, [clientId, geoClone]);
 
   const activeChannels = useMemo(() => (blocks ?? []).filter((b) => b.campaigns.length > 0), [blocks]);
+  const vensters = campagneVensters(today());
 
   if (error) return <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-body text-amber-800">{error}</div>;
   if (blocks === null) return <Laadvlak vorm="tabel" regels={4} titel="Actieve kanalen &amp; campagnes" />;
@@ -172,7 +183,7 @@ export function CampaignsPerChannel({ clientId, geoClone }: { clientId: string; 
         bijschrift={
           activeChannels.length === 0
             ? "Geen actieve campagnes gevonden voor deze scope."
-            : `Actief op ${activeChannels.length} kanaal${activeChannels.length === 1 ? "" : "en"}: ${activeChannels.map((b) => `${b.label} (${b.campaigns.length})`).join(" · ")}.`
+            : `Actief op ${activeChannels.length} ${activeChannels.length === 1 ? "kanaal" : "kanalen"}: ${activeChannels.map((b) => `${b.label} (${b.campaigns.length})`).join(" · ")}. Volgt de gekozen periode niet: elk kanaal noemt zijn eigen venster.`
         }
       >
 
@@ -183,6 +194,7 @@ export function CampaignsPerChannel({ clientId, geoClone }: { clientId: string; 
             <h3 className="text-title font-semibold text-brand-gray">{block.label}</h3>
             <span className="text-micro text-muted-foreground">{block.campaigns.length} campagne{block.campaigns.length === 1 ? "" : "s"}</span>
             {block.telt && <span className="text-micro text-muted-foreground">· telt: {block.telt}</span>}
+            <Vensterlabel soort="vast" venster={block.channel === "google_ads" ? vensters.maandLabel : vensters.dagLabel} className="ml-auto" />
           </div>
           {(() => {
             // Het aandeel wordt tegen de grootste campagne gezet en niet tegen de som: bij zeven

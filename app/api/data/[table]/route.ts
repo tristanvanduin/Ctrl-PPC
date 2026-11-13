@@ -15,6 +15,17 @@ import { getAuthUser } from "@/lib/auth/server";
 import { can, canAccessClient } from "@/lib/auth/roles";
 import { isWriteOperation, policyFor, validateWrite, type WriteOperation } from "@/lib/data-access/write-policy";
 import { validateRead, readPolicyFor, type ReadFilter } from "@/lib/data-access/read-policy";
+import { beslisserVan, stempelBeslissing, type HuidigeStand } from "@/lib/learning/beslis-stempel";
+
+/** De stand van precies een sprint_hypotheses-rij, of undefined als dat niet vast te stellen is. */
+async function huidigeHypotheseStand(match: Record<string, unknown> | undefined): Promise<HuidigeStand | undefined> {
+  const id = match?.id;
+  const admin = getSupabaseAdmin();
+  if (typeof id !== "string" || !admin) return undefined;
+  const { data, error } = await admin.from("sprint_hypotheses").select("status, accepted_at").eq("id", id).limit(2);
+  if (error || !data || data.length !== 1) return undefined;
+  return data[0] as HuidigeStand;
+}
 
 function authEnforced(): boolean {
   return process.env.O1_AUTH_ENFORCED === "true";
@@ -48,6 +59,21 @@ export async function POST(request: Request, context: { params: Promise<{ table:
       return Response.json({ error: "Onvoldoende rechten" }, { status: 403 });
     }
     inScope = policy.clientColumn ? canAccessClient(user.scope, body.clientId) : true;
+  }
+
+  // De beslisser van een voorstel komt uit de sessie, nooit uit de browser (lib/learning/beslis-stempel.ts).
+  // Ook bij insert: sprint-planning maakt een handmatige hypothese direct als accepted aan. Bij
+  // een update op een id leest de stempel eerst de huidige stand, zodat een tweede "accepted" of
+  // een afronding de oorspronkelijke beslistijd en het startpunt van de nameting niet overschrijft.
+  if (table === "sprint_hypotheses" && (op === "update" || op === "insert")) {
+    const beslisser = beslisserVan(await getAuthUser().catch(() => null));
+    const nu = new Date();
+    if (op === "update") {
+      const huidig = await huidigeHypotheseStand(body.match);
+      body.values = stempelBeslissing({ table, values: body.values, beslisser, nu, huidig });
+    } else {
+      body.rows = body.rows?.map((r) => stempelBeslissing({ table, values: r, beslisser, nu, huidig: null }) ?? r);
+    }
   }
 
   const check = validateWrite(

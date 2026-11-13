@@ -2,9 +2,10 @@ export {};
 // Verificatie van F2 4h (restant): het revisie-aanroeppunt gaf scoreFinalWhy een null
 // cluster, waardoor de why-score altijd de -0.8 "geen cluster"-aftrek nam en op 8.4 bleef
 // hangen, ongeacht de echte kwaliteit. Na de fix krijgt het de echte primaire cluster mee.
-// scoreFinalWhy is een interne functie in monthly-structured.ts (laadt niet standalone),
-// dus een getrouwe replica; tsc bevestigde dat de echte code 0 fouten heeft.
+// Getoetst op de echte scoreFinalWhy uit monthly-structured.ts; hier stond eerst een kopie.
 // Draaien: npx tsx lib/analysis/__why_score_cluster_test.ts
+
+import { scoreFinalWhy as echteScoreFinalWhy } from "./monthly-structured";
 
 type Cl = { issue_cluster: string; evRank: number };
 let passed = 0, failed = 0;
@@ -13,17 +14,14 @@ function check(name: string, cond: boolean, detail = "") {
   else { failed++; console.log("  FAIL  " + name + "  " + detail); }
 }
 
-// Replica exact zoals in de code; evidenceFromCluster/evidenceRank gestubd via evRank.
-function scoreFinalWhy(primaryThread: string, primaryCluster: Cl | null, supportingEvidence: string[]): number {
-  let score = 9.2;
-  if (!primaryCluster) score -= 0.8;
-  if (primaryCluster && ["network_quality", "desktop_inefficiency", "mobile_opportunity", "schedule_waste"].includes(primaryCluster.issue_cluster)) score -= 0.4;
-  if (primaryCluster && primaryCluster.issue_cluster === "tracking_cvr_drop") score -= 0.5;
-  if (primaryCluster && primaryCluster.evRank <= 2) score -= 0.5;
-  if (/[;:].*;/.test(primaryThread)) score -= 0.4;
-  if (supportingEvidence.length < 3) score -= 0.5;
-  return Math.max(0, Math.min(10, Number(score.toFixed(1))));
-}
+// De echte scoreFinalWhy. Het bewijsniveau komt uit de findings van het cluster, net als in de
+// pijplijn: "inferred" geeft rang 3, "hypothesis" rang 2.
+type Cluster = Parameters<typeof echteScoreFinalWhy>[1];
+const alsCluster = (c: Cl): Cluster => ({
+  issue_cluster: c.issue_cluster,
+  findings: [{ evidence_level: c.evRank >= 3 ? "inferred" : "hypothesis" }],
+} as unknown as Cluster);
+const scoreFinalWhy = (thread: string, c: Cl | null, ev: string[]) => echteScoreFinalWhy(thread, c ? alsCluster(c) : null, ev);
 
 const thread = "Account verliest rendement door geografische misallocatie.";
 const ev3 = ["a", "b", "c"];

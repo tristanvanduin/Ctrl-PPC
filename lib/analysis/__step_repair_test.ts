@@ -1,40 +1,23 @@
 export {};
-// Verificatie van F3 4a (generieke repair-loop), pure logica. Getrouwe replica van de helpers
-// uit app/api/analysis/monthly/route.ts (laadt niet standalone), met contrast oud versus nieuw.
+// Verificatie van F3 4a (generieke repair-loop), pure logica. Getoetst op de echte helpers uit
+// app/api/analysis/monthly/route.ts; hier stond eerst een kopie, inclusief een eigen kopie van de
+// lijst zware waarschuwingen. Een matcher erbij of eraf in de route zag deze test dan niet.
 // Draaien: npx tsx lib/analysis/__step_repair_test.ts
 
-const HEAVY_WARNING_MATCHERS = [
-  "Wiskundige inconsistentie",
-  "Verwacht 3 findings",
-  "Narratief bevat geen concrete cijfers",
-  "AC-08",
-  "Claim-consistentie",
-  "Wereldkennis",
-  "gedegradeerd of nested JSON",
-];
-type Validation = { stepNumber: number; valid: boolean; warnings: string[]; errors: string[] };
+import {
+  countHeavyWarnings,
+  shouldRepairStep,
+  buildStepRepairUserMessage,
+  pickBetterStepAttempt as echtePick,
+} from "../../app/api/analysis/monthly/route";
+import type { StepValidationResult } from "./step-validator";
 
-function countHeavyWarnings(v: Validation): number {
-  return v.warnings.filter((w) => HEAVY_WARNING_MATCHERS.some((m) => w.includes(m))).length;
-}
-function shouldRepairStep(v: Validation, errorsOnly: boolean): boolean {
-  if (v.errors.length > 0) return true;
-  if (errorsOnly) return false;
-  return countHeavyWarnings(v) >= 2;
-}
-function buildStepRepairUserMessage(message: string, v: Validation, runningContext: string, promptNote?: string): string {
-  const feedbackLines = [...v.errors, ...v.warnings].slice(0, 12);
-  return `${message}\n\n## REPAIR FEEDBACK\nJe vorige output is afgekeurd. Los exact deze punten op en lever opnieuw volledig JSON:\n${feedbackLines.map((l) => `- ${l}`).join("\n")}\n\n## Data beschikbaarheid voor deze stap\n${promptNote || "Geen extra data-opmerking."}\n\n## Running context uit laatste checkpoint\n${runningContext}`;
-}
+type Validation = StepValidationResult;
 type StepAttempt = { id: string; validation: Validation };
-function pickBetterStepAttempt(original: StepAttempt, repaired: StepAttempt): StepAttempt {
-  if (repaired.validation.errors.length !== original.validation.errors.length) {
-    return repaired.validation.errors.length < original.validation.errors.length ? repaired : original;
-  }
-  const rh = countHeavyWarnings(repaired.validation), oh = countHeavyWarnings(original.validation);
-  if (rh !== oh) return rh < oh ? repaired : original;
-  return original;
-}
+type EchtePoging = Parameters<typeof echtePick>[0];
+// De echte functie kijkt alleen naar .validation en geeft een van de twee pogingen terug.
+const pickBetterStepAttempt = (a: StepAttempt, b: StepAttempt): StepAttempt =>
+  echtePick(a as unknown as EchtePoging, b as unknown as EchtePoging) as unknown as StepAttempt;
 
 const V = (errors: string[], warnings: string[]): Validation => ({ stepNumber: 1, valid: errors.length === 0, errors, warnings });
 

@@ -62,11 +62,31 @@ function MeldingRij({ melding, magReageren, reageer }: {
 
 export function CodeRoodPaneel() {
   const { meldingen, magReageren, loading, error, reageer } = useCodeRoodMeldingen();
-  const open = meldingen.filter((m) => m.status === "open");
 
   if (loading) return null;
   if (error) return <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-body text-amber-800">{error}</div>;
-  if (open.length === 0) return null;
+  return <CodeRoodLijst meldingen={meldingen} magReageren={magReageren} reageer={reageer} />;
+}
+
+/** Het paneel zonder het ophalen, zodat te toetsen is wat het bij een lege lijst zegt. */
+export function CodeRoodLijst({ meldingen, magReageren, reageer }: {
+  meldingen: readonly CodeRoodMelding[];
+  magReageren: boolean;
+  reageer: (id: string, actie: "accepteren" | "afwijzen") => Promise<void>;
+}) {
+  const open = meldingen.filter((m) => m.status === "open");
+  // Leeg was eerst niets: geen paneel, geen regel. Maar de detectie (app/api/cron/evaluate-code-rood)
+  // staat niet ingepland en legt nergens vast wanneer hij draaide, dus "geen meldingen" en "nooit
+  // gekeken" zagen er hetzelfde uit. Tot er een vastlegging van de laatste controle is, zegt deze
+  // regel dat eerlijk in plaats van een lege plek die als "alles in orde" leest.
+  if (open.length === 0) {
+    return (
+      <p className="text-meta text-muted-foreground">
+        Code Rood / Amber: geen open meldingen. Niet gecontroleerd: er is geen vastlegging van wanneer
+        de detectie voor het laatst draaide, dus een lege lijst betekent niet dat er geen klantrisico is.
+      </p>
+    );
+  }
 
   const rood = open.filter((m) => m.licht === "rood");
   const amber = open.filter((m) => m.licht === "amber");

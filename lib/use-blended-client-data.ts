@@ -8,7 +8,7 @@ import type { DataStandSamen } from "./sync/datastand";
 import type { ClientForecast } from "./forecast";
 import { blendedForecastUitKanalen, eigenGrenzen } from "./forecast-som";
 import { loadClientSettings } from "./client-settings";
-import { mergeKpiTargets } from "./kpi-target-merge";
+import { mergeKpiTargetsVoorReeks } from "./kpi-target-merge";
 import { buildChannelForecastUitEmmers, tabStandUitRoute } from "./analysis/channel-forecast-data";
 import { computeHealthScore, zonderKanaalSpecifiekeHygiene, type HealthScore } from "./health-score";
 import { CONVERSIE_KANAAL, NIET_GOOGLE, type NietGoogleKanaal } from "./period/kanaal-maanden";
@@ -221,7 +221,8 @@ function haal(clientId: string): Promise<Opgehaald> {
         apiData.currentYear,
         apiData.realizedThroughMonth,
       );
-      const data = mergeKpiTargets(clientId, built);
+      // Alle kanalen samen: het doel uit Instellingen geldt hier altijd (lib/doel/jaardoel.ts).
+      const data = mergeKpiTargetsVoorReeks(clientId, built, "blended", null);
       const perKanaal = apiData.perKanaal ?? [];
       const waarde: Opgehaald = {
         data,

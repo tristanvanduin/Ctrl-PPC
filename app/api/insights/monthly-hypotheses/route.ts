@@ -2,6 +2,8 @@ import { NextRequest } from "next/server";
 import { getSupabase } from "@/lib/analysis/helpers";
 import { proposalSourceForSopType } from "@/lib/second-opinion/findings-to-hypotheses";
 import { decideTransition } from "@/lib/learning/hypothesis-status";
+import { beslisserVan } from "@/lib/learning/beslis-stempel";
+import { getAuthUser } from "@/lib/auth/server";
 import { recordMemoryEvent } from "@/lib/memory/agency-memory-events";
 import type { MonthlyStructuredOutput, OperatingHypothesisTrace } from "@/lib/analysis/monthly-structured";
 import { supabaseForClient } from "@/lib/demo/server-supabase";
@@ -247,6 +249,8 @@ export async function POST(request: NextRequest) {
 
   const ctx = await loadLatestMonthlyContext(clientId, sopType);
   if (ctx.error || !ctx.supabase) return ctx.error ?? Response.json({ error: "Supabase niet geconfigureerd" }, { status: 500 });
+  // Wie beslist, uit de sessie: decided_by werd nergens gezet (lib/learning/beslis-stempel.ts).
+  const beslisser = beslisserVan(await getAuthUser().catch(() => null));
 
   const hypothesis = ctx.structuredOutput.operating_detail.hypotheses_and_next_month_proof.find((item) => item.id === hypothesisId);
   if (!hypothesis) {
@@ -282,6 +286,7 @@ export async function POST(request: NextRequest) {
       current: { status: persisted.status, accepted_at: persisted.accepted_at ?? null },
       next: "rejected",
       reason: rejectedReason.trim(),
+      by: beslisser,
       now: new Date().toISOString(),
     });
     if (!rejectDecision.ok) {
@@ -299,6 +304,7 @@ export async function POST(request: NextRequest) {
         rationale: metadata,
         decision_reason: rejectDecision.patch.decision_reason,
         decided_at: rejectDecision.patch.decided_at,
+        ...(rejectDecision.patch.decided_by ? { decided_by: rejectDecision.patch.decided_by } : {}),
       })
       .eq("id", persisted.id);
 
@@ -472,13 +478,15 @@ export async function POST(request: NextRequest) {
   const acceptDecision = decideTransition({
     current: { status: persisted.status, accepted_at: persisted.accepted_at ?? null },
     next: "accepted",
+    by: beslisser,
     now: new Date().toISOString(),
   });
   if (!acceptDecision.ok) {
     return Response.json({ error: acceptDecision.reason }, { status: 409 });
   }
 
-  const acceptUpdate: Record<string, unknown> = { status: "accepted", rationale: metadata };
+  const acceptUpdate: Record<string, unknown> = { status: "accepted", rationale: metadata, decided_at: acceptDecision.patch.decided_at };
+  if (acceptDecision.patch.decided_by) acceptUpdate.decided_by = acceptDecision.patch.decided_by;
   if (acceptDecision.patch.accepted_at) {
     acceptUpdate.accepted_at = acceptDecision.patch.accepted_at;
   }

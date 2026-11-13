@@ -344,14 +344,22 @@ function buildNetworkFacts(breakdowns: MicrosoftBreakdownRow[] | undefined, acco
   const search = segments.find((s) => String(s.segment).toLowerCase() === "search");
   const searchCpa = (search?.cpa as number | null) ?? null;
   return {
-    segments: segments.map((s) => ({
-      ...s,
+    segments: segments.map((s) => {
+      const aandeel = (s.spend_share_pct as number | null) ?? null;
       // Het lek-criterium uit de adapter: meer dan 10% van spend bij een CPA boven 2x search.
-      cpa_vs_search: searchCpa != null && s.cpa != null ? round(((s.cpa as number) / searchCpa)) : null,
-      lek: searchCpa != null && s.cpa != null && (s.spend_share_pct as number | null) != null
-        ? (s.cpa as number) > 2 * searchCpa && (s.spend_share_pct as number) > 10
-        : false,
-    })),
+      // NUL conversies is het slechtste geval, geen ontbrekend geval: de CPA is dan null (deling
+      // door nul) en het segment kreeg "lek: false" mee als feit. Dezelfde regel als bij de
+      // keyword-bleeders: kosten boven twee keer de search-CPA zonder een conversie is een lek.
+      const zonderConversies = (s.conversions as number) === 0 && searchCpa != null && (s.spend as number) > 2 * searchCpa;
+      const lek = searchCpa != null && aandeel != null && aandeel > 10
+        && (s.cpa != null ? (s.cpa as number) > 2 * searchCpa : zonderConversies);
+      return {
+        ...s,
+        cpa_vs_search: searchCpa != null && s.cpa != null ? round(((s.cpa as number) / searchCpa)) : null,
+        lek,
+        ...(lek && s.cpa == null ? { lek_reden: "geen conversies" } : {}),
+      };
+    }),
     search_cpa: searchCpa,
   };
 }

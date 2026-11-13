@@ -19,7 +19,7 @@ import {
   bewaarGeroteerdRefreshToken, type LinkedInSyncCredentials, type MicrosoftSyncCredentials,
 } from "@/lib/tenancy/kanaal-credentials";
 import type { CredentialBron } from "@/lib/tenancy/credentials";
-import { syncMetaBackfill, syncMetaDaily, syncMetaBreakdowns, type SyncContext as MetaSyncContext, type MetaLevel } from "@/lib/meta/sync";
+import { syncMetaBackfill, syncMetaDaily, syncMetaBreakdowns, syncMetaPeriodReach, type SyncContext as MetaSyncContext, type MetaLevel } from "@/lib/meta/sync";
 import { META_GRAPH_BASE } from "@/lib/meta/api-version";
 import { trailingWindow, todayUTC } from "@/lib/meta/sync-windows";
 import { refreshAccessToken } from "@/lib/linkedin/auth";
@@ -221,6 +221,13 @@ export async function draaiMetaSync(supabase: SupabaseClient, clientId: string, 
       const breakdowns = await syncMetaBreakdowns(ctx, since, until);
       rowsUpserted = Object.fromEntries((Object.keys(outcome) as MetaLevel[]).map((level) => [level, outcome[level].rows]));
       rowsUpserted.breakdowns = breakdowns.rows;
+      // De periodelezing (frequentie over 28 dagen) staat in het verslag maar laat de run niet
+      // mislukken: zonder migratie 110 is er geen tabel, en de aanroep is nog niet tegen een echte
+      // Meta-respons getoetst. De signaalroute meldt zonder periode-rijen "niet te beoordelen".
+      const periode = await syncMetaPeriodReach(ctx, dailyEnd);
+      rowsUpserted.periodeBereik = periode.tabelOntbreekt
+        ? "overgeslagen: tabel meta_period_reach ontbreekt (migratie 110 niet gedraaid)"
+        : periode.failed.length > 0 ? { rijen: periode.rows, waarschuwing: periode.failed } : periode.rows;
       failed.push(
         ...(Object.keys(outcome) as MetaLevel[]).filter((level) => !outcome[level].success).map((level) => `${level}: ${outcome[level].error ?? "onbekende fout"}`),
         ...breakdowns.failed.map((t) => `breakdown:${t}`),

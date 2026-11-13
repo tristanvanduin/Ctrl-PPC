@@ -3,9 +3,11 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { type ClientHistoricalData } from "./types";
 import { useClientData, type ClientDataState } from "./use-client-data";
-import { heeftGecachteInstellingen, loadClientSettings } from "./client-settings";
+import { getClientSettings, heeftGecachteInstellingen, kpiDoelenIngevoerd, loadClientSettings } from "./client-settings";
 import { computeForecast, type ClientForecast } from "./forecast";
-import { mergeKpiTargets } from "./kpi-target-merge";
+import { mergeKpiTargetsVoorReeks } from "./kpi-target-merge";
+import { jaardoelBereik, type JaardoelBereik } from "./doel/jaardoel";
+import type { Kanaal } from "./kanalen/beschikbaar";
 import { PaginaLaadvlak } from "@/components/ui/laadvlak";
 
 const ClientDataContext = createContext<ClientDataState | null>(null);
@@ -17,6 +19,15 @@ const ClientDataContext = createContext<ClientDataState | null>(null);
 // componenten de uitkomst.
 const ForecastContext = createContext<ClientForecast | null>(null);
 
+// Over welke kanalen het jaardoel gaat (lib/doel/jaardoel.ts), voor elk blok binnen de provider
+// dat een oordeel over het doel geeft: de pacing, het budgetadvies, de prognosetegels.
+const JaardoelBereikContext = createContext<JaardoelBereik | null>(null);
+
+/** Het bereik van het jaardoel van de actieve klant; null buiten de provider of zolang onbekend. */
+export function useJaardoelBereik(): JaardoelBereik | null {
+  return useContext(JaardoelBereikContext);
+}
+
 /**
  * Provider that fetches client data (API or mock) and makes it
  * available to all dashboard child components via context.
@@ -27,9 +38,15 @@ const ForecastContext = createContext<ClientForecast | null>(null);
 /** Hoe lang de provider op het eerste lezen van de instellingen wacht voordat hij met de standaard rendert. */
 export const INSTELLINGEN_WACHT_MS = 3000;
 
-export function ClientDataProvider({ clientId, children, wachtvlak }: {
+export function ClientDataProvider({ clientId, children, wachtvlak, kanalen = null }: {
   clientId: string;
   children: ReactNode;
+  /**
+   * De kanalen van deze klant, voor de regel over het jaardoel (lib/doel/jaardoel.ts): het doel
+   * uit Instellingen geldt voor het account, en komt dus alleen op deze Google-reeks als de klant
+   * geen ander kanaal heeft. Onbekend (null): zoals voorheen, het doel op Google.
+   */
+  kanalen?: readonly Kanaal[] | null;
   /**
    * Wat er staat zolang het eerste lezen van de instellingen loopt; standaard het laadvlak van de
    * hele pagina. Het klantdashboard geeft er een zonder band-deel: daar staat de KPI-band buiten
@@ -86,11 +103,23 @@ export function ClientDataProvider({ clientId, children, wachtvlak }: {
   // wachttijd. De samenvoeging was dan al gedaan bij de eerste render, met een lege cache, en de
   // kinderen kregen het routedoel (1.938) terwijl Instellingen en "Alle kanalen" 2.600 zeiden. Op de
   // omslag van dicht naar open voegt hij opnieuw samen, met wat de cache dan heeft.
+  //
+  // Het doel komt alleen op deze Google-reeks als het voor Google bedoeld is (lib/doel/jaardoel.ts).
+  // Bij een klant met meer kanalen stond hier het accountdoel tegen Google alleen: "Jaardoel in
+  // gevaar, -51%" op de Google-tab bij een account dat het doel al in oktober gehaald had.
+  const kanalenSleutel = kanalen ? kanalen.join(",") : null;
+  // Of er echt een doel is ingevoerd, gaat mee: een kanaaltab zei anders "het jaardoel uit
+  // Instellingen" bij een klant zonder doel (oordeelOverTekst).
+  const doelIngevoerd = kpiDoelenIngevoerd(getClientSettings(clientId));
+  const bereik: JaardoelBereik | null = useMemo(
+    () => jaardoelBereik(kanalenSleutel ? (kanalenSleutel.split(",") as Kanaal[]) : null, doelIngevoerd),
+    [kanalenSleutel, doelIngevoerd],
+  );
   const enrichedData = useMemo(() => {
     if (!clientData.data) return clientData;
-    return { ...clientData, data: mergeKpiTargets(clientId, clientData.data) };
+    return { ...clientData, data: mergeKpiTargetsVoorReeks(clientId, clientData.data, "google", bereik) };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- instellingenVersie en instellingenKlaar: zie hierboven
-  }, [clientData, clientId, instellingenVersie, instellingenKlaar]);
+  }, [clientData, clientId, instellingenVersie, instellingenKlaar, bereik]);
 
   // Eén keer per datawijziging, gedeeld met alle kinderen.
   const forecast = useMemo(
@@ -108,7 +137,9 @@ export function ClientDataProvider({ clientId, children, wachtvlak }: {
   return (
     <ClientDataContext.Provider value={enrichedData}>
       <ForecastContext.Provider value={forecast}>
-        {children}
+        <JaardoelBereikContext.Provider value={bereik}>
+          {children}
+        </JaardoelBereikContext.Provider>
       </ForecastContext.Provider>
     </ClientDataContext.Provider>
   );

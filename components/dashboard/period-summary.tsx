@@ -9,12 +9,13 @@
 import { TriangleAlert } from "lucide-react";
 import type { ClientHistoricalData } from "@/lib/types";
 import { usePeriod, type PeriodDataStand } from "@/lib/period/period-context";
-import { comparePeriods, delta, ontbrekendeMaanden, type BronPaar, type BronReeks } from "@/lib/period/apply-period";
+import { comparePeriods, ontbrekendeMaanden, type BronPaar, type BronReeks } from "@/lib/period/apply-period";
 import { formatRange, formatMonth, lastCompleteMonth, monthIndex, type PeriodRange } from "@/lib/period/period-range";
 import { formatRoas } from "@/lib/forecast-format";
 import { KANAAL_NAAM, type Kanaal } from "@/lib/kanalen/beschikbaar";
 import { opsomming } from "@/lib/util/tekst";
-import { Kerncijfer } from "@/components/ui/kerncijfer";
+import { Kerncijfer, type KerncijferDelta } from "@/components/ui/kerncijfer";
+import { somVergelijking, verhoudingVergelijking, type DeelVergelijking } from "@/lib/period/vergelijkbaar-deel";
 import { BandLaadvlak } from "@/components/ui/laadvlak";
 import { Vensterlabel } from "@/components/ui/vensterlabel";
 import { nadrukIndex } from "@/lib/overzicht/bovenkant";
@@ -183,18 +184,17 @@ interface Props {
 }
 
 /**
- * De verandering van een verhouding (ROAS, CPA). Zonder vergelijkingsperiode niets; zonder vorige
- * waarde (geen spend, geen conversies toen) de uitleg in plaats van een percentage.
+ * Een vergelijking (lib/period/vergelijkbaar-deel.ts) als delta van een tegel. Gaat het percentage
+ * over een deel van de kanalen, dan staan de twee waarden van dat deel erbij, nu en toen; anders
+ * alleen de vorige waarde. Zo staat een percentage nooit naast een getal waar het niet bij hoort.
  */
-function verhoudingDelta(
-  vorig: number | null,
-  huidig: number | null,
-  hogerIsBeter: boolean,
-  opmaak: (v: number) => string,
-) {
-  if (vorig === null && huidig === null) return undefined;
-  if (vorig === null || huidig === null) return { pct: null, hogerIsBeter, leegTekst: "geen vergelijking mogelijk" };
-  return { pct: delta(huidig, vorig).pct, hogerIsBeter, was: opmaak(vorig) };
+function alsDelta(v: DeelVergelijking, hogerIsBeter: boolean, opmaak: (v: number) => string): KerncijferDelta | undefined {
+  switch (v.soort) {
+    case "geen": return undefined;
+    case "leeg": return { pct: null, hogerIsBeter, leegTekst: "geen vergelijking mogelijk" };
+    case "heel": return { pct: v.pct, hogerIsBeter, was: v.pct !== null ? opmaak(v.vorig) : undefined };
+    case "deel": return { pct: v.pct, hogerIsBeter, ...(v.pct !== null ? { nu: opmaak(v.huidig), was: opmaak(v.vorig) } : {}) };
+  }
 }
 
 export function PeriodSummary({ data, compact, bronnen, laden = false, vorm = "band" }: Props) {
@@ -259,15 +259,47 @@ export function PeriodSummary({ data, compact, bronnen, laden = false, vorm = "b
 
   const roas = current.totals.adSpend > 0 ? current.totals.revenue / current.totals.adSpend : null;
   const cpa = current.totals.conversions > 0 ? current.totals.adSpend / current.totals.conversions : null;
-  // ROAS en CPA hadden geen verandering onder zich: een verhouding van een verhouding zegt weinig
-  // in procenten alleen. Nu wél, met de vorige waarde erbij ("was 2,41×"), want dát is wat de
-  // lezer wil weten. Uit de GEPAARDE totalen, net als de drie percentages ernaast: een kanaal dat
-  // in de vergelijkingsperiode nog niet liep, trekt de vorige verhouding anders scheef.
-  const verhouding = (teller: number, noemer: number): number | null => (noemer > 0 ? teller / noemer : null);
-  const huidigeRoas = deltas ? verhouding(deltas.revenue.huidig, deltas.adSpend.huidig) : null;
-  const vorigeRoas = deltas ? verhouding(deltas.revenue.vorig, deltas.adSpend.vorig) : null;
-  const huidigeCpa = deltas ? verhouding(deltas.adSpend.huidig, deltas.conversions.huidig) : null;
-  const vorigeCpa = deltas ? verhouding(deltas.adSpend.vorig, deltas.conversions.vorig) : null;
+  // ROAS en CPA met hun verandering, uit de GEPAARDE totalen net als de drie percentages ernaast:
+  // een kanaal dat in de vergelijkingsperiode nog niet liep, trekt de vorige verhouding anders
+  // scheef. Het grote getal is wel het totaal over alle kanalen; gaat het percentage over een
+  // deel, dan staan de waarden van dat deel erbij (vergelijkbaar-deel.ts). Hier stond "CPA € 57,
+  // +14%, was € 96" waar +14% en € 96 alleen Google waren (nu € 109).
+  const roasVergelijking = verhoudingVergelijking({
+    totaalTeller: current.totals.revenue, totaalNoemer: current.totals.adSpend,
+    teller: deltas?.revenue, noemer: deltas?.adSpend,
+  });
+  const cpaVergelijking = verhoudingVergelijking({
+    totaalTeller: current.totals.adSpend, totaalNoemer: current.totals.conversions,
+    teller: deltas?.adSpend, noemer: deltas?.conversions,
+  });
+  const roasDelta = alsDelta(roasVergelijking, true, (v) => formatRoas(v));
+  const cpaDelta = alsDelta(cpaVergelijking, false, (v) => euro(v));
+
+  /** De delta van een somtegel: "nieuw in deze periode" als er toen niets was, anders de vergelijking. */
+  const somDelta = (k: (typeof kaarten)[number]): KerncijferDelta | undefined => {
+    if (!k.d) return undefined;
+    // Van niets naar iets is geen percentage; "+100%" zou een precisie suggereren die er niet is.
+    // k.d.vorig is het GEPAARDE vorige totaal: nul betekent ook "er viel niets te paren" (een
+    // kanaal dat pas in deze periode begon), en dan staat het grote getal er wel. Daarom op het
+    // totaal van de periode en niet op k.d.huidig, dat dan ook nul is.
+    if (k.d.vorig === 0 && k.totaal > 0 && !vorigeNietLeeg) {
+      return { pct: k.d.pct, hogerIsBeter: k.hogerIsBeter, leegTekst: "nieuw in deze periode" };
+    }
+    return alsDelta(somVergelijking(k.totaal, k.d), k.hogerIsBeter, k.opmaak);
+  };
+
+  /** De band toont bij een somtegel geen "was" (de kop zegt al waartegen), behalve als het
+   *  percentage over een deel gaat: dan staan de twee waarden van dat deel erbij. */
+  const bandDelta = (k: (typeof kaarten)[number]): KerncijferDelta | undefined => {
+    const d = somDelta(k);
+    if (!d) return undefined;
+    // Het percentage en de sparkline erboven lijken tegenstrijdig, maar zijn twee verschillende
+    // vergelijkingen: de lijn is het verloop BINNEN deze periode, dit percentage de vergelijking
+    // MET de vorige periode. In de volle band zegt de kop al "vergeleken met ..."; alleen in de
+    // compacte variant, zonder kop, staat het per tegel.
+    const waartegen = compact && periode.compareRange ? `vs ${formatRange(periode.compareRange)}` : undefined;
+    return d.nu ? { ...d, waartegen } : { ...d, was: undefined, waartegen };
+  };
 
   // De uitlegregels en waarschuwingen onder de cijfers: één blok, voor de band en voor de tegels.
   const uitleg = (
@@ -327,26 +359,15 @@ export function PeriodSummary({ data, compact, bronnen, laden = false, vorm = "b
     const tegels = [
       ...kaarten.map((k) => ({
         label: k.label, waarde: k.waarde, reeks: k.reeks, reeksBasis: "nul" as const,
-        delta: k.d ? {
-          pct: k.d.pct,
-          hogerIsBeter: k.hogerIsBeter,
-          leegTekst: k.d.vorig === 0 && k.totaal > 0 && !vorigeNietLeeg ? "nieuw in deze periode" : undefined,
-          // De bandkop "vergeleken met ..." staat hier in de voetregel; per tegel zegt "was" waartegen.
-          // Het GEPAARDE vorige totaal: precies het getal waar het percentage tegen gerekend is.
-          // Alleen als het grote getal erboven ook het gepaarde totaal is. Loopt een kanaal pas
-          // sinds kort, dan is het grote getal het hele periodetotaal en het percentage gerekend
-          // over de gepaarde maanden: "3.871 +23% was 1.902" klopt dan voor geen lezer. Dan alleen
-          // het percentage, zoals de band, en de uitlegregel eronder zegt waarover het gaat.
-          was: k.d.pct !== null && Math.abs(k.d.huidig - k.totaal) <= Math.max(1e-6, Math.abs(k.totaal) * 1e-9)
-            ? k.opmaak(k.d.vorig) : undefined,
-        } : undefined,
+        // De bandkop "vergeleken met ..." staat hier in de voetregel; per tegel zegt "was" waartegen.
+        delta: somDelta(k),
       })),
       { label: "ROAS", waarde: roas === null ? "—" : formatRoas(roas), reeksBasis: "bereik" as const,
         reeks: reeksVerhouding((m) => (m.adSpend > 0 ? m.revenue / m.adSpend : null)),
-        delta: verhoudingDelta(vorigeRoas, huidigeRoas, true, (v) => formatRoas(v)) },
+        delta: roasDelta },
       { label: "CPA", waarde: cpa === null ? "—" : euro(cpa), reeksBasis: "bereik" as const,
         reeks: reeksVerhouding((m) => (m.conversions > 0 ? m.adSpend / m.conversions : null)),
-        delta: verhoudingDelta(vorigeCpa, huidigeCpa, false, (v) => euro(v)) },
+        delta: cpaDelta },
     ];
     const nadruk = nadrukIndex(tegels.map((t) => t.delta?.pct));
     return (
@@ -427,23 +448,7 @@ export function PeriodSummary({ data, compact, bronnen, laden = false, vorm = "b
             waarde={k.waarde}
             reeks={k.reeks}
             reeksLabel={`${k.label} per maand binnen ${formatRange(periode.range)}`}
-            delta={k.d ? {
-              pct: k.d.pct,
-              hogerIsBeter: k.hogerIsBeter,
-              // Van niets naar iets is geen percentage; "+100%" zou een precisie suggereren die
-              // er niet is. k.d.vorig is het GEPAARDE vorige totaal: nul betekent ook "er viel
-              // niets te paren" (een kanaal dat pas in deze periode begon), en dan staat het grote
-              // getal er wel. Daarom op het totaal van de periode en niet op k.d.huidig, dat dan
-              // ook nul is.
-              leegTekst: k.d.vorig === 0 && k.totaal > 0 && !vorigeNietLeeg ? "nieuw in deze periode" : undefined,
-              // Feedback: het percentage en de sparkline erboven lijken tegenstrijdig, maar zijn
-              // twee verschillende vergelijkingen — de lijn is het verloop BINNEN deze periode, dit
-              // percentage is de vergelijking MET de vorige periode. Zonder "waartegen" oogt dat als
-              // dezelfde claim twee keer verteld; met "waartegen" is het duidelijk twee metingen.
-              // In de volle band zegt de kop al "vergeleken met …"; dan is het per tegel herhaald
-              // en concurreert het met het percentage. Alleen in de compacte variant, zonder kop.
-              waartegen: compact && periode.compareRange ? `vs ${formatRange(periode.compareRange)}` : undefined,
-            } : undefined}
+            delta={bandDelta(k)}
           />
         ))}
         {/* ROAS en CPA zijn verhoudingen en geen volumes, dus hun lijn loopt op het eigen bereik:
@@ -457,7 +462,7 @@ export function PeriodSummary({ data, compact, bronnen, laden = false, vorm = "b
           reeks={reeksVerhouding((m) => (m.adSpend > 0 ? m.revenue / m.adSpend : null))}
           reeksLabel={`ROAS per maand binnen ${formatRange(periode.range)}`}
           reeksBasis="bereik"
-          delta={verhoudingDelta(vorigeRoas, huidigeRoas, true, (v) => formatRoas(v))}
+          delta={roasDelta}
         />
         {/* Geen conversies betekent geen CPA; een bedrag tonen zou een prijs per conversie
             suggereren die niet bestaat. */}
@@ -467,7 +472,7 @@ export function PeriodSummary({ data, compact, bronnen, laden = false, vorm = "b
           reeks={reeksVerhouding((m) => (m.conversions > 0 ? m.adSpend / m.conversions : null))}
           reeksLabel={`CPA per maand binnen ${formatRange(periode.range)}`}
           reeksBasis="bereik"
-          delta={verhoudingDelta(vorigeCpa, huidigeCpa, false, (v) => euro(v))}
+          delta={cpaDelta}
         />
       </div>
 

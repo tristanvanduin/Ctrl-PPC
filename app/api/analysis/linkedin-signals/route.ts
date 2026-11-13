@@ -32,7 +32,7 @@ import { today, addDays } from "@/lib/reporting-date";
 import { supabaseForClient } from "@/lib/demo/server-supabase";
 import { vereisKlantToegangUitBody } from "@/lib/auth/server";
 import { eis, alleRijen, dataFoutNaarResponse } from "@/lib/analysis/db-veilig";
-import { resolveChannelConversionConfig, sumSelectedConversions } from "@/lib/analysis/channel-conversion-config";
+import { resolveChannelConversionConfig, selectedConversionLabels, sumSelectedConversions } from "@/lib/analysis/channel-conversion-config";
 
 // LinkedIn-pivot → leesbare demografische dimensie voor de segment-efficiëntie-detector.
 const PIVOT_TO_DIM: Record<string, string> = {
@@ -99,7 +99,7 @@ export async function POST(request: NextRequest) {
         .range(van, tot),
       "linkedin_campaign_daily"
     ),
-    supabase.from("linkedin_campaigns").select("campaign_urn, name").eq("client_id", clientId).limit(2000),
+    supabase.from("linkedin_campaigns").select("campaign_urn, name, objective_type").eq("client_id", clientId).limit(2000),
     alleRijen<Record<string, unknown>>(
       (van, tot) => supabase
         .from("linkedin_demographic_daily")
@@ -130,8 +130,16 @@ export async function POST(request: NextRequest) {
   );
   const conv = (r: Record<string, unknown>): number => sumSelectedConversions(r, "linkedin_ads", conversieConfig);
 
-  const names = new Map((eis(namesRes, "linkedin_campaigns")).map((c) => [c.campaign_urn as string, (c.name as string) ?? (c.campaign_urn as string)]));
-  const entities = shapeLinkedInInputs(rows, names);
+  const campagnes = eis(namesRes, "linkedin_campaigns");
+  const names = new Map(campagnes.map((c) => [c.campaign_urn as string, (c.name as string) ?? (c.campaign_urn as string)]));
+  // CPL-druk telt met dezelfde conversieselectie als de budget-concentratie hieronder; alleen
+  // lead-formulieren tellen liet campagnes op websiteconversies nooit een CPL-signaal krijgen.
+  // CTR en video-voltooiing vergelijken alleen binnen hetzelfde campagnedoel.
+  const entities = shapeLinkedInInputs(rows, names, {
+    objectives: new Map(campagnes.map((c) => [c.campaign_urn as string, (c.objective_type as string | null) ?? null])),
+    results: (r) => conv(r as unknown as Record<string, unknown>),
+    resultLabel: `resultaat (${selectedConversionLabels("linkedin_ads", conversieConfig).join(" of ").toLowerCase()})`,
+  });
 
   // Structuur naast entiteit-signalen: kosten-efficiëntie per demografisch segment (CPL per
   // functie/seniority/industrie/bedrijfsgrootte) — waste + schaalkansen. UNKNOWN is het

@@ -658,6 +658,7 @@ function CrossChannelViewRuw({ clientId, kanalen = [], edition, nieuw = false, a
               onSelect={setJaaroverzichtMetric}
             />
             <PerformanceChartView
+              reeks="blended"
               clientData={blendedForecast.data}
               forecast={blendedForecast.forecast}
               metric={jaaroverzichtMetric}

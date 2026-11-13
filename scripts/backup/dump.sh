@@ -34,6 +34,13 @@ gzip "$WORK/${BASE}.sql"
 gpg --batch --yes --encrypt --recipient "$GPG_RECIPIENT" --output "$WORK/${BASE}.sql.gz.gpg" "$WORK/${BASE}.sql.gz"
 
 echo "Dump klaar: ${BASE}.sql.gz.gpg plus ${BASE}.manifest.json in ${WORK}"
+
+# Zonder upload verdwijnt de dump met de runner, en dan is er geen back-up. Een eerdere versie
+# eindigde hier met 0, en met de secrets ingericht stond de workflow dan elke nacht groen terwijl
+# er niets terug te halen was (doorlichting 13 november). Tot stap 4 gebouwd is, faalt dit script
+# hier hardop: een groene back-up die niets bewaart is erger dan een rode.
+echo "::error title=Back-up niet bewaard::De dump is gemaakt maar nergens heen geschreven (de upload naar een bucket buiten het project is nog niet gebouwd, zie stap 4 in scripts/backup/dump.sh). Er is dus GEEN terug te halen back-up." >&2
+exit 1
 # 4. TODO infra: upload de .gpg en het manifest naar de private backup-bucket BUITEN het
 #    productieproject (aws s3 cp, rclone of een aparte Storage-bucket), en draai daarna
 #    de retentie: bucket-listing | tsx scripts/backup/prune.ts | xargs bucket-delete.

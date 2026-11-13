@@ -1,40 +1,18 @@
 export {};
 // Verificatie van F5 4b: guardrails overlapten de success-metrics (circulaire accept/reject),
-// en identieke aanbevelingen konden identieke hypotheses geven. De logica zit in de
-// hypothese-builder in monthly-structured.ts (laadt niet standalone); getrouwe replica's.
-// tsc bevestigde 0 fouten in productiecode.
+// en identieke aanbevelingen konden identieke hypotheses geven. Getoetst op de echte helpers van de
+// hypothese-builder in monthly-structured.ts (hier stonden eerst kopieen).
 // Draaien: npx tsx lib/analysis/__hypothese_hygiene_test.ts
+
+import { disjunctGuardrails, dedupeOpInterventie } from "./monthly-structured";
 
 let passed = 0, failed = 0;
 function check(name: string, cond: boolean, detail = "") {
   if (cond) { passed++; console.log("  PASS  " + name); }
   else { failed++; console.log("  FAIL  " + name + "  " + detail); }
 }
-const unique = <T>(arr: T[]): T[] => [...new Set(arr)];
-function normalizeText(value: string): string {
-  return value.normalize("NFKD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ").trim();
-}
-
-// Replica exact zoals in de code
 type Route = "validation" | "containment" | "recovery" | "controlled scale";
-function disjointGuardrails(route: Route, successMetrics: string[]): string[] {
-  const rawGuardrails =
-    route === "controlled scale" ? ["ROAS", "CPA"]
-      : route === "containment" ? ["ROAS", "Conversies"]
-        : route === "recovery" ? ["ROAS", "CPA"]
-          : successMetrics.slice(0, 2);
-  const successKeys = new Set(successMetrics.map((m) => m.toLowerCase()));
-  let g = unique(rawGuardrails.filter((m) => !successKeys.has(m.toLowerCase())));
-  if (g.length === 0) {
-    const complement =
-      route === "containment" ? ["CPA", "CVR"]
-        : route === "recovery" ? ["CPC", "Spend"]
-          : route === "controlled scale" ? ["CVR", "Spend"]
-            : ["CPA", "Spend"];
-    g = unique(complement.filter((m) => !successKeys.has(m.toLowerCase())));
-  }
-  return g.slice(0, 2);
-}
+const disjointGuardrails = disjunctGuardrails;
 const disjoint = (a: string[], b: string[]) => {
   const bk = new Set(b.map((x) => x.toLowerCase()));
   return a.every((x) => !bk.has(x.toLowerCase()));
@@ -68,15 +46,9 @@ console.log("\n1. Guardrails zijn in alle routes disjunct van de success-metrics
 console.log("\n2. Hypotheses worden op interventie gededupliceerd, zonder aanvullen");
 {
   type Entry = { route: Route; intervention: string };
-  const dedupe = (entries: Entry[]): Entry[] => {
-    const seen = new Set<string>();
-    return entries.filter((e) => {
-      const key = `${e.route}::${normalizeText(e.intervention)}`;
-      if (seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    });
-  };
+  // De echte dedupe leest de interventie uit validation_or_exploitation_step.
+  const dedupe = (entries: Entry[]): Entry[] =>
+    dedupeOpInterventie(entries.map((e) => ({ ...e, validation_or_exploitation_step: e.intervention })));
   const dupes: Entry[] = [
     { route: "containment", intervention: "Pauzeer landset Noord" },
     { route: "containment", intervention: "Pauzeer  landset  Noord" }, // zelfde modulo opmaak

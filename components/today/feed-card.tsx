@@ -6,6 +6,7 @@ import { Clock, UserPlus, ChevronRight } from "lucide-react";
 import { CHANNEL_BADGE_CLASS, CHANNEL_LABEL } from "@/lib/insights/channel-of";
 import type { FeedItem, FeedStatus } from "@/lib/feed/feed-item";
 import { MOCK_TEAM } from "@/lib/feed/owners-mock";
+import { VERLOPEN_NA_DAGEN, dagenVerlopen } from "@/lib/feed/adapters";
 
 // Presentatie van één feed-item. TYPE (chip) en STATUS (pill) zijn bewust twee losse visuele
 // kanalen; de status is neutraal gekleurd zodat hij niet met de urgentieband concurreert.
@@ -52,7 +53,10 @@ export function FeedCard({ item, onSnooze, onAssign, onStatus }: {
         <Link href={item.clientUrl} className="text-sm font-bold text-brand-gray hover:text-brand-blue-ink truncate max-w-[40%]">{item.clientName}</Link>
         <span className={`text-micro font-semibold px-1.5 py-0.5 rounded-full border ${CHANNEL_BADGE_CLASS[item.channel]}`}>{CHANNEL_LABEL[item.channel]}</span>
         <span className="text-micro font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded border border-border bg-gray-50 text-muted-foreground">{TYPE_LABEL[item.type]}</span>
-        <span className={`text-micro font-medium px-2 py-0.5 rounded-full border ${STATUS_CLASS[item.status]}`}>{STATUS_LABEL[item.status]}</span>
+        {/* Een taak die al weken over zijn deadline is, is niet "Nieuw": hij is verlopen. */}
+        {item.type === "task" && dagenVerlopen(item.dueAt, new Date()) > VERLOPEN_NA_DAGEN
+          ? <span className="text-micro font-medium px-2 py-0.5 rounded-full border text-gray-600 bg-gray-100 border-gray-300">Verlopen</span>
+          : <span className={`text-micro font-medium px-2 py-0.5 rounded-full border ${STATUS_CLASS[item.status]}`}>{STATUS_LABEL[item.status]}</span>}
         {item.isMock && <span className="text-micro font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-purple-100 text-purple-700 border border-purple-200">Demo</span>}
       </div>
 

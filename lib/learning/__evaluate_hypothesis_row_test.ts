@@ -141,12 +141,21 @@ console.log("\nDe baseline komt uit de weken VOOR acceptatie, de meting uit de w
 console.log("\nUitvoeringsdetectie kan een oordeel omdraaien");
 {
   const vlak = weken({ vanaf: "2026-05-04", aantal: 14, omslagIndex: 6, voor: { conversions: 60 }, na: { conversions: 60 } });
-  const zonder = evaluateHypothesisRow({ row: rij(), weekly: vlak, changeEvents: GEEN_EVENTS, now: NU });
+  // Er IS wijzigingshistorie (een zoekwoord toegevoegd), alleen geen budgetwijziging: dan is
+  // "niet uitgevoerd" een vaststelling. Zonder enige historie is het dat niet, zie hieronder.
+  const anderType: ChangeEvent[] = [{ date: "2026-06-25", type: "keyword_added", entity: "Merk", detail: "ander soort wijziging" }];
+  const zonder = evaluateHypothesisRow({ row: rij(), weekly: vlak, changeEvents: anderType, now: NU });
   // Niet gehaald én niets uitgevoerd is een ANDERE les dan niet gehaald ondanks uitvoering: in het
   // eerste geval is er niets geleerd over de interventie, alleen over het account.
   check("niet uitgevoerd wint van het metriekverdict",
     zonder.soort === "oordeel" && zonder.uitkomst.verdict === "niet_uitgevoerd", JSON.stringify(zonder));
   check("en resultMet valt terug op null", zonder.soort === "oordeel" && zonder.uitkomst.resultMet === null);
+
+  // Een LEGE wijzigingshistorie is geen bewijs van niets doen: demo-greentech heeft 0 rijen, en
+  // elke budget- of pauzehypothese werd daar "niet_uitgevoerd" (doorlichting 13 november).
+  const leeg = evaluateHypothesisRow({ row: rij(), weekly: vlak, changeEvents: GEEN_EVENTS, now: NU });
+  check("zonder enige wijzigingshistorie geen 'niet uitgevoerd'",
+    leeg.soort === "oordeel" && leeg.uitkomst.verdict === "rejected" && leeg.uitkomst.reason.includes("geen wijzigingshistorie"), JSON.stringify(leeg));
 
   const met = evaluateHypothesisRow({ row: rij(), weekly: vlak, changeEvents: BUDGET_EVENT, now: NU });
   check("uitgevoerd en niet gehaald is een eigen verdict",

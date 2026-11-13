@@ -8,6 +8,8 @@ import {
   daysToFair,
   windowLengthDays,
   cumulativeThroughDaysOut,
+  historyHorizon,
+  gemeenschappelijkeHorizon,
   type Edition,
   type DailyPoint,
 } from "./event-time-axis";
@@ -88,6 +90,12 @@ export function forecastStream(input: {
   previousEditions?: { edition: Edition; points: DailyPoint[] }[];
   target: number | null;
   asOfDate: string;
+  /**
+   * De eerste datum met data. Begint die midden in het venster van een eerdere editie, dan rekent
+   * de tempo-ratio alleen over het stuk dat die editie wel heeft (zie historyHorizon); anders
+   * wordt de opbouw tot D-x te laag geteld en de ratio te hoog.
+   */
+  historyStart?: string | null;
 }): StreamForecast {
   const { current, target, asOfDate } = input;
   // Meervoud wint; enkelvoud blijft werken voor bestaande aanroepers.
@@ -122,7 +130,7 @@ export function forecastStream(input: {
   // projectie die op een enkele vergelijking rust te onderscheiden is van een die op vier rust.
   const curWindow = windowLengthDays(current.edition);
 
-  interface EditieSignaal { id: string; ratio: number; restVolume: number; materializedFrac: number }
+  interface EditieSignaal { id: string; ratio: number; restVolume: number; materializedFrac: number; projectie: number }
   const signalen: EditieSignaal[] = [];
   const restVolumes: { id: string; rest: number; frac: number }[] = [];
 
@@ -133,8 +141,9 @@ export function forecastStream(input: {
       Math.abs(curWindow - prevWindow) / prevWindow <= MATERIAL_WINDOW_DIFF;
     if (!vergelijkbaar) continue;
 
-    const prevAtX = cumulativeThroughDaysOut(eerder.points, eerder.edition, x);
-    const prevFinal = cumulativeThroughDaysOut(eerder.points, eerder.edition, 0);
+    const horizon = gemeenschappelijkeHorizon(current.edition, eerder.edition, historyHorizon(eerder.edition, input.historyStart));
+    const prevAtX = cumulativeThroughDaysOut(eerder.points, eerder.edition, x, horizon);
+    const prevFinal = cumulativeThroughDaysOut(eerder.points, eerder.edition, 0, horizon);
     if (prevFinal <= 0) continue;
 
     const materializedFrac = prevAtX / prevFinal;
@@ -144,7 +153,12 @@ export function forecastStream(input: {
     // Alleen edities die op D-x genoeg curve hadden leveren een betrouwbare ratio. Daaronder
     // is eindstand ÷ stand-op-D-x een deling door een piepklein getal.
     if (prevAtX > 0 && materializedFrac >= RAMP_SIGNAL_FRAC) {
-      signalen.push({ id: eerder.edition.editionId, ratio: prevFinal / prevAtX, restVolume: rest, materializedFrac });
+      // De ratio geldt voor het stuk venster dat beide edities hebben; wat deze editie daarvoor
+      // al opbouwde telt er ongewijzigd bij. Zonder inkorting is dat gewoon huidig x ratio.
+      const ratio = prevFinal / prevAtX;
+      const vergelijkbaarDeel = horizon != null ? cumulativeThroughDaysOut(current.points, current.edition, clampX, horizon) : currentCumulative;
+      const projectie = currentCumulative + vergelijkbaarDeel * (ratio - 1);
+      signalen.push({ id: eerder.edition.editionId, ratio, restVolume: rest, materializedFrac, projectie });
     }
   }
 
@@ -156,7 +170,7 @@ export function forecastStream(input: {
     // De lijst is hierboven al op lengte gecontroleerd, dus null kan hier niet optreden;
     // 1 als terugval betekent "geen groei aangenomen" in plaats van een projectie van nul.
     const ratio = median(ratios) ?? 1;
-    const projectedFinal = round(currentCumulative * ratio);
+    const projectedFinal = round(median(signalen.map((s) => s.projectie)) ?? currentCumulative);
     const spread = ratios.length > 1 && ratio > 0
       ? Math.round(((Math.max(...ratios) - Math.min(...ratios)) / ratio) * 1000) / 1000
       : null;

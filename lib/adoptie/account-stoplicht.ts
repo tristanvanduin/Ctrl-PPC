@@ -94,6 +94,25 @@ export function heeftStructureleForecastAfwijking(signaal: ForecastAfwijkingSign
   return laatsten.every((pct) => Math.abs(pct) >= FORECAST_AFWIJKING_PCT);
 }
 
+/**
+ * De reden met richting erin. Er stond "2+ maanden op rij 45% afwijking t.o.v. forecast", zonder
+ * teken: een account dat twee maanden 45% BOVEN zijn doel draait las als een account in nood. En
+ * de maatstaf is het maanddeel van het jaardoel (monthRatio in detecteer-code-rood.ts), geen
+ * prognose; dat heet hier dus het doeltempo.
+ */
+export function afwijkingReden(afwijkingenPct: readonly number[]): string {
+  const laatste = afwijkingenPct.at(-1) ?? 0;
+  const richting = (pct: number) => (pct >= 0 ? "boven" : "onder");
+  // Gaan de maanden niet dezelfde kant op, dan zegt de reden dat ook: "op rij 45% onder" las als
+  // een account dat wegzakt, terwijl de maand ervoor 45% boven het doel lag. Het licht blijft
+  // gelijk; grilligheid is ook een reden om te kijken.
+  const laatsten = afwijkingenPct.slice(-FORECAST_AANHOUDEND_MAANDEN);
+  if (laatsten.some((p) => richting(p) !== richting(laatste))) {
+    return `${FORECAST_AANHOUDEND_MAANDEN}+ maanden op rij ver van het doeltempo, afwisselend erboven en eronder (laatste maand ${Math.abs(laatste).toFixed(0)}% ${richting(laatste)})`;
+  }
+  return `${FORECAST_AANHOUDEND_MAANDEN}+ maanden op rij ${Math.abs(laatste).toFixed(0)}% ${richting(laatste)} het doeltempo`;
+}
+
 interface WijzigingRij {
   changeDatetime: string;
   userEmail: string | null;
@@ -146,20 +165,18 @@ export function beoordeelAccount(signalen: AccountSignalen): AccountOordeel {
   const nieuweGebruiker = signalen.nieuweGebruiker !== null;
 
   if (forecastAfwijking && nieuweGebruiker) {
-    const laatste = signalen.forecast!.afwijkingenPct.at(-1)!;
     return {
       licht: "rood",
       redenen: [
-        `${FORECAST_AANHOUDEND_MAANDEN}+ maanden op rij ${Math.abs(laatste).toFixed(0)}% afwijking t.o.v. forecast`,
+        afwijkingReden(signalen.forecast!.afwijkingenPct),
         `nieuw e-mailadres (${signalen.nieuweGebruiker!.email}) actief sinds ${signalen.nieuweGebruiker!.eersteWijziging}`,
       ],
     };
   }
   if (forecastAfwijking) {
-    const laatste = signalen.forecast!.afwijkingenPct.at(-1)!;
     return {
       licht: "amber",
-      redenen: [`${FORECAST_AANHOUDEND_MAANDEN}+ maanden op rij ${Math.abs(laatste).toFixed(0)}% afwijking t.o.v. forecast`],
+      redenen: [afwijkingReden(signalen.forecast!.afwijkingenPct)],
     };
   }
   if (nieuweGebruiker) {

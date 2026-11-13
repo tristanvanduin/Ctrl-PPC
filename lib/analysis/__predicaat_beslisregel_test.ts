@@ -1,8 +1,9 @@
 export {};
 // Verificatie van F2 4e: het gestructureerde validation_predicate en de deterministische
-// renderer. De functies zitten in monthly-structured.ts (laadt niet standalone), dus
-// getrouwe replica's; tsc bevestigde al dat de echte code compileert (0 fouten in het bestand).
+// renderer, getoetst op de echte functies uit monthly-structured.ts (hier stonden eerst kopieen).
 // Draaien: npx tsx lib/analysis/__predicaat_beslisregel_test.ts
+
+import { renderPredicate, hasMalformedDecisionRule, hasDoubleConditional } from "./monthly-structured";
 
 type ValidationPredicate = {
   metrics: string[];
@@ -17,32 +18,7 @@ function check(name: string, cond: boolean, detail = "") {
   else { failed++; console.log("  FAIL  " + name + "  " + detail); }
 }
 
-// --- Replica's exact zoals in de code ---
-function renderPredicate(predicate: ValidationPredicate): string {
-  const verbs: Record<ValidationPredicate["direction"], [string, string]> = {
-    verbetert: ["verbetert", "verbeteren"],
-    daalt: ["daalt", "dalen"],
-    stijgt: ["stijgt", "stijgen"],
-    stabiliseert: ["stabiliseert", "stabiliseren"],
-  };
-  const plural = predicate.metrics.length > 1;
-  const verb = verbs[predicate.direction][plural ? 1 : 0];
-  const connector = predicate.connector ?? "en";
-  const metricsText = predicate.metrics.length <= 1
-    ? (predicate.metrics[0] ?? "")
-    : predicate.metrics.length === 2
-      ? `${predicate.metrics[0]} ${connector} ${predicate.metrics[1]}`
-      : `${predicate.metrics.slice(0, -1).join(", ")} ${connector} ${predicate.metrics[predicate.metrics.length - 1]}`;
-  return `${metricsText} ${verb} binnen ${predicate.window}`;
-}
-function hasMalformedDecisionRule(text: string): boolean {
-  return /Continueer alleen als doorzetten alleen als|doorzetten alleen als doorzetten alleen als|ga alleen door [^.\n]*ga pas door/i.test(text);
-}
-function hasDoubleConditional(text: string): boolean {
-  return / als [^.;]{3,60} alleen [^.;]{3,60} als /i.test(text)
-    || /\balleen als\b[^.;]*\balleen als\b/i.test(text);
-}
-// de twee render-paden, predicaat-tak
+// de render-paden, predicaat-tak: de zinnen uit decisionRuleForRoute om de echte renderPredicate heen
 const recoveryRule = (p: ValidationPredicate, metric: string) =>
   `Continueer alleen als ${renderPredicate(p)}; stop de herstelroute als ${metric} niet aantoonbaar verbetert.`;
 const validationRule = (p: ValidationPredicate) =>

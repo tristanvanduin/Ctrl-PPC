@@ -1,7 +1,7 @@
 export {};
 // Verificatie van F2 4g: de hasDoubleConditional grammatica-guard en de eerlijke
-// QA-aftrek. De functies zitten in monthly-structured.ts (laadt niet standalone door
-// vele runtime-imports), dus getrouwe replica's. De kern: hasDoubleConditional vangt de
+// QA-aftrek, getoetst op de echte functies uit monthly-structured.ts (hier stonden eerst
+// kopieen). De kern: hasDoubleConditional vangt de
 // bredere dubbele-condities die build 3's hasMalformedDecisionRule (drie vaste frasen)
 // mist, en geeft geen vals alarm op legitieme regels met twee clauses.
 // Draaien: npx tsx lib/analysis/__beslisregel_guard_test.ts
@@ -12,14 +12,7 @@ function check(name: string, cond: boolean, detail = "") {
   else { failed++; console.log("  FAIL  " + name + "  " + detail); }
 }
 
-// --- Replica's exact zoals in de code ---
-function hasMalformedDecisionRule(text: string): boolean {
-  return /Continueer alleen als doorzetten alleen als|doorzetten alleen als doorzetten alleen als|ga alleen door [^.\n]*ga pas door/i.test(text);
-}
-function hasDoubleConditional(text: string): boolean {
-  return / als [^.;]{3,60} alleen [^.;]{3,60} als /i.test(text)
-    || /\balleen als\b[^.;]*\balleen als\b/i.test(text);
-}
+import { hasMalformedDecisionRule, hasDoubleConditional, scoreFinalActionability } from "./monthly-structured";
 
 // Misvormde regels uit de echte generatie-paden (zie monthly-structured.ts 2938 + condition-bronnen)
 const doubled_doorzetten = "Continueer alleen als doorzetten alleen als CVR verbetert; stop of schaal af als de metric uitblijft.";
@@ -54,14 +47,13 @@ check("legit containment niet gevlagd", !hasDoubleConditional(legit_containment)
 check("twee legitieme 'alleen als'-clauses over ; heen niet gevlagd",
   !hasDoubleConditional("Continueer alleen als CVR verbetert; schaal alleen als ROAS stabiel blijft."));
 
-// --- Replica van scoreFinalActionability met de 4g-aftrek ---
-function scoreActionability(rules: string[]): number {
-  let score = 9.2;
-  // (aantallen-checks weggelaten; we isoleren de beslisregel-aftrek)
-  const doubleHits = rules.filter((r) => hasDoubleConditional(r)).length;
-  score -= doubleHits * 1.0;
-  return Math.max(0, Math.min(10, Number(score.toFixed(1))));
-}
+// De echte scoreFinalActionability. De regels gaan als aanbevelingen erin, met vier nette taken
+// ernaast, zodat de aantallen-aftrek niet meetelt en alleen de beslisregels het verschil maken.
+type Aanbevelingen = Parameters<typeof scoreFinalActionability>[0];
+type Taken = Parameters<typeof scoreFinalActionability>[1];
+const netteTaken = Array.from({ length: 4 }, (_, i) => ({ handeling: `Sluit zoekterm ${i} uit`, beslisregel: legit_recovery })) as unknown as Taken;
+const scoreActionability = (rules: string[]): number =>
+  scoreFinalActionability(rules.map((beslisregel) => ({ beslisregel })) as unknown as Aanbevelingen, netteTaken);
 
 console.log("\n3. De eerlijke QA-aftrek reageert op dubbele condities");
 {
@@ -71,7 +63,9 @@ console.log("\n3. De eerlijke QA-aftrek reageert op dubbele condities");
   console.log("     schoon: " + cleanScore + "  een dubbel: " + oneDoubled + "  twee dubbel: " + twoDoubled);
   check("schone set scoort hoog (9.2)", cleanScore === 9.2);
   check("een dubbele conditie kost precies 1.0", oneDoubled === 8.2);
-  check("twee dubbele condities kosten 2.0", twoDoubled === 7.2);
+  // De kopie die hier stond liet de aftrek van hasMalformedDecisionRule weg en kwam op 7.2 uit. De
+  // echte functie trekt voor doubled_doorzetten ook die 0.8 af: 9.2 - 2.0 - 0.8 = 6.4.
+  check("twee dubbele condities kosten 2.0, plus 0.8 voor de vaste misvormde frase", twoDoubled === 6.4, "kreeg " + twoDoubled);
   check("een dubbele regel die build 3 zou missen, drukt de score nu wel", oneDoubled < cleanScore);
 }
 

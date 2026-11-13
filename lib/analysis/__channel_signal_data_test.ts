@@ -40,7 +40,10 @@ console.log("meta-shaper:");
   const inputs = shapeMetaAdInputs(rows, new Map([["a", { adName: "Ad A", campaignName: "Camp" }]]));
   assert(inputs.length === 1 && inputs[0].adName === "Ad A", "één ad, naam geresolved");
   close(inputs[0].linkCtr, 50 / 4000, "CTR uit venstertotalen (niet gemiddelde van dagen)");
-  close(inputs[0].frequency, (2 * 1000 + 4 * 3000) / 4000, "frequency impressie-gewogen");
+  // De dagfrequentie mag niet als periodefrequentie doorgaan: zonder periode-rij is frequency
+  // null (de detector meldt dan "niet te beoordelen"), de dagwaarde staat apart als toelichting.
+  assert(inputs[0].frequency === null, "frequency is null zonder periode-rij");
+  close(inputs[0].dailyFrequency ?? null, (2 * 1000 + 4 * 3000) / 4000, "dagfrequentie impressie-gewogen");
   close(inputs[0].hookRate, (0.3 * 1000 + 0.1 * 3000) / 4000, "hook-rate impressie-gewogen");
   close(inputs[0].cpa, 300 / 10, "CPA uit venstertotalen");
   close(inputs[0].prevLinkCtr ?? null, 50 / 1000, "prior-CTR uit prior-venster");

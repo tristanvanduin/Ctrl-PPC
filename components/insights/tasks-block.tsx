@@ -445,7 +445,7 @@ export function TasksBlock({ clientId, selectedInsightId, refreshKey, channel }:
             {CADENCE_CONFIG[c].icon}
             {CADENCE_CONFIG[c].label}
             {c === "actions" && (dynamicCount + aiTasks.length) > 0 && cadence === "actions" && (
-              <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-micro font-bold rounded-full flex items-center justify-center">
+              <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white dark:text-red-50 text-micro font-bold rounded-full flex items-center justify-center">
                 {dynamicCount + aiTasks.length}
               </span>
             )}

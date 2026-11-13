@@ -31,6 +31,7 @@
 
 import { readFileSync } from "node:fs";
 import { sql } from "./supabase-sql.mjs";
+import { slaOver, Overslaan } from "./poort-overslaan.mjs";
 
 let env = "";
 try { env = readFileSync(".env.local", "utf8"); } catch { /* dan de omgeving zelf */ }
@@ -41,10 +42,7 @@ const url = lees("NEXT_PUBLIC_SUPABASE_URL") ?? lees("SUPABASE_URL");
 const svc = lees("SUPABASE_SERVICE_ROLE_KEY") ?? lees("SUPABASE_SECRET_KEY");
 const token = lees("SUPABASE_ACCESS_TOKEN");
 
-if (!url || !svc || !token) {
-  console.log("bureaugrens: overgeslagen (geen service-sleutel of project-URL).");
-  process.exit(0);
-}
+if (!url || !svc || !token) slaOver("bureaugrens", "geen service-sleutel of project-URL");
 
 const EMAIL = "poort-bureaugrens@voorbeeld.invalid";
 const kop = { apikey: svc, Authorization: `Bearer ${svc}`, "Content-Type": "application/json" };
@@ -61,14 +59,12 @@ const bureaus = await sql(`
   where exists (select 1 from accounts ac where ac.agency_id = a.id)
   order by a.name`);
 
-if (bureaus.length < 2) {
-  console.log(`bureaugrens: overgeslagen (${bureaus.length} bureau(s) met accounts; er zijn er twee nodig).`);
-  process.exit(0);
-}
+if (bureaus.length < 2) slaOver("bureaugrens", `${bureaus.length} bureau(s) met accounts; er zijn er twee nodig`);
 
 const [eigen, ander] = bureaus;
 let id = null;
 let fouten = 0;
+let overgeslagen = null;
 
 try {
   const maak = await adminApi("", {
@@ -76,10 +72,7 @@ try {
     body: JSON.stringify({ email: EMAIL, password: crypto.randomUUID(), email_confirm: true }),
   });
   id = maak.body?.id;
-  if (!id) {
-    console.log(`bureaugrens: kon geen proefgebruiker maken (${maak.status}). Overgeslagen.`);
-    process.exit(0);
-  }
+  if (!id) throw new Overslaan(`kon geen proefgebruiker maken (${maak.status})`);
 
   await sql(`insert into user_roles (user_id, role) values ('${id}', 'performance_marketeer')
              on conflict (user_id) do update set role = excluded.role`);
@@ -107,6 +100,9 @@ try {
     "dit is het lek: rolgebonden toegang zonder bureaugrens");
   eis("is niet per ongeluk platformbeheerder", r.platform === false,
     "platformbeheer hoort expliciet te zijn, nooit een bijwerking van een rol");
+} catch (e) {
+  if (!(e instanceof Overslaan)) throw e;
+  overgeslagen = e.reden;
 } finally {
   if (id) {
     await sql(`delete from user_agencies where user_id = '${id}'`);
@@ -114,6 +110,7 @@ try {
     await adminApi(`/${id}`, { method: "DELETE" });
   }
 }
+if (overgeslagen) slaOver("bureaugrens", overgeslagen);
 
 if (fouten === 0) {
   console.log("\n  OK  de bureaugrens houdt.");

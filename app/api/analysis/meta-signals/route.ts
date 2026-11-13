@@ -30,7 +30,7 @@ import { buildTrackingGapSignals, type TrackingGapRow } from "@/lib/signals/trac
 import { buildHourlyDaypartingSignals, type HourlyRow } from "@/lib/signals/hourly-dayparting";
 import { renderSignalSection } from "@/lib/signals/render-section";
 import { mergeDetections } from "@/lib/signals/types";
-import { shapeMetaAdInputs, shapeMetaLevelInputs, splitWindows, type MetaDailyRow } from "@/lib/analysis/channel-signal-data";
+import { shapeMetaAdInputs, shapeMetaLevelInputs, splitWindows, type MetaDailyRow, type MetaPeriodRow } from "@/lib/analysis/channel-signal-data";
 import { saveSignalHypotheses } from "@/lib/analysis/signals-to-hypotheses";
 import { today, addDays } from "@/lib/reporting-date";
 import { supabaseForClient } from "@/lib/demo/server-supabase";
@@ -81,7 +81,7 @@ export async function POST(request: NextRequest) {
 
   try {
   const since = addDays(today(), -FETCH_DAYS);
-  const [adFetch, campFetch, adNamesRes, campNamesRes, breakdownFetch, accountRes, hourlyRes] = await Promise.all([
+  const [adFetch, campFetch, adNamesRes, campNamesRes, breakdownFetch, accountRes, hourlyRes, periodRes] = await Promise.all([
     alleRijen<MetaDailyRow>(
       (van, tot) => supabase
         .from("meta_ad_daily")
@@ -134,6 +134,15 @@ export async function POST(request: NextRequest) {
       .eq("client_id", clientId)
       .gte("date", since)
       .limit(1000),
+    // De periodelezing (migratie 110). Bewust NIET via eis(): zolang de migratie niet gedraaid
+    // is bestaat de tabel niet, en dat hoort de detector als "frequentie niet te beoordelen" te
+    // melden, niet de hele route te laten falen.
+    supabase
+      .from("meta_period_reach")
+      .select("level, entity_id, period_start, period_end, impressions, reach")
+      .eq("client_id", clientId)
+      .gte("period_end", since)
+      .limit(2000),
   ]);
 
   const adRows = adFetch.rijen;
@@ -151,8 +160,9 @@ export async function POST(request: NextRequest) {
   );
   const levelNames = new Map([...campName.entries()].map(([id, name]) => [id, { adName: name }]));
 
-  const ads = shapeMetaAdInputs(adRows, adNames);
-  const levels = shapeMetaLevelInputs(campRows, levelNames);
+  const periodRows = periodRes.error ? [] : ((periodRes.data ?? []) as (MetaPeriodRow & { level?: string })[]);
+  const ads = shapeMetaAdInputs(adRows, adNames, periodRows.filter((p) => p.level === "ad"));
+  const levels = shapeMetaLevelInputs(campRows, levelNames, periodRows.filter((p) => p.level === "campaign"));
   // Structuur naast creative: waar landt het budget binnen plaatsing/leeftijd/device en
   // converteert dat mee (segment-waste + schaalkansen).
   const num = (v: unknown): number => (typeof v === "number" && Number.isFinite(v) ? v : 0);
@@ -240,6 +250,7 @@ export async function POST(request: NextRequest) {
     dekking: {
       laatsteDataDatum,
       uurdata: metaHourlyRows.length > 0,
+      periodeBereik: periodRows.length > 0,
       rijenAfgekapt: adFetch.afgekapt || campFetch.afgekapt || breakdownFetch.afgekapt,
     },
   });

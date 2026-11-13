@@ -1,5 +1,6 @@
 "use client";
 
+import { getoondeIce, sorteerOpIce } from "@/lib/ice-score";
 import { useState, useEffect } from "react";
 import { Lightbulb, ChevronDown, ChevronUp } from "lucide-react";
 import { useClientHistoricalData, useClientDataState, useForecast } from "@/lib/client-data-provider";
@@ -336,8 +337,10 @@ export function RecommendationsBlock({
       select: "id, insight_id, hypothesis, expected_result, measurement_metric, timeframe, ice_impact, ice_confidence, ice_ease, ice_total, sop_type",
       clientId,
       filters: [{ op: "notNull", column: "insight_id" }],
-      order: { column: "ice_total", ascending: false }, limit: 20,
-    }).then(({ data: rows }) => setDbRecs(rows));
+      // Ruimer ophalen en hier sorteren: de database sorteert op het opgeslagen totaal, en dat past
+      // niet altijd bij de drie delen (lib/ice-score.ts). Daarna de top 20 op het getoonde totaal.
+      order: { column: "ice_total", ascending: false }, limit: 100,
+    }).then(({ data: rows }) => setDbRecs(sorteerOpIce(rows).slice(0, 20)));
   }, [clientId, refreshKey]);
 
   // Kanaal-filter via de sop_type van de analyse die de aanbeveling schreef.
@@ -384,7 +387,7 @@ export function RecommendationsBlock({
               <div className="flex items-center gap-2 mb-2">
                 <Lightbulb className="w-4 h-4 text-brand-orange-ink shrink-0" />
                 <span className="text-micro font-bold uppercase px-1.5 py-0.5 rounded bg-brand-blue/10 text-brand-blue-ink">
-                  ICE {rec.ice_total}
+                  ICE {getoondeIce(rec) ?? "—"}
                 </span>
                 <span className="text-micro text-muted-foreground">
                   I:{rec.ice_impact} C:{rec.ice_confidence} E:{rec.ice_ease}

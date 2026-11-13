@@ -4,7 +4,7 @@ import { useMemo } from "react";
 import { Activity, AlertTriangle } from "lucide-react";
 import { useClientDataState, useForecast } from "@/lib/client-data-provider";
 import { computeForecast } from "@/lib/forecast";
-import { computeHealthScore, zonderKanaalSpecifiekeHygiene, type HealthScore, type HealthFactor } from "@/lib/health-score";
+import { googleHealthScore, type HealthScore, type HealthFactor } from "@/lib/health-score";
 import { useBlendedClientData, type PerKanaalTab } from "@/lib/use-blended-client-data";
 import { KANAAL_NAAM, KANAAL_KLEUR, type Kanaal } from "@/lib/kanalen/beschikbaar";
 import { Laadvlak } from "@/components/ui/laadvlak";
@@ -137,19 +137,18 @@ export function KanaalHealthRanking({ clientId, kanalen, onderbouwingAchterKlik 
   // Google uit de provider die de pagina toch al vult. useClientDataState en niet
   // useClientHistoricalData: die laatste gooit buiten een provider, en dan nam één ontbrekende
   // Google-bron de scores van de andere kanalen mee.
-  const googleData = useClientDataState()?.data ?? null;
+  const googleStaat = useClientDataState();
+  const googleData = googleStaat?.data ?? null;
   const googleForecast = useForecast();
   const heeftGoogle = kanalen.includes("google");
   const googleHealth = useMemo(() => {
     if (!heeftGoogle) return null;
     const forecast = googleForecast ?? (googleData ? computeForecast(googleData) : null);
-    // Zonder de Google-specifieke hygiëne-argumenten (impressionShare, zoektermen, ad groups):
-    // die zijn hier niet beschikbaar en computeHealthScore zou die factor dan stilzwijgend vol
-    // punten geven. Dezelfde correctie die de hook voor de dagkanalen doet (KanaalTab.health) --
-    // en juist hier moet hij, want anders scoort Google hoger dan de rest om een reden die
-    // niets met het account te maken heeft.
-    return forecast ? zonderKanaalSpecifiekeHygiene(computeHealthScore(forecast)) : null;
-  }, [heeftGoogle, googleForecast, googleData]);
+    // Dezelfde aanroep als het Google-tabblad (googleHealthScore): Hygiëne telt mee als de
+    // verspillingsdata er is, en staat op "niet beoordeeld" als die ontbreekt. Hier werd hij er
+    // altijd uit gehaald, en dan had Google in de ranking 57 en op zijn eigen tabblad 66.
+    return forecast ? googleHealthScore(forecast, googleStaat) : null;
+  }, [heeftGoogle, googleForecast, googleData, googleStaat]);
 
   // Hetzelfde verzoek als de KPI-band en het tabblad eromheen (de hook deelt en bewaart het).
   // Alleen als er een dagkanaal in de lijst staat: Google alleen heeft de route niet nodig.

@@ -37,6 +37,12 @@ export interface KerncijferDelta {
   leegTekst?: string;
   /** De vorige waarde in woorden ("€ 57", "2,41×"): bij een verhouding zegt een percentage alleen weinig. */
   was?: string;
+  /**
+   * De huidige waarde van het deel waarover het percentage gaat, als dat niet het grote getal is
+   * (lib/period/vergelijkbaar-deel.ts). Dan staat er "vergelijkbaar deel € 109, was € 96": anders
+   * leest "€ 57, +14%, was € 96" als een rekenfout.
+   */
+  nu?: string;
 }
 
 /**
@@ -48,13 +54,18 @@ export interface KerncijferDelta {
  */
 export type DeltaVorm = "regel" | "pil";
 
+/** "was € 96", of "vergelijkbaar deel € 109, was € 96" als het percentage over een deel gaat. */
+export function wasTekst(was: string, nu?: string): string {
+  return nu ? `vergelijkbaar deel ${nu}, was ${was}` : `was ${was}`;
+}
+
 /**
  * De verandering onder het getal. Dit is wat er bewoog, en het stond in de kleinste letter van de
  * pagina (10 px) in een groen dat op die maat 3,2:1 haalde. Nu een maat groter (text-body, 12 px),
  * met icoon en teken, in groen-700 en rood-700, en met een woord voor wie geen kleur ziet.
  * Vanaf tien procent zonder decimaal: "+15%" leest, "+15,3%" telt.
  */
-function Delta({ pct, hogerIsBeter = true, waartegen, leegTekst, was, vorm = "regel" }: KerncijferDelta & { vorm?: DeltaVorm }) {
+function Delta({ pct, hogerIsBeter = true, waartegen, leegTekst, was, nu, vorm = "regel" }: KerncijferDelta & { vorm?: DeltaVorm }) {
   if (pct === null) {
     return (
       <span className="text-body text-muted-foreground">
@@ -83,7 +94,7 @@ function Delta({ pct, hogerIsBeter = true, waartegen, leegTekst, was, vorm = "re
           <span>{getal}</span>
         </span>
         <span className="sr-only">{vlak ? "vrijwel gelijk" : goed ? "gunstig" : "ongunstig"}</span>
-        {was && <span className="text-muted-foreground">was {was}</span>}
+        {was && <span className="text-muted-foreground">{wasTekst(was, nu)}</span>}
         {waartegen && <span className="text-muted-foreground">{waartegen}</span>}
       </span>
     );
@@ -93,7 +104,7 @@ function Delta({ pct, hogerIsBeter = true, waartegen, leegTekst, was, vorm = "re
       <Icoon className="h-3.5 w-3.5 shrink-0" aria-hidden />
       <span>{getal}</span>
       <span className="sr-only">{vlak ? "vrijwel gelijk" : goed ? "gunstig" : "ongunstig"}</span>
-      {was && <span className="font-normal text-muted-foreground">was {was}</span>}
+      {was && <span className="font-normal text-muted-foreground">{wasTekst(was, nu)}</span>}
       {waartegen && <span className="font-normal text-muted-foreground">{waartegen}</span>}
     </span>
   );
