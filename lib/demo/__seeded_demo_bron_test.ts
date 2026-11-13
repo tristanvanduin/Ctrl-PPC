@@ -160,7 +160,7 @@ async function main() {
 
     const hook = zonderCommentaar(lees("lib/use-client-data.ts"));
     check("hook: geen localStorage-kopie van de conversieselectie meer", !/localStorage/.test(hook) && !/conversionActionIds/.test(hook));
-    check("hook: zet de datastand op de data", /dataStand:\s*apiData\.dataStand/.test(hook));
+    check("hook: zet de datastand op de data", /dataStand:\s*\(?apiData\.dataStand/.test(hook));
     check("hook: de cache blijft op clientId", /cache\.set\(clientId,/.test(hook) && /cache\.get\(clientId\)/.test(hook));
 
     const portfolio = zonderCommentaar(lees("components/portfolio/portfolio-scoreboard.tsx"));

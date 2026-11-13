@@ -34,6 +34,7 @@ import { today } from "@/lib/reporting-date";
 import { kanaalScores } from "./kanaal-health-ranking";
 import { Kanaalkaarten, KAARTENRIJ_HOOGTE, type KaartHealth, type Kanaalkaart } from "./kanaalkaarten";
 import { PeriodSummary } from "./period-summary";
+import { BandUitZaad, type BandZaad } from "./band-uit-zaad";
 import { OverzichtHoofdgrafiek } from "./overzicht-hoofdgrafiek";
 import { OverzichtLogboek } from "./overzicht-logboek";
 
@@ -78,7 +79,7 @@ function useGoogleHealth(clientId: string, googleData: ClientHistoricalData | nu
   return { health, laadt: aan && (!googleData || !klaar) };
 }
 
-function OverzichtBovenkantRuw({ clientId, channel, kanalen, onKies, onBeoordeel, googleData, googleStaat, route, band, bandKlaar, demo, reserveerKaarten = false }: {
+function OverzichtBovenkantRuw({ clientId, channel, kanalen, onKies, onBeoordeel, googleData, googleStaat, route, band, bandKlaar, demo, reserveerKaarten = false, bandZaad = null }: {
   clientId: string;
   /** Wat er getoond wordt: een kanaal, of "blended" voor alle kanalen. */
   channel: Kanaalkeuze;
@@ -108,6 +109,11 @@ function OverzichtBovenkantRuw({ clientId, channel, kanalen, onKies, onBeoordeel
    * (dezelfde reden als de gereserveerde kanaalbalk in de vertrouwde weergave).
    */
   reserveerKaarten?: boolean;
+  /**
+   * De kerncijfers die de server al uit het zaad rekende (band-uit-zaad.tsx): die staan in de
+   * tegels zolang de band laadt. Null: het laadvlak, zoals altijd.
+   */
+  bandZaad?: BandZaad | null;
 }) {
   const periode = usePeriod();
   const lijst = useMemo(() => ALLE_KANALEN.filter((k) => (kanalen ?? []).includes(k)), [kanalen]);
@@ -115,8 +121,19 @@ function OverzichtBovenkantRuw({ clientId, channel, kanalen, onKies, onBeoordeel
   const google = useGoogleHealth(clientId, googleData, googleStaat, lijst.includes("google"), route.perKanaalTab, kanalen);
 
   // De opbouw van het eerste bezoek begint pas als de cijfers er staan; een laadvlak bouwt niet op.
+  // En niet als het dashboard bij de eerste render zaad aanbood (bandZaad): dan stonden de
+  // cijfers al in de HTML, vóór het script, en een opbouw zou ze laten verdwijnen en opnieuw
+  // binnenkomen. Dat wordt HIER bepaald, bij de eerste render, en niet in een effect binnen de
+  // Suspense-grens van het zaad: duurt de stroom van de server langer dan het script (een live
+  // klant wacht op de Google Ads API), dan kan de hook eerder klaar zijn dan de grens hydrateert, en
+  // vervangt de echte band de grens zonder dat zijn effect ooit loopt. Dan speelde de opbouw over
+  // cijfers die er al stonden. De prijs: bood het dashboard zaad aan dat niets bruikbaars droeg (een
+  // fout van een route), dan komen de cijfers na het laadvlak binnen zonder opbouw. Een gemiste
+  // versiering, geen ander getal. Per klant, zoals het zaad zelf.
+  const [zaadVoorKlant] = useState(() => (bandZaad ? clientId : null));
+  const zaadAangeboden = zaadVoorKlant === clientId;
   const inhoudKlaar = bandKlaar && band.data !== null;
-  const { speel, klaar } = useEersteOpbouw(inhoudKlaar);
+  const { speel, klaar } = useEersteOpbouw(inhoudKlaar && !zaadAangeboden);
 
   const cijfers = useMemo(
     () => (bandKlaar ? kaartCijfers(band.perKanaal, lijst, periode.range) : null),
@@ -185,7 +202,8 @@ function OverzichtBovenkantRuw({ clientId, channel, kanalen, onKies, onBeoordeel
         <div className={`${KAARTENRIJ_HOOGTE} rounded-xl bg-muted/40`} aria-hidden />
       ) : null}
       <div className={speel ? "opbouw" : undefined} style={stap(voor)}>
-        <PeriodSummary data={bandKlaar ? band.data : null} bronnen={band.bronnen} laden={!bandKlaar} vorm="tegels" />
+        <PeriodSummary data={bandKlaar ? band.data : null} bronnen={band.bronnen} laden={!bandKlaar} vorm="tegels"
+          zolangLaden={bandZaad && <BandUitZaad zaad={bandZaad} vorm="tegels" />} />
       </div>
       {/* De grafiek en het logboek naast elkaar (8 en 4 van de 12 kolommen); op een telefoon onder
           elkaar met het logboek EERST: wat er gebeurde lees je voor je het verloop bekijkt.

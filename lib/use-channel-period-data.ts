@@ -172,7 +172,7 @@ export function meldKanaalselectieOpgeslagen(clientId: string): void {
 }
 
 /** Een kanaal zoals de band het bewaart: de stand plus tot waar terug hij geladen is. */
-type GeladenKanaal = KanaalStand & { geladenVanaf: Month };
+export type GeladenKanaal = KanaalStand & { geladenVanaf: Month };
 
 /** Wat de band van de blended route leest: de maandreeks per kanaal en de stand van de bronnen. */
 export type BandRoute = Pick<BlendedClientDataState, "perKanaal" | "dataStand" | "loading" | "error">;
@@ -212,6 +212,82 @@ export function kanaalStandUitRoute(clientId: string, kanaal: NietGoogleKanaal, 
     reeks?.vanaf ?? null,
   );
   return { ...stand, geladenVanaf: HELE_HISTORIE_GELADEN_VANAF };
+}
+
+/** De drie dagkanalen uit één routeantwoord, elk door kanaalStandUitRoute. */
+export function kanalenUitRoute(clientId: string, route: Pick<BandRoute, "perKanaal" | "dataStand">): Record<NietGoogleKanaal, GeladenKanaal> {
+  const uit = {} as Record<NietGoogleKanaal, GeladenKanaal>;
+  for (const kanaal of NIET_GOOGLE) uit[kanaal] = kanaalStandUitRoute(clientId, kanaal, { perKanaal: route.perKanaal, dataStand: route.dataStand, loading: false, error: null });
+  return uit;
+}
+
+/** Wat de band uit de vier kanalen bouwt; een kanaal dat nog laadt is null. */
+export interface BandKanalen {
+  googleData: ClientHistoricalData | null;
+  meta: GeladenKanaal | null;
+  linkedin: GeladenKanaal | null;
+  microsoft: GeladenKanaal | null;
+}
+
+/**
+ * Google's laadgrens: /api/google-ads/client-data haalt vanaf 1 januari, HISTORIE_JAREN jaar vóór
+ * het jaar van het antwoord. Zonder die grens "begon" een account dat al sinds 2015 loopt in
+ * januari 2021, en zei de band over 2020 "de data begint in januari 2021" en "nieuw in deze
+ * periode", of op Alle kanalen "Google Ads (sinds januari 2021) ... liep het nog niet". De
+ * demoroute haalt de hele historie; daar is dit een ondergrens, en zegt de band over wat ervóór
+ * ligt alleen dat hij het niet heeft, niet dat het leeg was.
+ */
+export function googleLaadgrens(googleData: ClientHistoricalData | null): Month | null {
+  return googleData ? `${googleData.currentYear - HISTORIE_JAREN}-01` : null;
+}
+
+/**
+ * Elk kanaal één keer als bron (bouwplan fase 3): de band op "Alle kanalen", de kanaalkaarten en
+ * de hoofdgrafiek lezen dezelfde objecten. Google is een maandbron zonder dagen: daar is de
+ * eerste maand met data de start.
+ */
+export function bandPerKanaal({ googleData, meta, linkedin, microsoft }: BandKanalen): Partial<Record<Kanaal, BronReeks>> {
+  const uit: Partial<Record<Kanaal, BronReeks>> = {};
+  if (googleData) uit.google = alsBronReeks("google", googleData, null, googleLaadgrens(googleData));
+  if (meta) uit.meta = alsBronReeks("meta", meta.data, meta.vanaf, meta.geladenVanaf);
+  if (linkedin) uit.linkedin = alsBronReeks("linkedin", linkedin.data, linkedin.vanaf, linkedin.geladenVanaf);
+  if (microsoft) uit.microsoft = alsBronReeks("microsoft", microsoft.data, microsoft.vanaf, microsoft.geladenVanaf);
+  return uit;
+}
+
+/**
+ * De reeks en de bronnen van de band voor het gekozen kanaal. Zuiver en los van de hook, zodat de
+ * kerncijfers die de server al in de HTML zet (components/dashboard/band-uit-zaad.tsx) door
+ * precies deze stappen gaan en niet door een tweede optelling.
+ *
+ * @param perKanaal bandPerKanaal van dezelfde kanalen: op "Alle kanalen" zijn de bronnen
+ *   DEZELFDE objecten, zodat de kaarten en de grafiek op dezelfde maandcijfers staan.
+ */
+export function bandKeuze(clientId: string, channel: ChannelPeriodDataArgs["channel"], kanalen: BandKanalen, perKanaal: Partial<Record<Kanaal, BronReeks>>): Pick<ChannelPeriodData, "data" | "bronnen"> {
+  const { googleData, meta, linkedin, microsoft } = kanalen;
+  // Eén kanaal: de data plus één bron met zijn eerste volle maand en laadgrens. "totaal" en geen
+  // kanaalnaam: de band noemt bij één bron geen kanaal (ongepaardTekst in period-summary.tsx).
+  const los = (s: GeladenKanaal | null): Pick<ChannelPeriodData, "data" | "bronnen"> =>
+    (s ? { data: s.data, bronnen: [alsBronReeks("totaal", s.data, s.vanaf, s.geladenVanaf)] } : { data: null, bronnen: null });
+  if (channel === "google") return { data: googleData, bronnen: googleData ? [alsBronReeks("totaal", googleData, null, googleLaadgrens(googleData))] : null };
+  if (channel === "meta") return los(meta);
+  if (channel === "linkedin") return los(linkedin);
+  if (channel === "microsoft") return los(microsoft);
+  // blended: pas tonen zodra alle kanalen binnen zijn -- anders telt een half-geladen kanaal als
+  // nul mee, en dat leest als "dit kanaal presteert niet" in plaats van "nog aan het laden".
+  if (!googleData || !meta || !linkedin || !microsoft) return { data: null, bronnen: null };
+  // De losse kanalen gaan mee, zodat de vergelijking per kanaal kan paren: een kanaal dat in de
+  // vergelijkingsperiode nog niet liep, telde in de optelling anders als groei. Dezelfde objecten
+  // als `perKanaal` (alle vier staan er, want alle vier de bronnen zijn binnen).
+  return {
+    data: samenvoegen(clientId, [googleData, meta.data, linkedin.data, microsoft.data]),
+    bronnen: [perKanaal.google!, perKanaal.meta!, perKanaal.linkedin!, perKanaal.microsoft!],
+  };
+}
+
+/** Per niet-Google-kanaal de laatste dag met een rij, voor het venster van de band. */
+export function bandLaatsteDag({ meta, linkedin, microsoft }: BandKanalen): Record<NietGoogleKanaal, string | null> {
+  return { meta: meta?.laatsteDag ?? null, linkedin: linkedin?.laatsteDag ?? null, microsoft: microsoft?.laatsteDag ?? null };
 }
 
 /** De juiste data voor de KPI-rij, gegeven het actieve kanaal. */
@@ -279,9 +355,7 @@ export function useChannelPeriodData({ clientId, channel, googleData, route }: C
   const routeStand = route.dataStand;
   const uitRoute = useMemo((): Partial<Record<NietGoogleKanaal, GeladenKanaal>> | null => {
     if (!routeKlaar) return null;
-    const uit: Partial<Record<NietGoogleKanaal, GeladenKanaal>> = {};
-    for (const kanaal of NIET_GOOGLE) uit[kanaal] = kanaalStandUitRoute(clientId, kanaal, { perKanaal: routePerKanaal, dataStand: routeStand, loading: false, error: null });
-    return uit;
+    return kanalenUitRoute(clientId, { perKanaal: routePerKanaal, dataStand: routeStand });
   }, [routeKlaar, routePerKanaal, routeStand, clientId]);
 
   // De route gaat voor; de eigen rijen alleen in de terugvalweg. Een kanaal dat de terugvalweg al
@@ -291,45 +365,15 @@ export function useChannelPeriodData({ clientId, channel, googleData, route }: C
   const linkedin = kanalen?.linkedin ?? null;
   const microsoft = kanalen?.microsoft ?? null;
 
-  // Google's laadgrens: /api/google-ads/client-data haalt vanaf 1 januari, HISTORIE_JAREN jaar vóór
-  // het jaar van het antwoord. Zonder die grens "begon" een account dat al sinds 2015 loopt in
-  // januari 2021, en zei de band over 2020 "de data begint in januari 2021" en "nieuw in deze
-  // periode", of op Alle kanalen "Google Ads (sinds januari 2021) ... liep het nog niet". De
-  // demoroute haalt de hele historie; daar is dit een ondergrens, en zegt de band over wat ervóór
-  // ligt alleen dat hij het niet heeft, niet dat het leeg was.
-  const googleGeladen = googleData ? `${googleData.currentYear - HISTORIE_JAREN}-01` : null;
-  // Elk kanaal één keer als bron (bouwplan fase 3): de band op "Alle kanalen", de kanaalkaarten en
-  // de hoofdgrafiek lezen dezelfde objecten. Google is een maandbron zonder dagen: daar is de
-  // eerste maand met data de start.
-  const perKanaal = useMemo((): Partial<Record<Kanaal, BronReeks>> => {
-    const uit: Partial<Record<Kanaal, BronReeks>> = {};
-    if (googleData) uit.google = alsBronReeks("google", googleData, null, googleGeladen);
-    if (meta) uit.meta = alsBronReeks("meta", meta.data, meta.vanaf, meta.geladenVanaf);
-    if (linkedin) uit.linkedin = alsBronReeks("linkedin", linkedin.data, linkedin.vanaf, linkedin.geladenVanaf);
-    if (microsoft) uit.microsoft = alsBronReeks("microsoft", microsoft.data, microsoft.vanaf, microsoft.geladenVanaf);
-    return uit;
-  }, [googleData, googleGeladen, meta, linkedin, microsoft]);
-
-  const keuze = useMemo((): Pick<ChannelPeriodData, "data" | "bronnen"> => {
-    // Eén kanaal: de data plus één bron met zijn eerste volle maand en laadgrens. "totaal" en geen
-    // kanaalnaam: de band noemt bij één bron geen kanaal (ongepaardTekst in period-summary.tsx).
-    const los = (s: GeladenKanaal | null): Pick<ChannelPeriodData, "data" | "bronnen"> =>
-      (s ? { data: s.data, bronnen: [alsBronReeks("totaal", s.data, s.vanaf, s.geladenVanaf)] } : { data: null, bronnen: null });
-    if (channel === "google") return { data: googleData, bronnen: googleData ? [alsBronReeks("totaal", googleData, null, googleGeladen)] : null };
-    if (channel === "meta") return los(meta);
-    if (channel === "linkedin") return los(linkedin);
-    if (channel === "microsoft") return los(microsoft);
-    // blended: pas tonen zodra alle kanalen binnen zijn -- anders telt een half-geladen kanaal als
-    // nul mee, en dat leest als "dit kanaal presteert niet" in plaats van "nog aan het laden".
-    if (!googleData || !meta || !linkedin || !microsoft) return { data: null, bronnen: null };
-    // De losse kanalen gaan mee, zodat de vergelijking per kanaal kan paren: een kanaal dat in de
-    // vergelijkingsperiode nog niet liep, telde in de optelling anders als groei. Dezelfde objecten
-    // als `perKanaal` hierboven (alle vier staan er, want alle vier de bronnen zijn binnen).
-    return {
-      data: samenvoegen(clientId, [googleData, meta.data, linkedin.data, microsoft.data]),
-      bronnen: [perKanaal.google!, perKanaal.meta!, perKanaal.linkedin!, perKanaal.microsoft!],
-    };
-  }, [channel, clientId, googleData, googleGeladen, meta, linkedin, microsoft, perKanaal]);
+  // Elk kanaal één keer als bron, en de keuze daaruit: bandPerKanaal en bandKeuze hierboven.
+  const perKanaal = useMemo(
+    () => bandPerKanaal({ googleData, meta, linkedin, microsoft }),
+    [googleData, meta, linkedin, microsoft],
+  );
+  const keuze = useMemo(
+    () => bandKeuze(clientId, channel, { googleData, meta, linkedin, microsoft }, perKanaal),
+    [channel, clientId, googleData, meta, linkedin, microsoft, perKanaal],
+  );
 
   const mDag = meta?.laatsteDag ?? null;
   const lDag = linkedin?.laatsteDag ?? null;

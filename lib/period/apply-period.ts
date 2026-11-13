@@ -180,6 +180,15 @@ export const heeftData = (m: Totalen | undefined): boolean =>
   !!m && !!(m.conversions || m.revenue || m.adSpend);
 
 /**
+ * Wat het Google-antwoord over de kanalen van de klant zegt (kanalenUitBronnen): een maand met
+ * data, of null als er geen antwoord is. Eén regel voor het klantdashboard en voor de kerncijfers
+ * uit het zaad (components/dashboard/band-uit-zaad.tsx).
+ */
+export function googleHeeftData(googleData: ClientHistoricalData | null): boolean | null {
+  return googleData ? flattenMonths(googleData).some(heeftData) : null;
+}
+
+/**
  * Maand i van de periode tegen maand i van de vergelijking, per bron.
  *
  * WAAROM PER BRON EN NIET OP DE OPTELLING

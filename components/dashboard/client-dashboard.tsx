@@ -6,7 +6,7 @@ import { Database, BarChart3, Settings, Target, AlertTriangle, Wifi, FlaskConica
 import { SyncStatusBadge } from "./sync-status-badge";
 import { PaginaLaadvlak } from "@/components/ui/laadvlak";
 import { getClientSettings, zaaiClientSettingsRij, type ClientSettingsRow } from "@/lib/client-settings";
-import type { Zaad } from "@/lib/overzicht/zaadbak";
+import { zaadNogVers, type Zaad } from "@/lib/overzicht/zaadbak";
 import { SecondOpinionView } from "./second-opinion-view";
 import { AnalysisOverview } from "./analysis-overview";
 import { useUpcomingEdition } from "@/lib/fair/use-upcoming-edition";
@@ -30,7 +30,7 @@ import {
 import { GEO_PARAM, leesAdresbalk, schrijfAdresbalk, useUrlKeuze, type UrlKoppeling } from "@/lib/adresbalk";
 import { periodeUitParams, zetPeriodeParams } from "@/lib/period/periode-url";
 import type { PeriodeKeuze } from "@/lib/period/period-range";
-import { flattenMonths, heeftData } from "@/lib/period/apply-period";
+import { googleHeeftData } from "@/lib/period/apply-period";
 
 // laadBeschikbareKanalen() neemt structureel een client aan met .from(); de browser-singleton
 // (lib/supabase.ts) is dat in demo-modus de mock, en die herkent alleen client_id ===
@@ -107,7 +107,8 @@ import { SectieKopBijeen } from "@/components/ui/sectie";
 import { ClientReporting } from "./client-reporting";
 import { BrandThemeProvider } from "../branding/brand-theme-provider";
 import { BrandHeaderBar } from "../branding/brand-header-bar";
-import { useClientData } from "@/lib/use-client-data";
+import { useClientData, zaaiClientData, type GoogleAntwoord } from "@/lib/use-client-data";
+import { BandUitZaad, type BandZaad } from "./band-uit-zaad";
 import { useChannelPeriodData } from "@/lib/use-channel-period-data";
 import { useBlendedClientData, vergeetBlendedClientData, zaaiBlendedClientData, type BlendedAntwoord } from "@/lib/use-blended-client-data";
 import { ClientDataProvider } from "@/lib/client-data-provider";
@@ -281,7 +282,7 @@ function DashboardPeriodPicker({ jaarlijkseEditie, klaar, snelVanafTablet = fals
   );
 }
 
-export function ClientDashboard({ client, bewaardeWeergave = null, kanaalbalkVanServer = null, blendedVanServer = null, instellingenVanServer = null }: {
+export function ClientDashboard({ client, bewaardeWeergave = null, kanaalbalkVanServer = null, blendedVanServer = null, instellingenVanServer = null, googleVanServer = null, periodeVanServer = null, vandaagVanServer = null }: {
   client: Client;
   /** De weergave zoals de server hem in de cookie las (lib/weergave.ts), zodat de eerste render al
    *  de gekozen kop toont in plaats van eerst de vertrouwde en dan de nieuwe. */
@@ -296,6 +297,12 @@ export function ClientDashboard({ client, bewaardeWeergave = null, kanaalbalkVan
    *  antwoord kan ook "geen data" zijn ({ error }): de uitkomst van de 404 van de route. */
   blendedVanServer?: Promise<Zaad<BlendedAntwoord> | null> | null;
   instellingenVanServer?: Promise<Zaad<{ rij: ClientSettingsRow | null }> | null> | null;
+  /** Het antwoord van de Google-route, idem; alleen een geslaagd antwoord (zaad-server.ts). */
+  googleVanServer?: Promise<Zaad<GoogleAntwoord> | null> | null;
+  /** De bewaarde periode zoals de server hem uit de cookie las (lib/period/periode-cookie.ts). */
+  periodeVanServer?: PeriodeKeuze | null;
+  /** Vandaag volgens de server: de kerncijfers uit het zaad rekenen in de browser met dezelfde dag. */
+  vandaagVanServer?: string | null;
 }) {
   // Het zaad klaarleggen VOOR de hooks hieronder hun eerste verzoek doen (dat gebeurt in een
   // effect, dus na deze render). Tijdens het renderen en niet in een effect: de effecten van de
@@ -304,6 +311,7 @@ export function ClientDashboard({ client, bewaardeWeergave = null, kanaalbalkVan
   // doet het helemaal niets (zaadbak.ts), en er verandert geen staat door.
   zaaiBlendedClientData(client.id, blendedVanServer);
   zaaiClientSettingsRij(client.id, instellingenVanServer);
+  zaaiClientData(client.id, googleVanServer);
   const [activeTab, setActiveTab] = useState<Tab>("dashboard");
   // DE KANAALKEUZE WOONT IN DE ADRESBALK (?kanaal=meta; bouwplan fase 2). Hier stond een useState:
   // een herlaad sprong terug naar "Alle kanalen", Terug verliet de klant, en een link naar één
@@ -327,6 +335,18 @@ export function ClientDashboard({ client, bewaardeWeergave = null, kanaalbalkVan
     leesNu: () => periodeUitParams(leesAdresbalk()),
     schrijf: (k) => schrijfAdresbalk((p) => zetPeriodeParams(p, k), "replace"),
   }), [searchParams]);
+  // De kerncijfers die de server al uit het zaad rekent (band-uit-zaad.tsx), zolang de hooks
+  // hieronder laden. Alleen met beide antwoorden van de server, en alleen als server en browser
+  // dezelfde periode kennen: uit de adresbalk, of uit de cookie die de server meegaf. Zonder een
+  // van beide begint de PeriodProvider op de standaard en leest hij daarna localStorage; dan zou
+  // het getal uit het zaad kunnen verspringen, en wacht de band op de hooks zoals altijd. En niet
+  // met een belofte die de router na meer dan een minuut terugbrengt (zaadNogVers, zaadbak.ts).
+  const periodeBekend = periodeVanServer !== null || periodeUitParams(searchParams) !== null;
+  const zaadAanbod = useMemo((): BandZaad | null => (
+    googleVanServer && blendedVanServer && vandaagVanServer && periodeBekend && zaadNogVers(googleVanServer)
+      ? { clientId: client.id, google: googleVanServer, blended: blendedVanServer, kanaal: kanaalUitAdres, vandaag: vandaagVanServer }
+      : null
+  ), [client.id, googleVanServer, blendedVanServer, vandaagVanServer, periodeBekend, kanaalUitAdres]);
   // De schakelaar "Nieuwe weergave" (bouwplan fase 3): per gebruiker bewaard, standaard uit, en met
   // ?weergave=nieuw voorop zodat de meting hem kan openen (lib/weergave.ts; de server geeft de
   // bewaarde keuze mee uit de cookie, zodat de kop niet verspringt bij het laden). Uit: de pagina is wat
@@ -407,7 +427,7 @@ export function ClientDashboard({ client, bewaardeWeergave = null, kanaalbalkVan
   // (lib/kanalen/beschikbaar.ts) en is daar getoetst.
   const kanalenNu = useMemo((): Kanaal[] | null => kanalenUitBronnen({
     googleLaadt: clientData.loading,
-    google: googleData ? flattenMonths(googleData).some(heeftData) : null,
+    google: googleHeeftData(googleData),
     route: routeKlaar ? (routePerKanaal ?? []).map((r) => r.kanaal) : null,
     proefje: proefje?.clientId === client.id ? proefje.kanalen : null,
   }), [client.id, clientData.loading, googleData, routeKlaar, routePerKanaal, proefje]);
@@ -535,6 +555,16 @@ export function ClientDashboard({ client, bewaardeWeergave = null, kanaalbalkVan
     } catch { /* geen cookies: dan weet alleen de browser het */ }
   }, [client.id, kanalen, nieuweWeergave]);
   const bandKlaar = kanalen !== null && eigenStandBekend;
+  // Het zaad is ALLEEN voor de eerste laad. Is de band hier één keer zelf klaar geweest, dan is elke
+  // latere laadstand een verversing (invalidateClientCache na een andere conversieselectie in de
+  // instellingen, client-settings.tsx), en dan zijn de cijfers van de paginalaad aantoonbaar oud:
+  // ze horen bij de selectie van toen. Die toonden we eerst als het huidige getal, tot de route
+  // antwoordde en ze versprongen (1.534 naar 7.534 in de toets). Nu het laadvlak, zoals vóór het zaad.
+  // In een effect, dus pas na het hydrateren: de eerste render is op server en browser gelijk. Per
+  // klant: met een andere klant in hetzelfde dashboard telt "was klaar" van de vorige niet.
+  const [klaarVoorKlant, setKlaarVoorKlant] = useState<string | null>(null);
+  useEffect(() => { if (bandKlaar) setKlaarVoorKlant(client.id); }, [bandKlaar, client.id]);
+  const bandZaad = klaarVoorKlant === client.id ? null : zaadAanbod;
 
   // De datastand in woorden, voor de bronrij van de nieuwe weergave (bouwplan fase 4): tot welke
   // dag de cijfers op dit scherm lopen, voor het gekozen kanaal of voor alle kanalen samen. Dezelfde
@@ -748,7 +778,7 @@ export function ClientDashboard({ client, bewaardeWeergave = null, kanaalbalkVan
   const codeRood = clientData.data && <CodeRoodBanner clientId={client.id} />;
 
   return (
-    <PeriodProvider scope={`client-${client.id}`} dataStand={dataStand} adres={periodeAdres}>
+    <PeriodProvider scope={`client-${client.id}`} dataStand={dataStand} adres={periodeAdres} beginKeuze={periodeVanServer} bewaarInCookie>
     <BrandThemeProvider clientId={client.id} geoClone={geoClone}>
     <div className="space-y-6">
       {nieuweWeergave ? (
@@ -785,6 +815,7 @@ export function ClientDashboard({ client, bewaardeWeergave = null, kanaalbalkVan
               band={periodSummary}
               bandKlaar={bandKlaar}
               demo={demoModus}
+              bandZaad={bandZaad}
               reserveerKaarten={reserveerKaartenrij({ kanalenBekend: kanalen !== null, geheugen: balkGeheugen, nieuw: true, meerdereVerwacht: isDemoClientId(client.id) })}
             />
           )}
@@ -822,7 +853,8 @@ export function ClientDashboard({ client, bewaardeWeergave = null, kanaalbalkVan
       {activeTab === "dashboard" && !clientData.error && (
         <div className="space-y-6">
           <ChannelTabs channel={channel} onChange={setChannel} beschikbaar={kanalen ?? []} ladenMetBalk={kanalen === null && hadKanaalbalk} />
-          <PeriodSummary data={bandKlaar ? periodSummary.data : null} bronnen={periodSummary.bronnen} laden={!bandKlaar} />
+          <PeriodSummary data={bandKlaar ? periodSummary.data : null} bronnen={periodSummary.bronnen} laden={!bandKlaar}
+            zolangLaden={bandZaad && <BandUitZaad zaad={bandZaad} />} />
           {/* De band (en Alle kanalen) leest de accountreeksen, niet de beurs: zeg dat in plaats
               van accountcijfers onder "Beurs: GreenTech Amsterdam" te zetten. */}
           <GeenBeursfilter geo={geoClone} tekst={beursmelding?.tekst ?? null} />

@@ -32,6 +32,7 @@ import {
   type ComparisonMode, type Month, type PeriodPreset, type PeriodRange, type PeriodeKeuze,
 } from "./period-range";
 import { schonePeriodeKeuze } from "./periode-url";
+import { periodeCookieRegel } from "./periode-cookie";
 import { useUrlKeuze, type UrlKoppeling } from "../adresbalk";
 import { today } from "../reporting-date";
 
@@ -101,6 +102,55 @@ function standaardPeriode(): PeriodState {
 
 const PeriodContext = createContext<PeriodState | null>(null);
 
+/**
+ * De datastand in de vaste vorm waarmee de provider rekent: de partiële maand alleen als hij heel
+ * is, en de uitgesloten bronnen alleen als er een is. Los, zodat de kerncijfers uit het zaad
+ * (components/dashboard/band-uit-zaad.tsx) met exact dezelfde stand rekenen als de provider.
+ */
+export function vasteStand(dataStand: PeriodDataStand | null | undefined): PeriodDataStand | null {
+  if (dataStand == null) return null;
+  const p = dataStand.partieel;
+  const partieel = p != null && p.maand != null && p.tmDag != null && p.dagenInMaand != null
+    ? { maand: p.maand, tmDag: p.tmDag, dagenInMaand: p.dagenInMaand } : null;
+  const uitgeslotenBronnen = dataStand.uitgeslotenBronnen ?? [];
+  return {
+    laatsteVolleMaand: dataStand.laatsteVolleMaand ?? null, partieel, dataTot: dataStand.dataTot ?? null,
+    ...(uitgeslotenBronnen.length > 0 ? { uitgeslotenBronnen } : {}),
+  };
+}
+
+/**
+ * De periode die de provider uitgeeft, uit de keuze en de datastand. Zuiver: de provider en de
+ * kerncijfers uit het zaad rekenen hem met dezelfde functie, en dus met hetzelfde venster.
+ */
+export function periodeWaarde(keuze: PeriodeKeuze, stand: PeriodDataStand | null, set: PeriodState["set"]): PeriodState {
+  const eindMaand = vensterEindMaand(stand?.laatsteVolleMaand);
+  // Een eigen periode wordt op eindMaand geklemd, net als de presets (periodeOpEind). Ongeklemd
+  // telden de maanden na het eind van de data als nullen (de demo: -26,5% conversies waar -1,5%
+  // hoort), en zo'n periode ontstaat vanzelf: opgeslagen onder de kalender als grens, gekozen op
+  // een tab met een latere eindmaand (er is één bewaarde keuze per klant), of terwijl de stand nog
+  // laadde (review [2], [42]). Alleen bij het uitrekenen: de bewaarde keuze blijft staan, en loopt
+  // de data later verder, dan krijg je hem weer heel.
+  const range = periodeOpEind(keuze.preset, keuze.custom, eindMaand);
+  return {
+    ...keuze,
+    range,
+    compareRange: resolveComparison(range, keuze.comparison),
+    eindMaand,
+    dataStand: stand,
+    set,
+  };
+}
+
+/**
+ * Een vaste periode voor wat eronder staat, zonder keuze en zonder opslag. Alleen voor de
+ * kerncijfers uit het zaad: die tonen het venster dat bij HUN data hoort, en de provider erboven
+ * kent die data nog niet (zijn hooks laden nog).
+ */
+export function VastePeriode({ waarde, children }: { waarde: PeriodState; children: React.ReactNode }) {
+  return <PeriodContext.Provider value={waarde}>{children}</PeriodContext.Provider>;
+}
+
 interface Opgeslagen {
   preset?: string;
   custom?: { start?: string; end?: string } | null;
@@ -115,13 +165,24 @@ function sleutel(scope: string): string {
 // zodat de hook hieronder altijd aangeroepen kan worden.
 const GEEN_ADRES: UrlKoppeling<PeriodeKeuze> = { waarde: null, leesNu: () => null, schrijf: () => {} };
 
-function bewaar(scope: string, keuze: PeriodeKeuze): void {
+function bewaar(scope: string, keuze: PeriodeKeuze, inCookie: boolean): void {
   if (typeof window === "undefined") return;
   try {
     localStorage.setItem(sleutel(scope), JSON.stringify({ preset: keuze.preset, custom: keuze.custom, comparison: keuze.comparison }));
   } catch {
     // Vol of geblokkeerd geheugen mag de keuze niet tegenhouden; hij geldt dan alleen
     // voor deze sessie.
+  }
+  if (inCookie) bewaarCookie(keuze);
+}
+
+/** Dezelfde keuze in de cookie van deze klantpagina (lib/period/periode-cookie.ts), voor de server. */
+function bewaarCookie(keuze: PeriodeKeuze): void {
+  try {
+    const regel = periodeCookieRegel(keuze, window.location.pathname);
+    if (regel) document.cookie = regel;
+  } catch {
+    // Geen cookies: dan weet alleen de browser het, en rendert de server de cijfers niet vooraf.
   }
 }
 
@@ -146,20 +207,33 @@ function lees(scope: string): PeriodeKeuze {
   }
 }
 
-export function PeriodProvider({ scope, dataStand, adres, children }: {
+export function PeriodProvider({ scope, dataStand, adres, beginKeuze = null, bewaarInCookie = false, children }: {
   scope: string;
   /** Tot waar de data loopt. Weglaten of null: de presets volgen de kalender. */
   dataStand?: PeriodDataStand | null;
   /** De koppeling met de adresbalk (?periode=, ?vergelijk=). Weglaten: alleen localStorage. */
   adres?: UrlKoppeling<PeriodeKeuze>;
+  /**
+   * De bewaarde keuze zoals de SERVER hem uit de cookie las (lib/period/periode-cookie.ts). Server
+   * en eerste client-render krijgen dezelfde prop, dus mag hij er meteen in, net als de adresbalk.
+   * Null: geen cookie, dan de standaard tot localStorage gelezen is, zoals altijd.
+   */
+  beginKeuze?: PeriodeKeuze | null;
+  /**
+   * Schrijf de keuze ook in de cookie van deze klantpagina, zodat de server hem bij de volgende
+   * paginalaad kent. Alleen op een klantpagina; het portfolio laat hem uit.
+   */
+  bewaarInCookie?: boolean;
   children: React.ReactNode;
 }) {
   // De keuze uit de adresbalk, met de directe echo van de eigen klik (zie lib/adresbalk.ts).
   const [uitAdres, kiesAdres] = useUrlKeuze(adres ?? GEEN_ADRES);
   // Server en eerste client-render moeten hetzelfde opleveren, anders klaagt React over een
-  // hydration mismatch. Daarom start alles op de standaard en komt localStorage er in een
-  // effect achteraan. De adresbalk kennen server en client allebei; die mag er meteen in.
-  const [staat, setStaat] = useState<PeriodeKeuze>(() => uitAdres ?? {
+  // hydration mismatch. Daarom start alles op wat beide kennen -- de adresbalk, dan de cookie die
+  // de server meegaf -- en anders op de standaard; localStorage komt er in een effect achteraan.
+  // Zonder de cookie startte ook wie een andere periode bewaard had op de standaard: de server
+  // kan de kerncijfers dan niet vooraf renderen, want ze zouden na het laden verspringen.
+  const [staat, setStaat] = useState<PeriodeKeuze>(() => uitAdres ?? beginKeuze ?? {
     preset: DEFAULT_PRESET, custom: null, comparison: DEFAULT_COMPARISON,
   });
 
@@ -171,8 +245,20 @@ export function PeriodProvider({ scope, dataStand, adres, children }: {
   // bij elke wissel de bewaarde keuze opnieuw inlezen en de hele boom laten renderen.
   const adresNu = useRef(adres);
   useEffect(() => { adresNu.current = adres; });
+  // Via een ref, zoals het adres: het effect hoort alleen op de scope en de adresbalk te lopen.
+  const inCookie = useRef(bewaarInCookie);
+  useEffect(() => { inCookie.current = bewaarInCookie; });
   useEffect(() => {
-    if (adresSleutel === null) { setStaat(lees(scope)); return; }
+    if (adresSleutel === null) {
+      // Zelfde inhoud: dezelfde staat, zodat er niets opnieuw rekent.
+      const bewaard = lees(scope);
+      setStaat((huidig) => (JSON.stringify(huidig) === JSON.stringify(bewaard) ? huidig : bewaard));
+      // De cookie gelijk met localStorage: wie al een keuze had van vóór de cookie, of een cookie
+      // die verliep, krijgt bij de volgende paginalaad de cijfers vooraf. Ook als er niets bewaard
+      // is: dan weet de server dat het de standaard is, en niet dat hij het niet weet.
+      if (inCookie.current) bewaarCookie(bewaard);
+      return;
+    }
     // Staat dit ook echt (nog) in de adresbalk? De echo van useUrlKeuze loopt één render achter:
     // bij een wissel naar een andere klant (een link zonder periode) is `scope` al van de nieuwe
     // klant terwijl de keuze nog die van de vorige is. Zonder deze controle werd de periode uit
@@ -183,7 +269,7 @@ export function PeriodProvider({ scope, dataStand, adres, children }: {
     // van terug te vallen op een keuze van weken geleden.
     const keuze = JSON.parse(adresSleutel) as PeriodeKeuze;
     setStaat((huidig) => (JSON.stringify(huidig) === adresSleutel ? huidig : keuze));
-    bewaar(scope, keuze);
+    bewaar(scope, keuze, inCookie.current);
   }, [scope, adresSleutel]);
 
   const heeftAdres = adres != null;
@@ -193,10 +279,10 @@ export function PeriodProvider({ scope, dataStand, adres, children }: {
       // keuze letterlijk wat er straks uit terugkomt, en hoeft niets een tweede keer te renderen.
       const keuze = heeftAdres ? schonePeriodeKeuze({ preset, custom, comparison }) : { preset, custom, comparison };
       setStaat(keuze);
-      bewaar(scope, keuze);
+      bewaar(scope, keuze, bewaarInCookie);
       if (heeftAdres) kiesAdres(keuze);
     },
-    [scope, heeftAdres, kiesAdres],
+    [scope, heeftAdres, kiesAdres, bewaarInCookie],
   );
 
   // Op de losse velden en niet op het object: een pagina die elke render een nieuw object
@@ -214,27 +300,10 @@ export function PeriodProvider({ scope, dataStand, adres, children }: {
     const partieel = pMaand !== null && pTmDag !== null && pDagen !== null
       ? { maand: pMaand, tmDag: pTmDag, dagenInMaand: pDagen } : null;
     const uitgeslotenBronnen = JSON.parse(uitSleutel) as { bron: string; dataTot: string | null }[];
-    return { laatsteVolleMaand: volle, partieel, dataTot, ...(uitgeslotenBronnen.length > 0 ? { uitgeslotenBronnen } : {}) };
+    return vasteStand({ laatsteVolleMaand: volle, partieel, dataTot, uitgeslotenBronnen });
   }, [heeftStand, volle, dataTot, pMaand, pTmDag, pDagen, uitSleutel]);
 
-  const waarde = useMemo<PeriodState>(() => {
-    const eindMaand = vensterEindMaand(stand?.laatsteVolleMaand);
-    // Een eigen periode wordt op eindMaand geklemd, net als de presets (periodeOpEind). Ongeklemd
-    // telden de maanden na het eind van de data als nullen (de demo: -26,5% conversies waar -1,5%
-    // hoort), en zo'n periode ontstaat vanzelf: opgeslagen onder de kalender als grens, gekozen op
-    // een tab met een latere eindmaand (er is één bewaarde keuze per klant), of terwijl de stand nog
-    // laadde (review [2], [42]). Alleen bij het uitrekenen: de bewaarde keuze blijft staan, en loopt
-    // de data later verder, dan krijg je hem weer heel.
-    const range = periodeOpEind(staat.preset, staat.custom, eindMaand);
-    return {
-      ...staat,
-      range,
-      compareRange: resolveComparison(range, staat.comparison),
-      eindMaand,
-      dataStand: stand,
-      set,
-    };
-  }, [staat, set, stand]);
+  const waarde = useMemo<PeriodState>(() => periodeWaarde(staat, stand, set), [staat, set, stand]);
 
   return <PeriodContext.Provider value={waarde}>{children}</PeriodContext.Provider>;
 }

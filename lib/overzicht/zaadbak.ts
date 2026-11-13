@@ -87,3 +87,30 @@ export function maakZaadbak<T>(nu: () => number = () => Date.now()): Zaadbak<T> 
     },
   };
 }
+
+// Wanneer de browser een belofte van de server voor het eerst zag (zaadNogVers).
+const eersteGezien = new WeakMap<object, number>();
+
+/**
+ * Mag wat deze belofte draagt nog als "nu" getoond worden? Voor de kerncijfers die de server al
+ * in de HTML zette (components/dashboard/band-uit-zaad.tsx), met dezelfde grens als `neem`.
+ *
+ * De eerste keer dat de browser de belofte ziet (het hydrateren van de pagina die hem meebracht)
+ * is het antwoord ja, net als op de server: anders zou de browser iets anders renderen dan de HTML.
+ * Komt dezelfde belofte later terug (de router zet een eerder bezochte klantpagina terug met haar
+ * oude props), dan alleen binnen ZAAD_VERS_MS: daarna wachten de tegels op de hooks, in plaats van
+ * cijfers van minuten geleden te tonen die even later verspringen.
+ *
+ * @param nu de klok, alleen voor de test.
+ */
+export function zaadNogVers(belofte: object, nu: () => number = () => Date.now()): boolean {
+  if (typeof window === "undefined") return true;
+  const t = nu();
+  const eerst = eersteGezien.get(belofte);
+  if (eerst === undefined) {
+    eersteGezien.set(belofte, t);
+    return true;
+  }
+  const leeftijd = t - eerst;
+  return leeftijd >= 0 && leeftijd < ZAAD_VERS_MS;
+}

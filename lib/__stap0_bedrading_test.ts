@@ -177,7 +177,10 @@ console.log("stap 4: band, kanalen en de vergeet-ingang");
     /const zaadVerwacht = blendedVanServer != null && zaadZonderAntwoord !== blendedVanServer;/.test(code));
   // De regel zelf (route vóór proefje, null zolang onbekend) is getoetst in lib/kanalen/__beschikbaar_test.ts.
   check("de kanalenlijst loopt via kanalenUitBronnen", /kanalenUitBronnen\(\{\s*googleLaadt: clientData\.loading,/.test(code));
-  check("Google in de kanalenlijst komt uit het Google-antwoord", /google: googleData \? flattenMonths\(googleData\)\.some\(heeftData\) : null,/.test(code));
+  // De regel staat sinds de kerncijfers uit het zaad (band-uit-zaad.tsx) op één plek, googleHeeftData,
+  // zodat de server de kanalen precies zo bepaalt als het dashboard.
+  check("Google in de kanalenlijst komt uit het Google-antwoord", /google: googleHeeftData\(googleData\),/.test(code)
+    && /return googleData \? flattenMonths\(googleData\)\.some\(heeftData\) : null;/.test(bron("lib/period/apply-period.ts")));
   check("de dagkanalen uit perKanaal van de route", /routePerKanaal \?\? \[\]\)\.map\(\(r\) => r\.kanaal\)/.test(code));
   // bandKlaar: per tabblad de eigen bron; geen losse wacht op de blended route (het Google-tabblad
   // van een klant met alleen Google hing daaraan).

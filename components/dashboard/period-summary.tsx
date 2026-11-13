@@ -6,9 +6,10 @@
 // getallen veranderen mee. Alles komt uit data die de pagina al geladen heeft — er gaat geen
 // query overheen — dus het werkt in demo-modus precies zoals met echte data.
 
+import type { ReactElement, ReactNode } from "react";
 import { TriangleAlert } from "lucide-react";
 import type { ClientHistoricalData } from "@/lib/types";
-import { usePeriod, type PeriodDataStand } from "@/lib/period/period-context";
+import { usePeriod, type PeriodDataStand, type PeriodState } from "@/lib/period/period-context";
 import { comparePeriods, ontbrekendeMaanden, type BronPaar, type BronReeks } from "@/lib/period/apply-period";
 import { formatRange, formatMonth, lastCompleteMonth, monthIndex, type PeriodRange } from "@/lib/period/period-range";
 import { formatRoas } from "@/lib/forecast-format";
@@ -181,6 +182,12 @@ interface Props {
    * elke waarschuwing van de band staat er ook: het is een andere vorm, geen andere inhoud.
    */
   vorm?: "band" | "tegels";
+  /**
+   * Wat er staat zolang `data` nog laadt, in plaats van het laadvlak: de kerncijfers die de server
+   * al uit het zaad rekende (components/dashboard/band-uit-zaad.tsx). Weglaten: het laadvlak, zoals
+   * altijd.
+   */
+  zolangLaden?: ReactNode;
 }
 
 /**
@@ -197,12 +204,22 @@ function alsDelta(v: DeelVergelijking, hogerIsBeter: boolean, opmaak: (v: number
   }
 }
 
-export function PeriodSummary({ data, compact, bronnen, laden = false, vorm = "band" }: Props) {
+export function PeriodSummary({ data, compact, bronnen, laden = false, vorm = "band", zolangLaden }: Props) {
   const periode = usePeriod();
   // Zonder data en nog ladend: de ruimte van de band alvast innemen. De band kwam als laatste
   // binnen en duwde dan alles eronder 200 px omlaag; dat was de grootste verspringing op de pagina.
-  if (!data) return laden ? <BandLaadvlak compact={compact || vorm === "tegels"} /> : null;
+  // Heeft de server de cijfers al gerekend, dan die (zolangLaden), met het laadvlak als terugval.
+  if (!data) return laden ? (zolangLaden ?? <BandLaadvlak compact={compact || vorm === "tegels"} />) : null;
+  return bandInhoud({ data, compact, bronnen, vorm }, periode);
+}
 
+/**
+ * De band of de tegels zelf, voor gegeven data en een gegeven periode. Zonder hooks, zodat de
+ * kerncijfers uit het zaad (components/dashboard/band-uit-zaad.tsx) door exact deze regels gaan,
+ * binnen opDag (lib/reporting-date.ts) met de dag van de server: elke tekst hier die van vandaag
+ * afhangt (lastCompleteMonth in dataStandTekst) is dan op server en browser dezelfde.
+ */
+export function bandInhoud({ data, compact, bronnen, vorm = "band" }: Pick<Props, "compact" | "bronnen" | "vorm"> & { data: ClientHistoricalData }, periode: PeriodState): ReactElement {
   // Met de losse kanalen erbij: een kanaal dat in de vergelijkingsperiode nog niet liep, telt dan
   // niet als groei. De grote getallen blijven de hele periode; alleen de percentages zijn gepaard.
   const { current, deltas, perBron } = comparePeriods(data, periode.range, periode.compareRange, bronnen ?? undefined);

@@ -33,7 +33,35 @@ export function fmt(d: Date): string {
  * eigen offsettabel die bij de volgende zomertijdregeling achterloopt.
  */
 export function today(): string {
+  if (vasteDag !== null) return vasteDag;
   return new Intl.DateTimeFormat("en-CA", { timeZone: REPORTING_TIMEZONE }).format(new Date());
+}
+
+// De dag die `opDag` vastzet, of null: dan is het de klok.
+let vasteDag: string | null = null;
+
+/**
+ * Reken `f` uit alsof het vandaag `dag` is, en geef de uitkomst terug.
+ *
+ * Voor de kerncijfers die de server al in de HTML zet (components/dashboard/band-uit-zaad.tsx):
+ * de browser moet bij het hydrateren byte voor byte dezelfde tekst renderen. Vlak na middernacht
+ * op de laatste dag van een maand zegt de klok van de browser al een andere maand dan die van de
+ * server een paar honderd milliseconden eerder, en dan schuift het venster van de presets
+ * (lastCompleteMonth) en geeft React een hydratiefout. Met de dag van de server rekenen beide
+ * hetzelfde.
+ *
+ * ALLEEN SYNCHROON. `f` mag niets afwachten: de dag staat op moduleniveau, en op de server lopen
+ * verzoeken door elkaar zodra er een await tussen zit. Zonder await kan er niets tussendoor, en
+ * `finally` zet de klok terug, ook als `f` gooit. Geneste aanroepen herstellen de buitenste dag.
+ */
+export function opDag<T>(dag: string, f: () => T): T {
+  const vorige = vasteDag;
+  vasteDag = dag.slice(0, 10);
+  try {
+    return f();
+  } finally {
+    vasteDag = vorige;
+  }
 }
 
 /**

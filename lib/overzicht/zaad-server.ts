@@ -1,5 +1,7 @@
-// De serverkant van het zaad (lib/overzicht/zaadbak.ts): de twee lezingen waar het eerste
-// kerncijfer op wacht, gestart terwijl de klantpagina haar schil stuurt.
+// De serverkant van het zaad (lib/overzicht/zaadbak.ts): de lezingen waar het eerste kerncijfer op
+// wacht, gestart terwijl de klantpagina haar schil stuurt. Sinds de kerncijfers ook op de server in
+// de HTML komen (components/dashboard/band-uit-zaad.tsx) hoort de Google-route erbij: zonder Google
+// is er op "Alle kanalen" geen totaal, en 62 van de 71 klanten hebben alleen Google.
 //
 // ALLEEN OP DE SERVER, aangeroepen uit app/(app)/client/[clientId]/page.tsx. De pagina wacht er
 // niet op: ze geeft de beloften als prop aan het dashboard, en het antwoord stroomt in dezelfde
@@ -18,6 +20,14 @@
 // DOOR JSON HEEN, net als over de lijn: de route stuurt Response.json(data), en de browser leest
 // dus wat JSON ervan overlaat (geen undefined-velden, NaN wordt null). Het zaad gaat door dezelfde
 // zeef, zodat de browser exact hetzelfde object krijgt als van de route.
+//
+// DE GOOGLE-ROUTE ZELF. Haar lichaam (live Google Ads, of de geseede demo) staat in de route en
+// nergens anders; een tweede kopie hier zou de eerste zijn die ervan afwijkt. De server roept
+// daarom haar GET aan met een nagebouwd verzoek, in hetzelfde proces: geen netwerk, wel exact het
+// antwoord dat de browser zou krijgen, door Response.json() en .json() heen. Alleen een geslaagd
+// antwoord (200, zonder `error`) wordt zaad; elke fout laat de browser zijn eigen verzoek doen.
+// De toets op toegang is die van de pagina: het recht van de route EN deze klant binnen de scope.
+// Dat is strenger dan de poortwachter bij de route zelf, die het klant-id niet in customerId zoekt.
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
@@ -26,6 +36,8 @@ import { can, canAccessClient, capabilityForApi, type Capability } from "@/lib/a
 import { readPolicyFor } from "@/lib/data-access/read-policy";
 import { fetchBlendedHistoricalData, geenBlendedDataFout, type BlendedHistoricalData } from "@/lib/api/blended-historical";
 import type { ClientSettingsRow } from "@/lib/client-settings";
+import { googleKlantnummer } from "@/lib/api/adapter";
+import type { GoogleAntwoord } from "@/lib/use-client-data";
 import type { Zaad } from "./zaadbak";
 
 /** De client_settings-rij in een omhulsel: "geen rij" (null) is een geldig antwoord. */
@@ -43,6 +55,23 @@ export interface GeenBlendedData { error: string }
 export interface OverzichtZaad {
   blended: Promise<Zaad<BlendedHistoricalData | GeenBlendedData> | null>;
   instellingen: Promise<Zaad<InstellingenZaad> | null>;
+  google: Promise<Zaad<GoogleAntwoord> | null>;
+}
+
+/** Het pad van de Google-route, voor het recht (capabilityForApi) en het nagebouwde verzoek. */
+const GOOGLE_ROUTE = "/api/google-ads/client-data";
+
+/**
+ * De GET van de Google-route, aangeroepen in dit proces. Laat geladen: de route trekt de hele
+ * Google Ads-client mee, en een test die zijn eigen route meegeeft hoeft dat niet.
+ */
+async function vraagGoogleRoute(customerId: string): Promise<Response> {
+  const [{ GET }, { NextRequest }] = await Promise.all([
+    import("@/app/api/google-ads/client-data/route"),
+    import("next/server"),
+  ]);
+  // Het adres wordt alleen ontleed (de route leest er customerId uit), nooit opgevraagd.
+  return GET(new NextRequest(`http://zaad.invalid${GOOGLE_ROUTE}?customerId=${encodeURIComponent(customerId)}`));
 }
 
 type Gebruiker = Pick<AuthUser, "role" | "scope"> | null;
@@ -87,6 +116,7 @@ export function startOverzichtZaad(clientId: string, deps: {
   gebruiker?: () => Promise<Gebruiker>;
   afgedwongen?: boolean;
   database?: SupabaseClient | null;
+  googleRoute?: (customerId: string) => Promise<Response>;
 } = {}): OverzichtZaad {
   const afgedwongen = deps.afgedwongen ?? process.env.O1_AUTH_ENFORCED === "true";
   // Eén keer de gebruiker voor beide lezingen; zonder afdwinging wordt hij niet eens gelezen.
@@ -113,5 +143,15 @@ export function startOverzichtZaad(clientId: string, deps: {
     return alsZaad<InstellingenZaad>({ rij: (data as ClientSettingsRow | null) ?? null });
   }).catch(() => null);
 
-  return { blended, instellingen };
+  const google = gebruiker.then(async (g) => {
+    if (!magLezen(g, afgedwongen, capabilityForApi(GOOGLE_ROUTE, "GET"), clientId)) return null;
+    // Hetzelfde klantnummer als de browser vraagt (lib/use-client-data.ts).
+    const antwoord = await (deps.googleRoute ?? vraagGoogleRoute)(googleKlantnummer(clientId));
+    if (!antwoord.ok) return null;
+    const lichaam = (await antwoord.json()) as GoogleAntwoord | null;
+    if (!lichaam || typeof lichaam !== "object" || lichaam.error) return null;
+    return { waarde: lichaam };
+  }).catch(() => null);
+
+  return { blended, instellingen, google };
 }

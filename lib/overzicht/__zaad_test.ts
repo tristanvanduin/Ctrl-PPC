@@ -164,10 +164,13 @@ async function main() {
   const alsDb = (sb: FakeSupabase) => sb as unknown as SupabaseClient;
   const ALLES = "all" as never;
   const gebruiker = (role: string, scope: unknown) => async () => ({ role, scope }) as never;
+  // De Google-route: in de blokken hieronder een die faalt (zonder Google Ads-sleutels), zodat ze
+  // de echte route niet laden; de Google-lezing zelf heeft een eigen blok.
+  const geenGoogle = async () => Response.json({ error: "Google Ads API not configured" }, { status: 500 });
 
   console.log("De server: zonder afdwinging leest hij, en het antwoord is dat van de route (door JSON heen)");
   {
-    const zaad = startOverzichtZaad("klant-z", { afgedwongen: false, database: alsDb(database()) });
+    const zaad = startOverzichtZaad("klant-z", { afgedwongen: false, database: alsDb(database()) , googleRoute: geenGoogle });
     check("de aanroep geeft meteen beloften terug", typeof zaad.blended.then === "function" && typeof zaad.instellingen.then === "function");
     const [b, i] = await Promise.all([zaad.blended, zaad.instellingen]);
     const direct = await fetchBlendedHistoricalData(alsDb(database()), "klant-z");
@@ -179,7 +182,7 @@ async function main() {
 
   console.log("De server: een klant zonder rij krijgt 'geen rij', een klant zonder data krijgt 'geen data' als antwoord");
   {
-    const zaad = startOverzichtZaad("onbekend", { afgedwongen: false, database: alsDb(database()) });
+    const zaad = startOverzichtZaad("onbekend", { afgedwongen: false, database: alsDb(database()) , googleRoute: geenGoogle });
     // Eerder null: de browser vroeg de route dan alsnog (404) en pas daarna vertrok het
     // kanalenproefje. Nu reist de uitkomst mee, met de melding van de route zelf.
     const { geenBlendedDataFout } = await import("../api/blended-historical");
@@ -193,7 +196,7 @@ async function main() {
   console.log("De server: met afdwinging dezelfde toets als de routes");
   {
     const sb = database();
-    const lees = (g: () => Promise<never>) => startOverzichtZaad("klant-z", { afgedwongen: true, gebruiker: g, database: alsDb(sb) });
+    const lees = (g: () => Promise<never>) => startOverzichtZaad("klant-z", { afgedwongen: true, gebruiker: g, database: alsDb(sb) , googleRoute: geenGoogle });
     const ingelogd = lees(gebruiker("admin", ALLES));
     const { can, canAccessClient } = await import("../auth/roles");
     check("voorwaarde: een admin met alle klanten mag lezen", can("admin" as never, "client:read") && canAccessClient(ALLES, "klant-z"));
@@ -213,11 +216,34 @@ async function main() {
   {
     const sb = database();
     sb.faalOp("client_settings", "kapot");
-    const zaad = startOverzichtZaad("klant-z", { afgedwongen: false, database: alsDb(sb) });
+    const zaad = startOverzichtZaad("klant-z", { afgedwongen: false, database: alsDb(sb) , googleRoute: geenGoogle });
     check("blended (leest client_settings mee): null", (await zaad.blended) === null);
     check("instellingen: null", (await zaad.instellingen) === null);
-    const zonderDb = startOverzichtZaad("klant-z", { afgedwongen: false, database: null });
+    const zonderDb = startOverzichtZaad("klant-z", { afgedwongen: false, database: null , googleRoute: geenGoogle });
     check("zonder database: null", (await zonderDb.blended) === null && (await zonderDb.instellingen) === null);
+    await rust();
+    check("geen onafgehandelde afwijzing", onafgehandeld.length === 0, String(onafgehandeld[0]));
+  }
+
+  console.log("De server: de Google-route, in dit proces, met dezelfde toets");
+  {
+    const gevraagd: string[] = [];
+    const LICHAAM = { currentYear: 2026, historicalYears: [], currentYearMonthly: [{ month: 1, conversions: 5 }], leeg: undefined, niets: Number.NaN };
+    const route = (status: number, lichaam: unknown) => async (customerId: string) => { gevraagd.push(customerId); return Response.json(lichaam, { status }); };
+    const lees = (deps: Parameters<typeof startOverzichtZaad>[1]) => startOverzichtZaad("gads-555", { database: alsDb(database()), ...deps });
+    const goed = await lees({ afgedwongen: false, googleRoute: route(200, LICHAAM) }).google;
+    check("geslaagd: het lichaam van de route, door JSON heen zoals over de lijn", JSON.stringify(goed?.waarde) === JSON.stringify(LICHAAM) && !!goed && !Object.prototype.hasOwnProperty.call(goed.waarde, "leeg") && goed.waarde.niets === null, JSON.stringify(goed));
+    check("met hetzelfde klantnummer als de browser vraagt (zonder gads-)", gevraagd.at(-1) === "555", gevraagd.join(","));
+    check("een foutstatus: geen zaad (de browser vraagt zelf, met de eigen melding)", (await lees({ afgedwongen: false, googleRoute: route(500, { error: "kapot" }) }).google) === null);
+    check("een lichaam met error bij status 200: geen zaad", (await lees({ afgedwongen: false, googleRoute: route(200, { error: "x" }) }).google) === null);
+    check("de route gooit: geen zaad, geen afwijzing", (await lees({ afgedwongen: false, googleRoute: async () => { throw new Error("weg"); } }).google) === null);
+    const voor = gevraagd.length;
+    const buiten = await lees({ afgedwongen: true, gebruiker: gebruiker("admin", ["andere-klant"]), googleRoute: route(200, LICHAAM) }).google;
+    check("een klant buiten de scope: geen zaad, en de route wordt niet eens gevraagd", buiten === null && gevraagd.length === voor);
+    const niemand = await lees({ afgedwongen: true, gebruiker: (async () => null) as never, googleRoute: route(200, LICHAAM) }).google;
+    check("niet ingelogd: geen zaad", niemand === null && gevraagd.length === voor);
+    const binnen = await lees({ afgedwongen: true, gebruiker: gebruiker("admin", ALLES), googleRoute: route(200, LICHAAM) }).google;
+    check("met het recht en de klant in scope: zaad", binnen !== null && gevraagd.length === voor + 1);
     await rust();
     check("geen onafgehandelde afwijzing", onafgehandeld.length === 0, String(onafgehandeld[0]));
   }

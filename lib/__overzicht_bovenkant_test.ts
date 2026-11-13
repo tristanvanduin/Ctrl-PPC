@@ -150,7 +150,9 @@ console.log("De schakelaar in het klantdashboard: uit is de vertrouwde boom, aan
   check("AAN: de compacte merkregel", /<BrandHeaderBar compact /.test(nieuw));
   check("UIT: de kanaaltabs en de band, zonder de nieuwe bovenkant", /<ChannelTabs\b/.test(oud) && /<PeriodSummary\b/.test(oud) && !/<OverzichtBovenkant\b/.test(oud));
   check("UIT: de hero zoals hij was", /<BrandHeaderBar geoClone=\{geoClone\} fallbackName=\{client\.name\} edition=\{upcomingEdition\} \/>/.test(oud) && !/compact/.test(oud));
-  check("UIT: de band krijgt geen andere vorm mee", /<PeriodSummary data=\{bandKlaar \? periodSummary\.data : null\} bronnen=\{periodSummary\.bronnen\} laden=\{!bandKlaar\} \/>/.test(oud));
+  // Zolang hij laadt, staan er de cijfers die de server al uit het zaad rekende, in dezelfde vorm
+  // (band-uit-zaad.tsx; het gedrag zelf staat in lib/overzicht/__band_uit_zaad_test.ts).
+  check("UIT: de band krijgt geen andere vorm mee", /<PeriodSummary data=\{bandKlaar \? periodSummary\.data : null\} bronnen=\{periodSummary\.bronnen\} laden=\{!bandKlaar\}\s+zolangLaden=\{bandZaad && <BandUitZaad zaad=\{bandZaad\} \/>\} \/>/.test(oud));
   // Niets verdwijnt: elk onderdeel van de kop staat in beide takken.
   for (const deel of ["{periodeKiezer}", "{schakelaar}", "{bronrij}", "{geenDataMelding}", "{tabnav}", "{codeRood}"]) {
     check(`${deel} staat in beide weergaven`, nieuw.includes(deel) && oud.includes(deel));
@@ -468,7 +470,9 @@ console.log("Opbouw: hooguit 600 ms bij het eerste bezoek, 400 ms bij een wissel
   check("de hook speelt niet bij minder beweging", /speel: eerste && actief && !gespeeld && !minder/.test(beweging));
   check("één keer per sessie (sessionStorage)", /window\.sessionStorage\.getItem\(OPBOUW_SLEUTEL\) === null/.test(beweging) && /window\.sessionStorage\.setItem\(OPBOUW_SLEUTEL, "1"\)/.test(beweging));
   const boven = zonderCommentaar(lees("components/dashboard/overzicht-bovenkant.tsx"));
-  check("de opbouw begint pas als de cijfers er staan", /useEersteOpbouw\(inhoudKlaar\)/.test(boven) && /const inhoudKlaar = bandKlaar && band\.data !== null/.test(boven));
+  // En niet als de tegels hun cijfers al uit het zaad van de server hadden (band-uit-zaad.tsx): die
+  // stonden er dan al, en een opbouw zou ze laten verdwijnen en opnieuw binnenkomen.
+  check("de opbouw begint pas als de cijfers er staan", /useEersteOpbouw\(inhoudKlaar && !zaadAangeboden\)/.test(boven) && /const inhoudKlaar = bandKlaar && band\.data !== null/.test(boven));
   check("de vertraging per blok komt uit opbouwVertraging", /opbouwVertraging\(i, aantal\)/.test(boven));
 }
 

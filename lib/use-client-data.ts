@@ -3,8 +3,9 @@
 import { useState, useEffect } from "react";
 import { getAllClients, type Client } from "./clients";
 import { type ClientHistoricalData } from "./types";
-import { buildClientDataFromApi, type ApiMonthlyData, type ApiWeeklyData, type YearDataInput } from "./api/adapter";
+import { buildClientDataFromApi, googleKlantnummer, type ApiMonthlyData, type ApiWeeklyData, type YearDataInput } from "./api/adapter";
 import { today } from "./reporting-date";
+import { maakZaadbak, type Zaad } from "./overzicht/zaadbak";
 
 export interface ConversionAction {
   id: string;
@@ -144,9 +145,59 @@ interface ApiCampaignRow {
 const cache = new Map<string, { data: ClientDataState; timestamp: number }>();
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
+/**
+ * Het lichaam van /api/google-ads/client-data zoals de browser het leest (res.json()). Alleen de
+ * velden die hier gelezen worden zijn benoemd; de rest gaat ongezien door naar de staat.
+ */
+export type GoogleAntwoord = Record<string, unknown> & { error?: string };
+
+/**
+ * De Google-reeks uit het antwoord van de route: precies wat deze hook altijd bouwde. Los, zodat de
+ * kerncijfers die de server al in de HTML zet (components/dashboard/band-uit-zaad.tsx) dezelfde
+ * reeks uit hetzelfde antwoord bouwen, en niet een tweede vertaling die ergens anders afrondt.
+ */
+export function googleDataUitAntwoord(clientId: string, apiData: GoogleAntwoord): ClientHistoricalData {
+  return {
+    ...buildClientDataFromApi(
+      clientId,
+      (apiData.historicalYears as YearDataInput[]) ?? [],
+      (apiData.currentYearMonthly as ApiMonthlyData[]) ?? [],
+      (apiData.currentYearWeekly as ApiWeeklyData[]) ?? [],
+      apiData.targetCurrentYear as Parameters<typeof buildClientDataFromApi>[4],
+      (apiData.currentYear as number | undefined) ?? Number(today().slice(0, 4)),
+      apiData.realizedThroughMonth as number,
+    ),
+    // Tot waar de route de data definitief acht. Het venster van de KPI-band eindigt hierop;
+    // zonder (een oudere route) volgen de presets de kalender.
+    dataStand: (apiData.dataStand as ClientHistoricalData["dataStand"]) ?? null,
+  };
+}
+
+// Het antwoord dat de server met de pagina meestuurde (lib/overzicht/zaad-server.ts), op dezelfde
+// manier als de blended route (lib/use-blended-client-data.ts): de eerste ophaalronde van een klant
+// gebruikt dat in plaats van de route op te vragen, en alles erna is dezelfde code. Zonder dit las
+// de server de Google-data voor de kerncijfers in de HTML, en vroeg de browser hem daarna nog eens.
+// De server zaait alleen een geslaagd antwoord; een fout vraagt de browser zelf, met de eigen
+// foutmelding van de route.
+const zaadbak = maakZaadbak<GoogleAntwoord>();
+
+/**
+ * Leg het Google-antwoord van de server klaar voor de eerste ophaalronde van deze klant. Aan te
+ * roepen tijdens het renderen van de klantpagina, vóór het effect van de hook; doet niets op de
+ * server, niets met een belofte die de bak al kende, en niets als er al een vers antwoord in de
+ * cache staat.
+ */
+export function zaaiClientData(clientId: string, belofte: Promise<Zaad<GoogleAntwoord> | null> | null | undefined): void {
+  const cached = cache.get(clientId);
+  if (cached && Date.now() - cached.timestamp < CACHE_TTL) return;
+  zaadbak.zaai(clientId, belofte);
+}
+
 /** Invalidate cache for a specific client — triggers refetch */
 export function invalidateClientCache(clientId: string): void {
   cache.delete(clientId);
+  // Ook het zaad van de server: dat is van vóór de wijziging.
+  zaadbak.vergeet(clientId);
   window.dispatchEvent(new CustomEvent("client-data-refresh", { detail: { clientId } }));
 }
 
@@ -196,7 +247,7 @@ export function useClientData(clientId: string): ClientDataState {
       }
     }
 
-    const googleAdsCustomerId = clientId.replace("gads-", "");
+    const googleAdsCustomerId = googleKlantnummer(clientId);
 
     setState({ data: null, loading: true, error: null, source: "api", googleAdsCustomerId });
 
@@ -205,8 +256,15 @@ export function useClientData(clientId: string): ClientDataState {
     // is: een eerste bezoek zag andere Google-cijfers dan een tweede. De cache blijft op clientId;
     // na een wijziging in de instellingen ververst invalidateClientCache hem. Dat moet dan wel ná
     // het opslaan in de database gebeuren: de route leest de selectie daar, niet uit de browser.
-    fetch(`/api/google-ads/client-data?customerId=${googleAdsCustomerId}`)
-      .then((res) => res.json())
+    // Stuurde de server het antwoord al mee, dan dat; anders (of als het zaad niets bruikbaars
+    // draagt) de route. Een geforceerde ververs (refetchCount) neemt nooit het zaad: dat is oud.
+    const vanRoute = (): Promise<GoogleAntwoord> =>
+      fetch(`/api/google-ads/client-data?customerId=${googleAdsCustomerId}`).then((res) => res.json());
+    const zaad = refetchCount === 0 ? zaadbak.neem(clientId) : null;
+    // Ongetypeerd, zoals res.json() het hier altijd gaf: de velden gaan ongezien door naar de staat.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const antwoord: Promise<any> = zaad ? zaad.then((a) => a ?? vanRoute()) : vanRoute();
+    antwoord
       .then((apiData) => {
         if (apiData.error) {
           const result: ClientDataState = {
@@ -217,20 +275,7 @@ export function useClientData(clientId: string): ClientDataState {
         }
 
         // Convert API data to ClientHistoricalData using the adapter
-        const historicalData: ClientHistoricalData = {
-          ...buildClientDataFromApi(
-            clientId,
-            (apiData.historicalYears as YearDataInput[]) ?? [],
-            (apiData.currentYearMonthly as ApiMonthlyData[]) ?? [],
-            (apiData.currentYearWeekly as ApiWeeklyData[]) ?? [],
-            apiData.targetCurrentYear,
-            apiData.currentYear ?? Number(today().slice(0, 4)),
-            apiData.realizedThroughMonth,
-          ),
-          // Tot waar de route de data definitief acht. Het venster van de KPI-band eindigt hierop;
-          // zonder (een oudere route) volgen de presets de kalender.
-          dataStand: apiData.dataStand ?? null,
-        };
+        const historicalData: ClientHistoricalData = googleDataUitAntwoord(clientId, apiData);
 
         const result: ClientDataState = {
           data: historicalData,

@@ -42,6 +42,16 @@ function parseMonth(dateStr: string): number {
   return parseInt(parts[1], 10);
 }
 
+/**
+ * Het Google Ads-klantnummer bij een klant-id: het id zonder "gads-". De browser vraagt
+ * /api/google-ads/client-data op met dit nummer (lib/use-client-data.ts), en de server leest
+ * hetzelfde antwoord voor het zaad (lib/overzicht/zaad-server.ts). Eén plek, zodat de twee
+ * nooit een ander account lezen.
+ */
+export function googleKlantnummer(clientId: string): string {
+  return clientId.replace("gads-", "");
+}
+
 export function googleAdsMonthlyToApiData(
   metrics: GoogleAdsMetrics[]
 ): ApiMonthlyData[] {
