@@ -109,6 +109,9 @@ const LEES = (klant) => {
     if (!eigen || eigen.length > 24 || !/\d/.test(eigen)) continue;
     const cs = getComputedStyle(el);
     if (parseFloat(cs.fontSize) < 18 || cs.display === "none" || el.getClientRects().length === 0) continue;
+    // Een verandering ("+6%", "-7,5%") is geen kerncijfer, ook al staat hij groot onder een label:
+    // zo las de controle "+6%" als de kosten en vergeleek dat met een bedrag.
+    if (/^[+\u2212-]/.test(eigen) || /%$/.test(eigen)) continue;
     const label = schoon(el.previousElementSibling?.textContent);
     if (label && label.length <= 40) tegels.push({ label, tekst: eigen });
   }
@@ -175,7 +178,7 @@ const totaalSom = (gelezen, patroon) => {
 
 const TEGELS = [
   ["Conversies", /^conversies$/i],
-  ["Kosten", /^(kosten|spend|ad ?spend|uitgaven)$/i],
+  ["Kosten", /^(advertentie)?(kosten|spend|ad ?spend|uitgaven)$/i],
   ["CPA", /^cpa$/i],
   ["ROAS", /^roas$/i],
   ["Omzet", /^(omzet|opbrengst|revenue)$/i],
@@ -211,8 +214,12 @@ function vergelijkingen(p) {
 
   paar("Jaardoel", "Prognose", tegel(p.prognose, /doel/i), "Doelen & voortgang", tegel(p.doelen, /doel/i));
 
-  paar("Conversies", "Portfolio (rij van de klant)", cel(p.portfolio, /conversies/i), "Overzicht oud (tegel)", tegel(p.oud, /^conversies$/i));
-  paar("Kosten", "Portfolio (rij van de klant)", cel(p.portfolio, /kosten|spend/i), "Overzicht oud (tegel)", tegel(p.oud, TEGELS[1][1]));
+  // Portfolio toont alleen Google Ads en zegt dat in zijn kop (lib/portfolio-kop.ts). Hij hoort dus
+  // gelijk te zijn aan de Google-kaart, niet aan het totaal over alle kanalen: tegen dat totaal
+  // stond hier elke klant met meer dan een kanaal als "verschil", terwijl beide schermen klopten.
+  const google = p.nieuw?.kaarten.find((k) => k.kanaal === "google");
+  paar("Conversies", "Portfolio (rij van de klant, alleen Google)", cel(p.portfolio, /conversies/i), "kanaalkaart Google", google?.conversies ? { label: "Google", tekst: google.conversies } : null);
+  paar("Kosten", "Portfolio (rij van de klant, alleen Google)", cel(p.portfolio, /kosten|spend/i), "kanaalkaart Google", google?.kosten ? { label: "Google", tekst: google.kosten } : null);
   return uit;
 }
 
@@ -276,14 +283,16 @@ async function zelftest(browser) {
   const ctx = await browser.newContext();
   const p = await ctx.newPage();
   const paginas = {
-    oud: pagina(tegelHtml([["Conversies", "1.246"], ["Kosten", "€ 49.870"], ["CPA", "€ 40,02"]])),
+    // Eerst een verandering onder het label Kosten ("+6%"), dan het bedrag onder "Advertentiekosten",
+    // zoals PeriodSummary ze toont: de lezer moet de verandering overslaan en het label herkennen.
+    oud: pagina(tegelHtml([["Conversies", "1.246"], ["Kosten", "+6%"], ["Advertentiekosten", "€ 49.870"], ["CPA", "€ 40,02"]])),
     // Conversies wijken echt af; CPA verschilt alleen in afronding; kosten in "k"-notatie, binnen de stap.
     nieuw: pagina(tegelHtml([["Conversies", "1.312"], ["Kosten", "€ 50k"], ["CPA", "€ 40"]]) + kaartHtml([["google", "1.000", "€ 40.000"], ["meta", "246", "€ 9.870"]])),
     // Zoals campaigns-per-channel.tsx: een tabel per kanaal, het totaal in tfoot, de kop met bijschrift.
     campagnes: pagina(campagneTabel("Google Ads", "Conversies", "€ 40.000", "1.000") + campagneTabel("LinkedIn", "Leads", "€ 9.870", "246")),
     // Zoals portfolio-scoreboard.tsx: de NAAM in de rij, het id alleen in de href. Een andere klant
     // erboven, zodat een lezer die de eerste rij pakt het verkeerde getal krijgt.
-    portfolio: pagina(portfolioTabel([["Andere klant", "/client/iemand-anders", "88", "€ 3.100"], ["GreenTech (demo)", `/client/${KLANT}`, "1.246", "€ 49.870"]])),
+    portfolio: pagina(portfolioTabel([["Andere klant", "/client/iemand-anders", "88", "€ 3.100"], ["GreenTech (demo)", `/client/${KLANT}`, "1.000", "€ 40.000"]])),
   };
   await p.route(`${NEP}/**`, (route) => {
     const naam = new URL(route.request().url()).pathname.slice(1);
@@ -311,6 +320,7 @@ async function zelftest(browser) {
     ["Campagnes: kosten uit de totaalrijen opgeteld gelijk aan € 49.870", uitslag("Kosten", "Overzicht oud", "Campagnes") === "gelijk"],
     ["Portfolio: de rij wordt via de link gevonden, niet via de tekst", uitslag("Conversies", "Portfolio") === "gelijk"],
     ["Portfolio: kosten van de juiste rij (niet de eerste)", uitslag("Kosten", "Portfolio") === "gelijk"],
+    ["een verandering (+6%) is geen kostenbedrag, Advertentiekosten wel", uitslag("Kosten", "Overzicht oud", "Campagnes") === "gelijk"],
     ["leesGetal: '1.246' is 1246", leesGetal("1.246")?.waarde === 1246],
     ["leesGetal: '€ 45,20' is 45,2 met stap 0,01", leesGetal("€ 45,20")?.waarde === 45.2 && leesGetal("€ 45,20")?.stap === 0.01],
     ["leesGetal: '—' is geen getal", leesGetal("—") === null],

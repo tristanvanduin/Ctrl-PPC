@@ -18,7 +18,7 @@
 // "onherleidbaar" zodat ze zichtbaar blijven, maar ze laten de check niet falen — anders
 // went iedereen aan een rode uitkomst en is de check dood.
 
-import { readFileSync, writeFileSync, readdirSync, statSync } from "node:fs";
+import { readFileSync, writeFileSync, readdirSync, statSync, existsSync } from "node:fs";
 import { join, relative } from "node:path";
 
 const WORTEL = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
@@ -44,6 +44,23 @@ if (process.argv.includes("--vernieuw")) {
 }
 
 const SCHEMA = JSON.parse(readFileSync(SNAPSHOT_PAD, "utf8"));
+
+// ── Klaargezette tabellen ──────────────────────────────────────────────────
+//
+// Een tabel waarvan de migratie klaarstaat maar nog niet gedraaid is (dat wacht op de eigenaar),
+// en waarvan de code het ontbreken BEWUST opvangt. Die telt niet als fout, maar wordt wel elke
+// keer gemeld, zodat hij niet uit beeld raakt. Een naam hier zonder het migratiebestand telt
+// gewoon als fout. Staat de tabel eenmaal in de snapshot (na --vernieuw), dan doet de regel niets
+// meer en hoort hij weg. Een tabel hoort hier ALLEEN als de code getest is zonder de tabel.
+const KLAARGEZET = {
+  meta_period_reach: {
+    migratie: "scripts/migrations/110_meta_period_reach.sql",
+    reden: "Meta-periodebereik voor de frequentiedetector. lib/meta/sync.ts kijkt eerst of de tabel " +
+      "bestaat en slaat de lezing anders over (getest in lib/meta/__meta_sync_test.ts); de detector " +
+      "zegt dan 'niet te beoordelen'.",
+  },
+};
+const klaargezet = [];
 
 // ── Bronbestanden verzamelen ───────────────────────────────────────────────
 
@@ -130,6 +147,10 @@ for (const pad of bestanden) {
     // en horen er ook niet in.
     if (bron.slice(Math.max(0, m.index - 60), m.index).includes(".storage")) continue;
     if (!SCHEMA[tabel]) {
+      if (KLAARGEZET[tabel] && existsSync(join(WORTEL, KLAARGEZET[tabel].migratie))) {
+        klaargezet.push({ bestand: rel, regel, tabel });
+        continue;
+      }
       fouten.push({ bestand: rel, regel, melding: `tabel "${tabel}" bestaat niet` });
       continue;
     }
@@ -163,6 +184,14 @@ for (const pad of bestanden) {
 
 // ── Rapport ────────────────────────────────────────────────────────────────
 
+if (klaargezet.length) {
+  const tabellen = [...new Set(klaargezet.map((k) => k.tabel))];
+  console.log(`\nKLAARGEZET, nog niet in de database (${klaargezet.length} plek(ken), geen fout):`);
+  for (const t of tabellen) {
+    console.log(`  ${t}: wacht op ${KLAARGEZET[t].migratie}. ${KLAARGEZET[t].reden}`);
+    for (const k of klaargezet.filter((x) => x.tabel === t)) console.log(`    ${k.bestand}:${k.regel}`);
+  }
+}
 if (fouten.length) {
   console.error(`\n${fouten.length} kolom/tabel-fouten:\n`);
   for (const f of fouten) console.error(`  ${f.bestand}:${f.regel}  ${f.melding}`);

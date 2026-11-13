@@ -1209,9 +1209,11 @@ export function DgmView({ clientId, kanalen = null, geoClone = null }: {
                     <CircleDot className="w-4 h-4 text-brand-blue-ink" />
                   )}
                 </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-0.5">
-                    <p className="text-sm font-medium text-brand-gray">{action.title}</p>
+                {/* break-words: een titel met een lang samengesteld woord of een campagnenaam kon niet
+                    afbreken en duwde de kaart op een telefoon 200 px buiten het scherm. */}
+                <div className="flex-1 min-w-0 break-words">
+                  <div className="flex items-center gap-2 mb-0.5 min-w-0">
+                    <p className="min-w-0 text-sm font-medium text-brand-gray">{action.title}</p>
                   </div>
                   <p className="text-xs text-muted-foreground leading-relaxed">{action.why}</p>
                   <div className="flex flex-wrap gap-2 mt-1.5">

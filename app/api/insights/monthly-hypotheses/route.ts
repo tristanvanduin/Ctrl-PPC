@@ -215,7 +215,16 @@ export async function GET(request: NextRequest) {
   const sopType = resolveSopType(request.nextUrl.searchParams.get("channel"));
 
   const ctx = await loadLatestMonthlyContext(clientId, sopType);
-  if (ctx.error) return ctx.error;
+  // Geen maandanalyse voor dit kanaal is een gewone lege stand, geen fout: het blok toont dan "nog
+  // geen hypothesen". Een 404 maakte van elke klant zonder maandrun vier mislukte verzoeken per
+  // bezoek aan Bevindingen, die de browser als fout logt en die de rookproef terecht afkeurde.
+  // Een POST op zo'n klant blijft wel een 404: daar wordt een hypothese gezocht die er niet is.
+  if (ctx.error) {
+    if (ctx.error.status === 404) {
+      return Response.json({ analysis_id: null, structured_row_id: null, structured_created_at: null, hypotheses: [] });
+    }
+    return ctx.error;
+  }
 
   return Response.json(ctx.payload);
 }

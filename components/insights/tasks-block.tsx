@@ -431,7 +431,7 @@ export function TasksBlock({ clientId, selectedInsightId, refreshKey, channel }:
       </p>
 
       {/* Cadence tabs */}
-      <div className="flex gap-1 bg-gray-100 rounded-lg p-0.5 mb-4">
+      <div className="flex flex-wrap gap-1 bg-gray-100 rounded-lg p-0.5 mb-4">
         {(["actions", "weekly", "biweekly", "monthly"] as Cadence[]).map((c) => (
           <button
             key={c}

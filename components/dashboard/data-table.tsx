@@ -56,10 +56,16 @@ export const TABEL_KOP = "px-3 py-2.5";
 /** De opvulling van een gewone cel. */
 export const TABEL_CEL = "px-3 py-2";
 
-/** De tabel plus zijn horizontale scroll. Tabellen mogen nooit de pagina laten scrollen. */
+/**
+ * De tabel plus zijn horizontale scroll. Tabellen mogen nooit de pagina laten scrollen.
+ *
+ * `relative`: een sr-only kolomkop ("Openen" op Portfolio) is absoluut gepositioneerd. Zonder
+ * gepositioneerde voorouder hing hij aan de body, buiten dit schuifvak, en duwde hij op een
+ * telefoon de hele pagina 400 px zijwaarts.
+ */
 export function Tabel({ children, className = "" }: { children: ReactNode; className?: string }) {
   return (
-    <div className={`overflow-x-auto ${className}`}>
+    <div className={`relative overflow-x-auto ${className}`}>
       <table className="w-full text-body border-collapse">{children}</table>
     </div>
   );

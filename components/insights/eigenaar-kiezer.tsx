@@ -19,6 +19,7 @@
 // regel die dat zegt, met de verwijzing waar accounts vandaan komen. Hetzelfde geldt voor de
 // klantkant, waar personen per definitie ontbreken.
 
+import { isDemoMode } from "@/lib/demo/demo-mode";
 import { useEffect, useRef, useState } from "react";
 import { Check, ChevronDown, X } from "lucide-react";
 import {
@@ -45,6 +46,9 @@ export interface TeamResultaat {
 
 let teamCache: Promise<TeamResultaat> | null = null;
 export function haalTeam(): Promise<TeamResultaat> {
+  // In de demo is er geen sessie, dus de route weigert altijd (401). Dat verzoek leverde op elk
+  // planningsscherm een fout in de console op, voor een uitkomst die vooraf vaststaat.
+  if (!teamCache && isDemoMode()) teamCache = Promise.resolve({ leden: [], ok: false });
   if (!teamCache) {
     teamCache = fetch("/api/team")
       .then(async (r) => {

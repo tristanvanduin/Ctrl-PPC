@@ -114,6 +114,10 @@ export function ClientSettingsPanel({ clientId, clientName, kaarten }: Props) {
     async function loadLogo() {
       if (!supabase) return;
       const path = `${clientId}/logo.png`;
+      // Eerst kijken of er een logo is: een handtekening vragen voor een bestand dat niet bestaat
+      // geeft een 400 van de opslag, en dat stond bij elke klant zonder logo als fout in de console.
+      const { data: lijst } = await supabase.storage.from("client-files").list(clientId, { search: "logo.png", limit: 1 });
+      if (!Array.isArray(lijst) || !lijst.some((f) => f.name === "logo.png")) return;
       const { data } = await supabase.storage.from("client-files").createSignedUrl(path, 3600);
       if (data?.signedUrl) setLogoUrl(data.signedUrl);
     }
@@ -974,8 +978,8 @@ export function ClientSettingsPanel({ clientId, clientName, kaarten }: Props) {
       </div>
       )}
 
-      {/* Save / Reset */}
-      <div className="flex items-center gap-3">
+      {/* Save / Reset. flex-wrap: op een telefoon passen de twee knoppen niet naast elkaar. */}
+      <div className="flex flex-wrap items-center gap-3">
         <Button onClick={handleSave} className="bg-brand-blue hover:bg-brand-blue-light text-white gap-2">
           {saved ? <Check className="w-4 h-4" /> : <Save className="w-4 h-4" />}
           {saved ? "Opgeslagen!" : "Instellingen opslaan"}

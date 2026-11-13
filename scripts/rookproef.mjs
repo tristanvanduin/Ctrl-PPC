@@ -51,9 +51,11 @@ const BREEDTE = 390;
  * die buiten de pagina zitten.
  *
  * Een kerncijfer is een zichtbaar getal in grote letter: tekst met een cijfer erin, hoogstens
- * dertig tekens, met een lettergrootte van 20 px of meer. Dat dekt de Kerncijfer-component in beide
- * maten (text-figure en text-xl) en de grote cijfers van Portfolio, zonder op een klassenaam te
- * leunen die bij een restyle verandert.
+ * dertig tekens, met een lettergrootte van 18 px of meer. Dat dekt de Kerncijfer-component in beide
+ * maten (text-figure en text-xl) en de cijfers van Portfolio, zonder op een klassenaam te leunen
+ * die bij een restyle verandert. 18 en niet 20: op een telefoon verbergt Portfolio de grote cijfers
+ * in de kop en toont dezelfde cijfers in kaarten van 18 px; met 20 keurde de proef die pagina af
+ * als "leeg" terwijl alle cijfers er stonden.
  */
 const MEET = () => {
   const zichtbaar = (el) => {
@@ -69,7 +71,7 @@ const MEET = () => {
     // Alleen de eigen tekst van het element, niet die van zijn kinderen.
     const eigen = [...el.childNodes].filter((n) => n.nodeType === 3).map((n) => n.textContent).join("").trim();
     if (!eigen || eigen.length > 30 || !/\d/.test(eigen)) continue;
-    if (parseFloat(getComputedStyle(el).fontSize) < 20 || !zichtbaar(el)) continue;
+    if (parseFloat(getComputedStyle(el).fontSize) < 18 || !zichtbaar(el)) continue;
     kerncijfers += 1;
     if (voorbeeld.length < 3) voorbeeld.push(eigen);
   }
@@ -105,8 +107,19 @@ function luister(p) {
 }
 
 /** Beoordeelt de pagina zoals hij nu staat. */
+/** Hoe lang een pagina na de vaste wachttijd nog krijgt om zijn eerste kerncijfer te tonen. */
+const KERNCIJFER_GEDULD_MS = 10000;
+
 async function beoordeel(p, verzamel, { kerncijfer }) {
-  const m = await p.evaluate(MEET);
+  let m = await p.evaluate(MEET);
+  // Een pagina die zijn cijfers na een eigen verzoek tekent (Portfolio laadt de klantenlijst en
+  // daarna de cijfers) kan na de vaste wachttijd nog leeg zijn, vooral vlak na een build. Dan nog
+  // tot KERNCIJFER_GEDULD_MS wachten tot er een cijfer staat, voor het oordeel "leeg" valt: een
+  // pagina die echt leeg blijft, wordt na die tijd nog steeds afgekeurd.
+  for (let t = 0; kerncijfer && m.kerncijfers === 0 && t < KERNCIJFER_GEDULD_MS; t += 500) {
+    await p.waitForTimeout(500);
+    m = await p.evaluate(MEET);
+  }
   const fouten = [...verzamel()];
   if (m.nextFout) fouten.push(m.nextFout);
   for (const g of m.foutgrenzen) fouten.push(`error-grens toont een melding (${g})`);
