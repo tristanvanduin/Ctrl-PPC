@@ -244,6 +244,11 @@ export function resolveComparison(p: PeriodRange, mode: ComparisonMode): PeriodR
   return { start: addMonths(p.start, -12), end: addMonths(p.end, -12) };
 }
 
+/** De zin bij overlap. Eén plek: de dagperiode (dag-periode.ts) meldt hetzelfde verschijnsel met
+ *  dezelfde woorden. */
+export const OVERLAP_WAARSCHUWING =
+  "De vergelijkingsperiode overlapt met de gekozen periode; een deel van de data telt twee keer mee.";
+
 /** Overlappen de periode en zijn vergelijking elkaar? Dan telt data dubbel mee. */
 export function overlaps(a: PeriodRange, b: PeriodRange): boolean {
   return monthIndex(a.start) <= monthIndex(b.end) && monthIndex(b.start) <= monthIndex(a.end);
@@ -293,7 +298,7 @@ export function comparisonWarning(
   const c = resolveComparison(p, mode);
   if (!c) return null;
   if (overlaps(p, c)) {
-    return "De vergelijkingsperiode overlapt met de gekozen periode; een deel van de data telt twee keer mee.";
+    return OVERLAP_WAARSCHUWING;
   }
   if (mode === "previous_period" && opties?.jaarlijkseEditie) {
     return "Deze beurs heeft een jaarlijkse editie. De voorgaande periode vergelijkt dan de aanloop met de nasleep; vorig jaar is hier de zinnige vergelijking.";

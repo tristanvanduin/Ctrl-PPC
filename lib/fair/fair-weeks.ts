@@ -99,7 +99,10 @@ function geldigeEdities(event: FairEventCfg): Edition[] {
     .sort((a, b) => a.date.localeCompare(b.date));
 }
 
-function editieLabel(e: Edition): string {
+/** Het label van een editie, of het jaar van zijn datum als het leeg is. Ook gebruikt door
+ *  lib/events/event-periodes.ts, zodat dezelfde editie in de aftelling en in de periodekiezer
+ *  dezelfde naam heeft (ook als zijn aanloop over de jaargrens loopt). */
+export function editieLabel(e: Pick<Edition, "date" | "label">): string {
   return e.label?.trim() || e.date.slice(0, 4);
 }
 

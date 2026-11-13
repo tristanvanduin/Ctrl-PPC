@@ -7,7 +7,13 @@
 import type { BrandVisualIdentity } from "@/lib/branding/theme";
 
 export type Cadence = "annual" | "biennial" | "custom";
-export interface Edition { date: string; label: string }
+/**
+ * Een editie zoals hij in rai_events staat. `start` en `end` zijn optioneel ("YYYY-MM-DD", beide
+ * meegeteld): de periode van de editie als die langer is dan de ene dag in `date`. Zonder beide is
+ * de editie een periode van die ene dag. Gelezen door lib/events/event-periodes.ts; `date` blijft het
+ * ankerpunt van de T-minus-analyse.
+ */
+export interface Edition { date: string; label: string; start?: string | null; end?: string | null }
 
 // Branding-override: de merknaam plus de visuele identiteit (zelfde velden als de brand guide).
 export interface GeoCloneBranding extends BrandVisualIdentity {
