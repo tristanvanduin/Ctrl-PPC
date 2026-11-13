@@ -146,8 +146,17 @@ export interface MicrosoftAnalysisData {
 // in lib/meta/analysis-data.ts). select("*") en niet een dynamische kolomlijst: Supabase's
 // template-literal-parser kan een string-interpolatie niet typechecken, en de tabellen zijn per
 // klant klein.
+//
+// microsoft_breakdown_daily bevat sinds de kaart per dag ook land en staat (syncMicrosoftGeo). Die
+// filteren we IN de query weg: tientallen landen en staten per dag brengen een venster van weken over
+// de 1000 rijen die PostgREST teruggeeft, en dan zouden de netwerk- en apparaatrijen die de analyses
+// lezen stil en willekeurig wegvallen. Een filter na het ophalen komt daarvoor te laat.
+const ANALYSE_BREAKDOWN_TYPES = ["network", "device"] as const;
+
 export async function fetchMicrosoftDaily(supabase: SupabaseClient, clientId: string, table: string, start: string, end: string): Promise<DbRow[]> {
-  const { data } = await supabase.from(table).select("*").eq("client_id", clientId).gte("date", start).lte("date", end);
+  let q = supabase.from(table).select("*").eq("client_id", clientId).gte("date", start).lte("date", end);
+  if (table === "microsoft_breakdown_daily") q = q.in("breakdown_type", [...ANALYSE_BREAKDOWN_TYPES]);
+  const { data } = await q;
   return (data ?? []) as DbRow[];
 }
 

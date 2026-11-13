@@ -45,7 +45,10 @@ export const STAND_VAN_NU = { "data-venster": "stand" } as const;
 type Props = (
   /** `kaal`: alleen "volgt periode", zonder de maanden; voor een kop die de periode zelf al voluit
    *  toont (de KPI-band), waar de maanden ernaast een herhaling zijn. */
-  | { soort: "periode"; kaal?: boolean }
+  | { soort: "periode"; kaal?: boolean;
+      /** Het blok telt de periode van de kiezer per dag (de kaart in de nieuwe weergave): dan staan de
+       *  dagen in het label, niet de maanden die de periode raken. */
+      perDag?: boolean }
   /** Zonder `jaar`: het lopende rapportagejaar (Amsterdam), het jaar waar pacing, jaardoel en
    *  prognose over gaan. Een blok dat zijn jaar uit de data kent, geeft dat mee. */
   | { soort: "jaar"; jaar?: number }
@@ -65,11 +68,15 @@ export function Vensterlabel(props: Props) {
   const jaar = soort === "jaar" ? props.jaar ?? Number(today().slice(0, 4)) : null;
   // Een periode per dag die geen hele maanden is: dit blok telt de maanden die hij raakt.
   const perMaand = periode.dag && !periode.dag.maandPad && periode.dag.keuze.periode.soort === "dagen" ? periode.dag.periode : null;
-  const tekst = soort === "periode" && perMaand ? `volgt periode · per maand: ${formatRangeKort(periode.range)}`
+  // Een blok dat per dag telt, volgt de dagen zelf.
+  const dagen = soort === "periode" && props.perDag && periode.dag ? periode.dag.periode : null;
+  const tekst = dagen ? `volgt periode · per dag: ${formatDagPeriode(dagen)}`
+    : soort === "periode" && perMaand ? `volgt periode · per maand: ${formatRangeKort(periode.range)}`
     : soort === "periode" ? (props.kaal ? "volgt periode" : `volgt periode · ${formatRangeKort(periode.range)}`)
     : soort === "jaar" ? `jaarblok · ${jaar}`
     : `vast venster · ${props.venster}`;
-  const uitleg = soort === "periode" && perMaand
+  const uitleg = dagen ? `Dit blok volgt de gekozen periode per dag: ${formatDagPeriode(dagen)}.`
+    : soort === "periode" && perMaand
     ? `Dit blok telt per maand: de maanden die de gekozen periode (${formatDagPeriode(perMaand)}) raken, ${formatRange(periode.range)}.`
       // Het venster loopt bewust door tot na de datastand: dan staat er een halve maand naast hele.
       + (periode.range.end > periode.eindMaand ? " De laatste maand is nog niet compleet." : "")

@@ -97,6 +97,7 @@ import { FullBrandingToggle } from "./full-branding-toggle";
 import { EventSettings } from "./event-settings";
 import { GeoCloneSettingsPanel } from "./geo-clone-settings";
 import { ChannelConversionSettings } from "./channel-conversion-settings";
+import { ConversieTrechterSettings } from "./conversie-trechter-settings";
 import { Ga4Settings } from "./ga4-settings";
 import { SearchConsoleSettings } from "./search-console-settings";
 import { ChannelStructureAnalysis } from "./channel-structure-analysis";
@@ -472,6 +473,7 @@ export function ClientDashboard({ client, bewaardeWeergave = null, kanaalbalkVan
   // de tabs en de band, zoals het altijd deed: de oude weergave mag alleen sneller worden, niet
   // anders, en een moment met de band van het ene kanaal boven het tabblad van het andere is anders.
   const naarBeoordelen = useCallback(() => setActiveTab("outcomes"), []);
+  const naarInstellingen = useCallback(() => setActiveTab("settings"), []);
   const kanaalUitgesteld = useDeferredValue(channel);
   const kanaalOnder: Channel = nieuweWeergave ? kanaalUitgesteld : channel;
   const onderLooptAchter = kanaalOnder !== channel;
@@ -616,7 +618,7 @@ export function ClientDashboard({ client, bewaardeWeergave = null, kanaalbalkVan
   // Periode en Vergelijk met, met de events van de klant en vrije datums. Met de schakelaar uit de
   // vertrouwde kiezer, precies zoals hij was.
   const periodeKiezer = kiezerHier.toon && nieuweWeergave ? (
-    <PeriodeKiezer scope={`client-${client.id}`} events={eventPeriodes} kanalen={kanalen ?? GEEN_KANALEN} laden={!bandKlaar}
+    <PeriodeKiezer scope={`client-${client.id}`} clientId={client.id} events={eventPeriodes} kanalen={kanalen ?? GEEN_KANALEN} laden={!bandKlaar}
       onNaarEvents={() => setActiveTab("settings")} />
   ) : kiezerHier.toon ? (
     <DashboardPeriodPicker klaar={bandKlaar} jaarlijkseEditie={upcomingEdition?.cadence === "annual"} snelVanafTablet={nieuweWeergave} />
@@ -833,6 +835,7 @@ export function ClientDashboard({ client, bewaardeWeergave = null, kanaalbalkVan
               kanalen={kanalen}
               onKies={setChannel}
               onBeoordeel={naarBeoordelen}
+              onNaarInstellingen={naarInstellingen}
               googleData={clientData.data}
               googleStaat={clientData}
               route={blendedStand}
@@ -1125,7 +1128,7 @@ export function ClientDashboard({ client, bewaardeWeergave = null, kanaalbalkVan
                   </details>
                 </>
               ) : (
-                <SettingsSections client={client} />
+                <SettingsSections client={client} nieuweWeergave={nieuweWeergave} />
               )}
             </div>
           )}
@@ -1170,7 +1173,7 @@ const SETTINGS_GROEPEN = [
 
 type SettingsGroep = (typeof SETTINGS_GROEPEN)[number]["id"];
 
-function SettingsSections({ client }: { client: Client }) {
+function SettingsSections({ client, nieuweWeergave }: { client: Client; nieuweWeergave: boolean }) {
   const [groep, setGroep] = useState<SettingsGroep>("meten");
   const actief = SETTINGS_GROEPEN.find((g) => g.id === groep)!;
 
@@ -1196,6 +1199,9 @@ function SettingsSections({ client }: { client: Client }) {
           <ClientSettingsPanel clientId={client.id} clientName={client.name} kaarten={["kpi", "conversies", "overrides", "lag"]} />
           {/* Meta/LinkedIn direct onder de Google-conversie-acties: dezelfde vraag, ander kanaal. */}
           <ChannelConversionSettings clientId={client.id} />
+          {/* De stappen na de klik die het Overzicht in de nieuwe weergave toont: alleen daar, met de
+              schakelaar uit verandert er niets. */}
+          {nieuweWeergave && <ConversieTrechterSettings clientId={client.id} />}
         </div>
       )}
 

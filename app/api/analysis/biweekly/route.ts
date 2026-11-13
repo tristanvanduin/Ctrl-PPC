@@ -1187,7 +1187,9 @@ async function runMicrosoftBiWeeklyAnalysis(supabase: SupabaseClient, apiKey: st
   // level="account": zonder dit filter telt de som dubbel zodra een sync ook campagne-level
   // breakdowns schrijft (de unieke sleutel van de tabel draagt een level-kolom).
   const netwerkDeviceMonthly = aggregateMonthlyPerEntity(
-    breakdownRows.filter((r) => String(r.level) === "account")
+    // Alleen netwerk en apparaat: sinds de kaart per dag staan er ook land en staat in dezelfde tabel
+    // (lib/microsoft/sync.ts, syncMicrosoftGeo), en die horen niet in stap 4.
+    breakdownRows.filter((r) => String(r.level) === "account" && (r.breakdown_type === "network" || r.breakdown_type === "device"))
       .map((r) => ({ ...r, entity_id: `${r.breakdown_type}=${r.breakdown_value}` })),
     MICROSOFT_SUM_FIELDS
   ).map(({ entity_id, ...rest }) => ({ segment: entity_id, ...rest }));

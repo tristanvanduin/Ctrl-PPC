@@ -14,7 +14,7 @@ import {
   type MicrosoftApiConfig,
 } from "./api";
 import {
-  parseReportCsv, naarDagRij, naarBreakdownRij, naarKeywordMaandRij, naarZoektermMaandRij,
+  parseReportCsv, naarDagRij, naarBreakdownRij, naarGeoBreakdownRijen, naarKeywordMaandRij, naarZoektermMaandRij,
   naarImpressieAandeelRij, aggregeerProfielRijen, naarCampagneRij, naarAdGroupRij,
   normaliseerNetwerk, normaliseerApparaat, PROFIEL_PIVOTS,
 } from "./transform";
@@ -22,6 +22,8 @@ import {
 // Een eigen kopie hier zou precies de dubbele-hulpjes-val zijn die de hygienepoort bewaakt.
 import { trailingWindow, backfillWindow, monthlyChunks } from "@/lib/meta/sync-windows";
 import { recordFetchFailure, withFetchFailures } from "@/lib/api/fetch-failures";
+import { landcodeUitNaam } from "@/lib/geo/land-namen";
+import { regionNameToUsps } from "@/lib/geo/us-fips";
 import { logger } from "@/lib/logger";
 
 const log = logger.child("microsoft-sync");
@@ -132,6 +134,36 @@ export async function syncMicrosoftBreakdowns(ctx: MicrosoftSyncContext, since: 
       "client_id,date,level,entity_id,breakdown_type,breakdown_value", spec.bron
     );
     if (!uitkomst.success) failed.push(spec.breakdownType);
+    totaal += uitkomst.rows;
+  }
+  return { rows: totaal, success: failed.length === 0, failed };
+}
+
+// ── Geo per dag (land en staat) ─────────────────────────────────────────────
+//
+// Voor de kaart per dag (lib/geo/geo-source.ts): een GeographicPerformanceReport met aggregation
+// Daily, naast de bestaande rapporten, in dezelfde long-format-tabel als netwerk en apparaat. Net
+// als de rest van dit bestand live-ongetest: de kolomnamen (Country, State) volgen de v13-docs.
+
+const GEO_SPECS = [
+  { bron: "breakdown:country", type: "country" as const, kolommen: ["Country"] },
+  { bron: "breakdown:region", type: "region" as const, kolommen: ["Country", "State"] },
+];
+
+export async function syncMicrosoftGeo(ctx: MicrosoftSyncContext, since: string, until: string): Promise<MicrosoftSyncOutcome & { failed: string[] }> {
+  let totaal = 0;
+  const failed: string[] = [];
+  for (const spec of GEO_SPECS) {
+    const { rijen, fout } = await rapportRijen(ctx, spec.bron, bouwReportRequest({
+      type: "GeographicPerformanceReportRequest", aggregation: "Daily", accountId: ctx.cfg.accountId, since, until,
+      columns: ["TimePeriod", ...spec.kolommen, ...METRIEKEN],
+    }));
+    if (fout) { failed.push(spec.type); continue; }
+    const { rijen: dbRijen, onbekend } = naarGeoBreakdownRijen(rijen, ctx.clientId, ctx.cfg.accountId, spec.type, landcodeUitNaam, regionNameToUsps);
+    if (onbekend > 0) log.info(`${spec.bron}: ${onbekend} rijen zonder herkend land of staat overgeslagen`);
+    const uitkomst = await upsert(ctx, "microsoft_breakdown_daily", dbRijen,
+      "client_id,date,level,entity_id,breakdown_type,breakdown_value", spec.bron);
+    if (!uitkomst.success) failed.push(spec.type);
     totaal += uitkomst.rows;
   }
   return { rows: totaal, success: failed.length === 0, failed };
@@ -249,9 +281,10 @@ export async function syncMicrosoftDaily(ctx: MicrosoftSyncContext, endDate: str
     const entiteiten = await syncMicrosoftEntiteiten(ctx);
     const dagen = await syncMicrosoftDagen(ctx, since, until);
     const breakdowns = await syncMicrosoftBreakdowns(ctx, since, until);
+    const geo = await syncMicrosoftGeo(ctx, since, until);
     const maandSince = `${addMaanden(endDate.slice(0, 7), -1)}-01`;
     const maanden = await syncMicrosoftMaandtabellen(ctx, maandSince, until, entiteiten.budgetPerCampagne);
-    return verzamel({ entiteiten: entiteiten.uitkomst, ...dagen, breakdowns, ...maanden });
+    return verzamel({ entiteiten: entiteiten.uitkomst, ...dagen, breakdowns, geo, ...maanden });
   });
   return result;
 }
@@ -281,8 +314,15 @@ export async function syncMicrosoftBackfill(ctx: MicrosoftSyncContext, endDate: 
 
     const { since: bdSince } = trailingWindow(until, 62);
     const breakdowns = await syncMicrosoftBreakdowns(ctx, bdSince, until);
+    // Geo per dag over het hele venster, per maandstuk: de kaart volgt elke periode per dag, ook een
+    // van vorig jaar. Wat er eenmaal staat, blijft staan (upsert).
+    let geo: MicrosoftSyncOutcome & { failed: string[] } = { rows: 0, success: true, failed: [] };
+    for (const chunk of monthlyChunks(since, until)) {
+      const deel = await syncMicrosoftGeo(ctx, chunk.since, chunk.until);
+      geo = { rows: geo.rows + deel.rows, success: geo.success && deel.success, failed: [...new Set([...geo.failed, ...deel.failed])], error: deel.error ?? geo.error };
+    }
     const maanden = await syncMicrosoftMaandtabellen(ctx, since, until, entiteiten.budgetPerCampagne);
-    return verzamel({ entiteiten: entiteiten.uitkomst, ...dagUitkomsten, breakdowns, ...maanden });
+    return verzamel({ entiteiten: entiteiten.uitkomst, ...dagUitkomsten, breakdowns, geo, ...maanden });
   });
   return result;
 }

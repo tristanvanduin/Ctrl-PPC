@@ -218,6 +218,12 @@ opDag("2026-11-13", () => {
     check("de weken die de periode raken", !!noot?.includes("16 nov 2026 t/m 6 dec 2026") && noot.includes("Meta en LinkedIn tellen per dag"), String(noot));
     check("niet bij hele maanden", googleWeekNoot({ start: "2026-10-01", eind: "2026-10-31" }, ["google"]) === null);
     check("niet zonder Google", googleWeekNoot({ start: "2026-11-20", eind: "2026-11-30" }, ["meta"]) === null);
+    // Met dagopslag (migratie 111) telt Google per dag: alleen een regel voor het deel ervóór.
+    check("met dagopslag die de periode dekt: geen regel", googleWeekNoot({ start: "2026-11-20", eind: "2026-11-30" }, ["google", "meta"], "2026-01-01") === null);
+    const deels = googleWeekNoot({ start: "2026-09-10", eind: "2026-11-12" }, ["google", "meta"], "2026-10-01");
+    check("met dagopslag die later begint: precies welk deel per maand",
+      deels === "Google: 1 okt 2026 t/m 12 nov 2026 per dag; sep 2026 per maand, voor de dagopslag begon (hele maanden: een maand wordt niet naar rato verdeeld). Meta telt per dag.", String(deels));
+    check("zonder dagopslag (null): per week, zoals voorheen", !!googleWeekNoot({ start: "2026-11-20", eind: "2026-11-30" }, ["google"], null)?.startsWith("Google telt op weekniveau"));
   }
 
   console.log("De kiezer dicht: twee knoppen naast elkaar en de regel eronder");

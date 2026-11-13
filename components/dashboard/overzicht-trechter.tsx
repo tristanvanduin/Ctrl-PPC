@@ -15,6 +15,7 @@
 // schermlezer krijgt de trechter als tabel. Kleur draagt nergens iets alleen: een kanaal dat meer
 // kost dan het levert, staat er in woorden, en een verandering heeft altijd een teken.
 
+import type { ReactNode } from "react";
 import { ArrowRight, Filter, PieChart } from "lucide-react";
 import { DUUR, useTellendeTekst } from "@/lib/beweging";
 import { KANAAL_KLEUR, KANAAL_NAAM, type Kanaal } from "@/lib/kanalen/beschikbaar";
@@ -198,13 +199,15 @@ function Overgang({ label, waarde, vorig }: { label: string; waarde: number | nu
  * De trechter van één kanaal: drie horizontale balken die afnemen, met de getallen ernaast en de
  * CTR en conversieratio ertussen. Daaronder een tabel voor een schermlezer met hetzelfde.
  */
-export function KanaalTrechter({ kanaal, trechter, uitleg, venster }: {
+export function KanaalTrechter({ kanaal, trechter, uitleg, venster, children }: {
   kanaal: Kanaal;
   /** Null zolang de cijfers laden. */
   trechter: Trechter | null;
   /** Waarom er voor dit kanaal geen vergelijking is, als dat zo is. */
   uitleg: string | null;
   venster: TrechterVenster;
+  /** Wat onder de trechter doorloopt: de stappen na de klik (overzicht-na-de-klik.tsx). */
+  children?: ReactNode;
 }) {
   const naam = KANAAL_NAAM[kanaal];
   const kleur = KANAAL_KLEUR[kanaal];
@@ -268,6 +271,7 @@ export function KanaalTrechter({ kanaal, trechter, uitleg, venster }: {
           )}
         </>
       )}
+      {children}
     </section>
   );
 }

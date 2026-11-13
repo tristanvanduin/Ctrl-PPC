@@ -15,6 +15,7 @@ import { getAuthUser } from "@/lib/auth/server";
 import { can, canAccessClient } from "@/lib/auth/roles";
 import { isWriteOperation, policyFor, validateWrite, type WriteOperation } from "@/lib/data-access/write-policy";
 import { validateRead, readPolicyFor, type ReadFilter } from "@/lib/data-access/read-policy";
+import { leesFoutAntwoord } from "@/lib/data-access/lees-fout";
 import { beslisserVan, stempelBeslissing, type HuidigeStand } from "@/lib/learning/beslis-stempel";
 
 /** De stand van precies een sprint_hypotheses-rij, of undefined als dat niet vast te stellen is. */
@@ -181,6 +182,10 @@ export async function GET(request: Request, context: { params: Promise<{ table: 
       : check.single === "single" ? await query.single()
         : await query;
 
-  if (error) return Response.json({ error: error.message }, { status: 500 });
+  if (error) {
+    // Een ontbrekende tabel (een klaargezette migratie) is geen 500: zie lib/data-access/lees-fout.ts.
+    const { body, status } = leesFoutAntwoord(error);
+    return Response.json(body, { status });
+  }
   return Response.json({ ok: true, data: data ?? (check.single ? null : []) });
 }

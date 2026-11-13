@@ -44,7 +44,12 @@ export function GeoMapCard({ state, channel = "google", verdieping, naast, voet,
    *  een klant met één land open in de kaart: hier een eigen regel kostte op elk scherm hoogte. */
   vensterUitleg?: string;
 }) {
-  const { metricKey, setMetricKey, metric, focus, setFocus, countries, laden, canDrillUs, geoWord, values, ranked, eenLandOfMinder } = state;
+  const { metricKey, setMetricKey, metric, focus, setFocus, countries, laden, canDrillUs, geoWord, values, ranked, eenLandOfMinder, dagVenster } = state;
+  // De nieuwe weergave: de kaart volgt de kiezer per dag, en zijn eigen voorbehoud (welk kanaal geen
+  // landdata heeft, wat Google per maand telde) vervangt het vaste "zonder Microsoft": per dag telt
+  // Microsoft mee als het landdata heeft, en anders staat dat in de regels.
+  const toevoeging = dagVenster ? dagVenster.toevoeging ?? undefined : vensterToevoeging;
+  const toevoegingUitleg = dagVenster ? (dagVenster.regels.length ? dagVenster.regels.join(" ") : undefined) : vensterUitleg;
 
   if (laden) return <Laadvlak vorm="grafiek" hoogte={220} titel="Waar komt het vandaan" />;
   // Was tot 20 augustus 2026 een stille `return null` -- zie geo-empty-state.tsx voor waarom dat
@@ -54,7 +59,7 @@ export function GeoMapCard({ state, channel = "google", verdieping, naast, voet,
   // vaakst.
   // Het voorbehoud bij het venster gaat mee: deze stand heeft geen eigen kop met een vensterlabel, en
   // zonder stond "zonder Microsoft" bij een klant met één land nergens meer.
-  if (eenLandOfMinder) return <GeoEnkelLandKaart channel={channel} land={countries[0] ?? null} voorbehoud={vensterToevoeging} voorbehoudUitleg={vensterUitleg} />;
+  if (eenLandOfMinder) return <GeoEnkelLandKaart channel={channel} land={countries[0] ?? null} voorbehoud={toevoeging} voorbehoudUitleg={toevoegingUitleg} />;
 
   // De kolom ernaast alleen als de ranglijst iets toont: zonder rijen voor de gekozen metriek stond
   // er rechts een leeg omrand vak naast "Geen data voor deze metric".
@@ -74,7 +79,9 @@ export function GeoMapCard({ state, channel = "google", verdieping, naast, voet,
         <span className="text-micro font-medium text-muted-foreground bg-muted px-1.5 py-0.5 rounded">{CHANNEL_LABEL[channel]}</span>
         {/* De landrijen komen uit een eigen lezing over 180 dagen (lib/geo/use-geo-breakdown.ts); de
             periode laten volgen kost een verzoek per wissel. Tot die tijd staat het venster erbij. */}
-        <Vensterlabel soort="vast" venster="laatste 180 dagen" toevoeging={vensterToevoeging} toevoegingUitleg={vensterUitleg} />
+        {dagVenster
+          ? <Vensterlabel soort="periode" perDag toevoeging={toevoeging} toevoegingUitleg={toevoegingUitleg} />
+          : <Vensterlabel soort="vast" venster="laatste 180 dagen" toevoeging={vensterToevoeging} toevoegingUitleg={vensterUitleg} />}
         {/* Het aantal landen als bijschrift, nu de tegel "aantal landen" er in deze vorm niet meer is. */}
         {naast !== undefined && ranked.length > 0 && (
           <span className="text-meta text-muted-foreground">{ranked.length} {focus === "US" ? "staten" : ranked.length === 1 ? "land" : "landen"}</span>
@@ -117,7 +124,7 @@ export function GeoMapCard({ state, channel = "google", verdieping, naast, voet,
             {/* Zonder rijen is er geen lade onder de kaart (GeoTabelLade rendert dan niets), en stond
                 het voorbehoud voluit alleen in de uitleg van het vensterlabel: niet te lezen zonder
                 muis. Juist hier hoort het: "geen data" kan ook betekenen dat de bron een kanaal mist. */}
-            {vensterUitleg && <p className="px-2 pb-2 text-center text-micro leading-snug text-muted-foreground" data-venster-uitleg>{vensterUitleg}</p>}
+            {toevoegingUitleg && <p className="px-2 pb-2 text-center text-micro leading-snug text-muted-foreground" data-venster-uitleg>{toevoegingUitleg}</p>}
           </>
         ) : (
           // De kaart-SVG is `w-full h-auto` op een viewBox van 760x380, dus zijn hoogte groeit
@@ -153,6 +160,13 @@ export function GeoMapCard({ state, channel = "google", verdieping, naast, voet,
       {metNaast && <div className="min-w-0 border-t border-border lg:border-l lg:border-t-0">{naast}</div>}
       </div>
 
+      {/* Per dag: wat elk kanaal telde staat hier leesbaar, niet alleen in de uitleg van het label
+          (die is zonder muis niet te zien). Met een vergelijking ook wat buiten de verandering valt. */}
+      {dagVenster && ranked.length > 0 && dagVenster.regels.length > 0 && (
+        <div className="border-t border-border px-5 py-2" data-venster-uitleg>
+          {dagVenster.regels.map((r) => <p key={r} className="text-micro leading-snug text-muted-foreground">{r}</p>)}
+        </div>
+      )}
       {verdieping}
       {voet}
     </div>

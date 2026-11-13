@@ -36,7 +36,9 @@ import {
 } from "@/lib/overzicht/trechter";
 import { comparePeriods } from "@/lib/period/apply-period";
 import { formatRange, monthsIn, type Month } from "@/lib/period/period-range";
-import { formatDagPeriode } from "@/lib/period/dag-periode";
+import { alsMaandPeriode, formatDagPeriode, uitMaandPeriode, type DagPeriode } from "@/lib/period/dag-periode";
+import { ketenNaDeKlik, naDeKlikPerStap, telKanaalStappen } from "@/lib/overzicht/conversiestappen";
+import { useConversiestappen } from "@/lib/overzicht/use-conversiestappen";
 import { useDagTelling } from "@/lib/period/use-dag-telling";
 import { opbouwVertraging, useEersteOpbouw } from "@/lib/beweging";
 import { heeftGecachteInstellingen, loadClientSettings } from "@/lib/client-settings";
@@ -54,6 +56,7 @@ import { BandUitZaad, type BandZaad } from "./band-uit-zaad";
 import { OverzichtHoofdgrafiek } from "./overzicht-hoofdgrafiek";
 import { OverzichtLogboek } from "./overzicht-logboek";
 import { BijdragePerKanaal, KanaalTrechter, StatusRegel, type TrechterVenster } from "./overzicht-trechter";
+import { KanaalNaDeKlik, NaDeKlikPerKanaal } from "./overzicht-na-de-klik";
 
 /**
  * De health van Google voor de kaart: dezelfde score als in de ranking "Account Health per kanaal".
@@ -96,7 +99,7 @@ function useGoogleHealth(clientId: string, googleData: ClientHistoricalData | nu
   return { health, laadt: aan && (!googleData || !klaar) };
 }
 
-function OverzichtBovenkantRuw({ clientId, channel, kanalen, onKies, onBeoordeel, googleData, googleStaat, route, band, bandKlaar, demo, reserveerKaarten = false, bandZaad = null }: {
+function OverzichtBovenkantRuw({ clientId, channel, kanalen, onKies, onBeoordeel, onNaarInstellingen, googleData, googleStaat, route, band, bandKlaar, demo, reserveerKaarten = false, bandZaad = null }: {
   clientId: string;
   /** Wat er getoond wordt: een kanaal, of "blended" voor alle kanalen. */
   channel: Kanaalkeuze;
@@ -106,6 +109,8 @@ function OverzichtBovenkantRuw({ clientId, channel, kanalen, onKies, onBeoordeel
   onKies: (keuze: Kanaalkeuze) => void;
   /** Naar het tabblad Bevindingen: daar wordt beslist, het logboek wijst er alleen naar. */
   onBeoordeel: () => void;
+  /** Naar de instellingen, waar de conversietrechter staat: voor een blok zonder stappen na de klik. */
+  onNaarInstellingen?: () => void;
   googleData: ClientHistoricalData | null;
   /**
    * De verspillingsdata en de accountstructuur van de Google-route (useClientData), voor Hygiëne in
@@ -290,6 +295,28 @@ function OverzichtBovenkantRuw({ clientId, channel, kanalen, onKies, onBeoordeel
       ? { ...venster, noot: "niet elk kanaal telde precies deze dagen; de uitleg onder de kerncijfers zegt per kanaal welke" }
       : venster;
   }, [dagPad, dagTelling.alle, venster]);
+  // ── Na de klik: de stappen die de klant meet, per DAG over de gekozen periode
+  // (lib/overzicht/conversiestappen.ts). Eén lezing per klant, daarna rekenwerk.
+  const stapBron = useConversiestappen({ clientId, kanalen: lijst, aan: lijst.length > 0 });
+  const stapVensters = useMemo((): { p: DagPeriode; v: DagPeriode | null } => periode.dag
+    ? { p: periode.dag.periode, v: periode.dag.keuze.vergelijk !== "none" ? periode.dag.vergelijking.periode : null }
+    : { p: uitMaandPeriode(periode.range), v: periode.compareRange ? uitMaandPeriode(periode.compareRange) : null },
+  [periode.dag, periode.range, periode.compareRange]);
+  const ketens = useMemo(() => {
+    if (!stapBron) return null;
+    // Google heeft geen klikken per dag in deze rijen: alleen over hele maanden zijn ze bekend.
+    const googleKlikken = (p: DagPeriode) => {
+      const m = alsMaandPeriode(p);
+      return m ? tellersOver(tellersPerKanaal.google, monthsIn(m))?.clicks ?? null : null;
+    };
+    const { p, v } = stapVensters;
+    return lijst.map((k) => ketenNaDeKlik(
+      telKanaalStappen(k, p, stapBron.trechter, stapBron.rijen, googleKlikken(p)),
+      v ? telKanaalStappen(k, v, stapBron.trechter, stapBron.rijen, googleKlikken(v)) : null,
+    ));
+  }, [stapBron, stapVensters, lijst, tellersPerKanaal]);
+  const naDeKlik = useMemo(() => (ketens ? naDeKlikPerStap(ketens) : null), [ketens]);
+
   const trechterUitkomst = useMemo(
     () => (trechterStand ? trechter(trechterStand, trechterVergelijk?.paar ?? null) : null),
     [trechterStand, trechterVergelijk],
@@ -336,9 +363,14 @@ function OverzichtBovenkantRuw({ clientId, channel, kanalen, onKies, onBeoordeel
             zolangLaden={bandZaad && <BandUitZaad zaad={bandZaad} vorm="tegels" />} />
         )}
         {trechterKanaal ? (
-          <KanaalTrechter kanaal={trechterKanaal} trechter={trechterUitkomst} uitleg={trechterVergelijk?.uitleg ?? null} venster={trechterVenster} />
+          <KanaalTrechter kanaal={trechterKanaal} trechter={trechterUitkomst} uitleg={trechterVergelijk?.uitleg ?? null} venster={trechterVenster}>
+            <KanaalNaDeKlik keten={ketens?.find((k) => k.kanaal === trechterKanaal) ?? null} venster={venster} onNaarInstellingen={onNaarInstellingen} />
+          </KanaalTrechter>
         ) : lijst.length > 1 ? (
-          <BijdragePerKanaal rijen={bijdrage} venster={bijdrageVenster} />
+          <>
+            <BijdragePerKanaal rijen={bijdrage} venster={bijdrageVenster} />
+            <NaDeKlikPerKanaal uitkomst={naDeKlik} venster={venster} onNaarInstellingen={onNaarInstellingen} />
+          </>
         ) : null}
       </div>
       {/* De grafiek en het logboek naast elkaar (8 en 4 van de 12 kolommen); op een telefoon onder

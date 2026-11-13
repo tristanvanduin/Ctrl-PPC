@@ -14,7 +14,17 @@
 
 import { NextRequest } from "next/server";
 import { resolveGeo, type GeoChannel, type GeoLevel } from "@/lib/geo/geo-source";
+import { resolveGeoPeriode } from "@/lib/geo/geo-periode";
+import { isGeldigeDag, type DagPeriode } from "@/lib/period/dag-periode";
 import { isDemoRequest } from "@/lib/demo/server-supabase";
+
+/**
+ * De periode uit `van` en `tot` (en de vergelijking uit `vvan` en `vtot`), alleen als beide
+ * bestaande dagen zijn en in volgorde staan. Null: geen periode gevraagd, of een die niet klopt.
+ */
+function dagPeriodeUit(van: string | null, tot: string | null): DagPeriode | null {
+  return isGeldigeDag(van) && isGeldigeDag(tot) && van <= tot ? { start: van, eind: tot } : null;
+}
 
 const CHANNELS: GeoChannel[] = ["google", "meta", "linkedin", "blended"];
 const LEVELS: GeoLevel[] = ["country", "region"];
@@ -42,6 +52,24 @@ export async function GET(req: NextRequest) {
   const evidence = isDemoRequest(clientId) ? "demo" : "platform";
 
   const channel = kanaalParam as GeoChannel;
+
+  // De nieuwe weergave stuurt de periode van de kiezer mee (van/tot, en vvan/vtot voor de
+  // vergelijking): dan exact die dagen, per kanaal, met de vergelijking erbij (lib/geo/geo-periode.ts).
+  // Zonder periode het vaste venster van de vertrouwde weergave, ongewijzigd hieronder.
+  if (sp.has("van") || sp.has("tot")) {
+    const periode = dagPeriodeUit(sp.get("van"), sp.get("tot"));
+    if (!periode) return Response.json({ error: "van en tot moeten bestaande dagen zijn (JJJJ-MM-DD), van vóór tot" }, { status: 400 });
+    const metVergelijking = sp.has("vvan") || sp.has("vtot");
+    const vergelijking = metVergelijking ? dagPeriodeUit(sp.get("vvan"), sp.get("vtot")) : null;
+    if (metVergelijking && !vergelijking) return Response.json({ error: "vvan en vtot moeten bestaande dagen zijn (JJJJ-MM-DD), vvan vóór vtot" }, { status: 400 });
+    try {
+      const uit = await resolveGeoPeriode({ clientId, channel, periode, vergelijking });
+      return Response.json({ channel, level: BEIDE, evidence, ...uit });
+    } catch (e) {
+      console.error(`[api/geo] ${channel} per dag voor ${clientId} mislukt:`, e);
+      return Response.json({ error: "de landcijfers per dag konden niet geladen worden" }, { status: 500 });
+    }
+  }
 
   // level=beide: de kaart vroeg per kanaal twee losse verzoeken (land en staat; de staten zijn
   // nodig om de knop voor de VS te tonen). Nu één antwoord met beide. Het zijn dezelfde twee

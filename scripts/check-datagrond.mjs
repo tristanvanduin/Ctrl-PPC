@@ -54,8 +54,32 @@ const SCHEMA = JSON.parse(readFileSync(SNAPSHOT_PAD, "utf8"));
 // keer gemeld, zodat hij niet uit beeld raakt. Een naam hier zonder het migratiebestand telt
 // gewoon als fout. Staat de tabel eenmaal in de snapshot (na --vernieuw), dan doet de regel niets
 // meer en hoort hij weg. Een tabel hoort hier ALLEEN als de code getest is zonder de tabel.
+const MIGRATIE_111 = "scripts/migrations/111-google-dagtabellen.sql";
 const KLAARGEZET = {
-  // Leeg. meta_period_reach (migratie 110) stond hier tot hij op 13 november 2026 gedraaid werd.
+  // meta_period_reach (migratie 110) stond hier tot hij op 13 november 2026 gedraaid werd.
+  //
+  // Migratie 111: Google per dag. Zonder deze tabellen telt alles zoals daarvoor (per maand of week),
+  // en dat zegt het label; getest zonder de tabellen in lib/sync/__google_dagen_test.ts,
+  // lib/data-access/__lees_fout_test.ts, lib/period/__dag_opslag_test.ts en lib/geo/__geo_dag_test.ts.
+  google_dag_stand: {
+    migratie: MIGRATIE_111,
+    reden: "De sync leest hier eerst tot waar elke dagtabel gevuld is; ontbreekt de tabel, dan slaat hij " +
+      "Google per dag over met een logregel en mislukt de run niet (lib/sync/google-dagen.ts, leesGoogleDagStand).",
+  },
+  ads_account_daily: {
+    migratie: MIGRATIE_111,
+    reden: "De sync schrijft hem pas na google_dag_stand. De kerncijfers lezen hem via /api/data; een ontbrekende " +
+      "tabel komt daar terug als code tabel_ontbreekt (geen 500), en dan telt Google per week of maand, met label.",
+  },
+  ads_campaign_daily: { migratie: MIGRATIE_111, reden: "Alleen de sync schrijft hem, na dezelfde controle op google_dag_stand." },
+  ads_country_daily: {
+    migratie: MIGRATIE_111,
+    reden: "De kaart (lib/geo/geo-periode.ts) leest hem per periode; een fout of lege tabel valt terug op ads_country_monthly, met label.",
+  },
+  ads_region_daily: {
+    migratie: MIGRATIE_111,
+    reden: "Als ads_country_daily, met terugval op ads_region_monthly.",
+  },
 };
 const klaargezet = [];
 

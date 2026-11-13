@@ -155,6 +155,15 @@ export const READABLE_TABLES: Record<string, TableReadPolicy> = {
   // periode of een event daarom per hele week (lib/period/dag-telling.ts). Alleen lezen, per klant,
   // zoals de maandrijen hierboven.
   ads_account_weekly: { capability: "client:read", clientColumn: "client_id" },
+  // De dagrijen van Google (migratie 111): sinds de dagopslag telt elke periode per dag, ook bij
+  // Google (lib/period/dag-telling.ts). Zolang de tabel er niet is, antwoordt /api/data met de code
+  // tabel_ontbreekt (lib/data-access/lees-fout.ts) en telt Google per week of maand zoals daarvoor.
+  ads_account_daily: { capability: "client:read", clientColumn: "client_id" },
+  // De checkoutstappen van Google, voor de stappen na de klik op het Overzicht in de nieuwe weergave
+  // (lib/overzicht/use-conversiestappen.ts): per dag, en zolang de dagtabel er niet is (migratie
+  // 111) per maand. Alleen lezen, per klant.
+  google_ads_checkout_funnel_daily: { capability: "client:read", clientColumn: "client_id" },
+  google_ads_checkout_funnel: { capability: "client:read", clientColumn: "client_id" },
 
   // 23 augustus 2026: channel-forecast-overview.tsx (Meta/LinkedIn's "Jaaroverzicht 2026") is de
   // eerste browser-lezer van client_targets. De tabel bestond al (migratie 002/082, fase 2

@@ -55,6 +55,7 @@ import type { LinkedInObjective } from "../../lib/linkedin/campaign-types";
 import { splitInt } from "../../lib/demo/split";
 import { today } from "../../lib/reporting-date";
 import { microsoftDemoRows, MS_CAMPAIGNS, MS_ADGROUPS } from "../../lib/demo/microsoft-demo";
+import { checkoutPerDagUitCampagnes } from "../../lib/demo/checkout-demo";
 
 export const DEMO_CLIENT = "demo-greentech";
 const DEMO_NAME = "DEMO — GreenTech (fictief)";
@@ -275,10 +276,15 @@ function metaAccountDaily(): MetaDaily[] {
   for (let d = 159; d >= 0; d--) {
     const date = addDays(TODAY, -d);
     const surge = isSurgeMonth(date);
-    // Funnel-fasen: landing->winkelwagen zakt in de laatste 28 dagen van 20% naar 12%
-    // (materiele drop-off voor de losse funnel-analyse), de rest blijft stabiel.
+    // Funnel-fasen: landing->winkelwagen zakt in de laatste 28 dagen van 40% naar 24% (dezelfde
+    // relatieve daling van 40% als eerder; materiele drop-off voor de losse funnel-analyse).
+    // VOORBEELDEN, maar samenhangend: landingspagina >= winkelwagen >= afrekenen >= conversies, op
+    // elke dag. Eerder stonden hier 6 conversies op 4 (recent 2,4) gestarte afrekeningen: meer
+    // aankopen dan mensen die begonnen met afrekenen. De conversies (6) blijven gelijk, want die
+    // tellen in de demo-totalen; de winkelwagens en afrekeningen zijn erboven gelegd. Afrekenen is
+    // 90% van de winkelwagens, in beide vensters.
     const recent28 = d < 28;
-    rows.push({ entity: "demo-meta-account", date, imp: surge ? 7000 : 5000, linkClicks: surge ? 63 : 45, spend: 150, conv: 6, freq: null, hook: null, hold: null, lpv: 30, atc: recent28 ? 3.6 : 6, ic: recent28 ? 2.4 : 4 });
+    rows.push({ entity: "demo-meta-account", date, imp: surge ? 7000 : 5000, linkClicks: surge ? 63 : 45, spend: 150, conv: 6, freq: null, hook: null, hold: null, lpv: 30, atc: recent28 ? 7.2 : 12, ic: recent28 ? 6.48 : 10.8 });
   }
   return rows;
 }
@@ -497,6 +503,11 @@ export function buildAllRows(): Record<string, Row[]> {
     cost_per_conversion: r.conv > 0 ? r2(r.cost / r.conv) : null, conversion_rate: r2(r.conv / r.clicks),
     roas: r.cost > 0 ? r2(r.value / r.cost) : 0,
   }));
+  // De Google-checkoutstappen per dag voor de conversietrechter op het Overzicht (VOORBEELDEN, uit
+  // dezelfde generator als de mock: lib/demo/checkout-demo.ts). Alleen als migratie 111 gedraaid is
+  // (OPTIONELE_TABELLEN). De maandtabel google_ads_checkout_funnel blijft bewust leeg: die leest de
+  // maandanalyse, en daar hoort de demo niets nieuws te vinden.
+  tables["google_ads_checkout_funnel_daily"] = checkoutPerDagUitCampagnes(DEMO_CLIENT, tables["ads_campaign_monthly"], TODAY, monthsBack(12).slice(0, 7));
 
   tables["ads_account_monthly"] = [...byMonth.entries()].map(([mIdx, a]) => ({
     client_id: DEMO_CLIENT, month: monthsBack(mIdx), impressions: a.imp, clicks: a.clicks, cost: a.cost,
@@ -804,6 +815,7 @@ const sqlLit = (v: unknown): string => {
 // bestaan, in plaats van halverwege af te breken: de rest van de demo werkt zonder.
 const OPTIONELE_TABELLEN: Record<string, string> = {
   meta_period_reach: "migratie 110 (Meta-periodelezing); zonder deze tabel meldt de Meta-signaalroute 'frequentie niet te beoordelen'",
+  google_ads_checkout_funnel_daily: "migratie 111 (Google per dag); zonder deze tabel toont het Overzicht bij Google geen stappen na de klik, met de reden",
 };
 
 function printSql(tables: Record<string, Row[]>) {

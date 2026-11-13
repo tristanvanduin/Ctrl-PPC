@@ -36,6 +36,12 @@ import {
   getAudiencePerformanceByMonth,
   getAdSchedulePerformance,
   getCheckoutFunnelByMonth,
+  getCheckoutFunnelByDay,
+  getAccountMetricsByDay,
+  getCampaignMetricsByDay,
+  getGeoPerformanceByDay,
+  getRegionPerformanceByDay,
+  type CheckoutActieMap,
   getRsaAssetMetricsByMonth,
   getAdMeta,
   getDisplayImageAssets,
@@ -65,6 +71,10 @@ import { projecteerNaarFactCore } from "./projectie";
 import { withFetchFailures, hasFetchFailure } from "../api/fetch-failures";
 import { maandagVanWeek } from "../api/google-weekvensters";
 import { buildRegionRows, overslaanSamenvatting } from "@/lib/geo/region-rows";
+import {
+  accountDagRijen, campagneDagRijen, DAG_SLEUTELS, landDagRijen, leesGoogleDagStand, regioDagRijen,
+  checkoutDagRijen, selectieSleutel, syncGoogleDagen, type DagTabel, type DagVenster,
+} from "./google-dagen";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -317,6 +327,10 @@ const FETCH_SOURCE_BY_DATASET: Record<string, string[]> = {
   ads_negative_keywords: ["getAdGroupNegatives", "getCampaignNegatives", "getSharedSetNegatives"],
 };
 
+/** Het tijdbudget van de dagsync per run. De route heeft maxDuration 120 en de maandsync gaat voor;
+ *  wat in dit budget niet past, haalt de volgende run op (lib/sync/google-dagen.ts). */
+const GOOGLE_DAG_BUDGET_MS = 30_000;
+
 // ── Main orchestrator ──────────────────────────────────────────────────────
 
 /**
@@ -372,7 +386,9 @@ async function syncClientRun(opts: SyncOptions): Promise<SyncResult> {
   // Dezelfde lezing van de lijst als de client-data-route: anders kunnen sync en dashboard een
   // ander filter bouwen uit dezelfde instellingen (een id zonder waarde maakte de query hier leeg).
   const convActionIds = dashboardConversionActionIds(settingsData?.conversion_actions);
-  const checkoutActionMap = (settingsData?.checkout_action_map as Partial<Record<"add_to_cart" | "begin_checkout" | "purchase", string>> | null) ?? undefined;
+  // Per positie een actienaam of een lijst (de conversietrechter in de instellingen); de sleutel
+  // `trechter` ernaast is de keuze zelf en leest de sync niet (lib/overzicht/conversiestappen.ts).
+  const checkoutActionMap = (settingsData?.checkout_action_map as CheckoutActieMap | null) ?? undefined;
 
   // ── Fetch all data in parallel ──
 
@@ -942,6 +958,59 @@ async function syncClientRun(opts: SyncOptions): Promise<SyncResult> {
   // precies andersom.
   const projectie = await projecteerNaarFactCore(supabase, clientId);
   datasetResults.push({ name: "fact_core_projectie", rows: 0, success: projectie.ok, error: projectie.ok ? undefined : projectie.fout });
+
+  // ── Google per dag (migratie 111, lib/sync/google-dagen.ts) ──
+  //
+  // NA de projectie: de dagtabellen zijn dezelfde cijfers fijner, en mogen de maandsync en de
+  // projectie (waar de app uit leest) nooit ophouden. Met een eigen tijdbudget, per maandstuk van oud
+  // naar nieuw geschreven: een eerste run van drie jaar loopt zo over meerdere runs, en een volgende
+  // run gaat verder waar de vorige stopte. Zonder tabel (migratie 111 niet gedraaid): een logregel
+  // en door, geen mislukte dataset.
+  const dagStand = await leesGoogleDagStand(supabase, clientId);
+  if (dagStand.ontbreekt) {
+    logger.warn(`[sync] google_dag_stand bestaat nog niet (migratie 111); Google per dag overgeslagen voor ${clientId}`);
+  } else if (dagStand.fout) {
+    logger.warn(`[sync] de dagstand van ${clientId} is niet te lezen (${dagStand.fout}); Google per dag deze run overgeslagen`);
+  } else {
+    const BRON: Record<DagTabel, string> = {
+      ads_account_daily: "getAccountMetricsByDay", ads_campaign_daily: "getCampaignMetricsByDay",
+      ads_country_daily: "getGeoPerformanceByDay", ads_region_daily: "getRegionPerformanceByDay",
+      google_ads_checkout_funnel_daily: "getCheckoutFunnelByDay",
+    };
+    const haal = async (tabel: DagTabel, stuk: DagVenster): Promise<Record<string, unknown>[]> => {
+      if (tabel === "ads_account_daily") return accountDagRijen(await getAccountMetricsByDay(credentials, customerId, stuk.since, stuk.until, convActionIds), clientId, stuk, now);
+      if (tabel === "google_ads_checkout_funnel_daily") return checkoutDagRijen(await getCheckoutFunnelByDay(credentials, customerId, stuk.since, stuk.until, checkoutActionMap), clientId, stuk, now);
+      if (tabel === "ads_campaign_daily") return campagneDagRijen(await getCampaignMetricsByDay(credentials, customerId, stuk.since, stuk.until, convActionIds), clientId, stuk, now);
+      if (tabel === "ads_country_daily") {
+        const landen = landDagRijen(await getGeoPerformanceByDay(credentials, customerId, stuk.since, stuk.until), clientId, stuk, now);
+        if (landen.zonderLand > 0) logger.info(`[sync] ads_country_daily ${stuk.since}: ${landen.zonderLand} rijen zonder herkende landcode overgeslagen`);
+        return landen.rijen;
+      }
+      const ruw = await getRegionPerformanceByDay(credentials, customerId, stuk.since, stuk.until);
+      const regio = buildRegionRows(ruw.rows, ruw.labels);
+      const uitleg = overslaanSamenvatting(regio);
+      if (uitleg) logger.info(`[sync] ads_region_daily ${stuk.since}: overgeslagen: ${uitleg}`);
+      return regioDagRijen(regio, clientId, stuk, now);
+    };
+    const uitkomsten = await syncGoogleDagen({
+      haal: async (tabel, stuk) => {
+        const rijen = await haal(tabel, stuk);
+        return { rijen, fout: hasFetchFailure(BRON[tabel]) ? BRON[tabel] : null };
+      },
+      schrijf: (tabel, rijen) => upsertBatch(supabase, tabel, rijen, DAG_SLEUTELS[tabel]),
+      bewaarStand: async (tabel, st) => {
+        const { error } = await supabase.from("google_dag_stand").upsert({
+          client_id: clientId, tabel, vanaf: st.vanaf, tot: st.tot, conversie_selectie: st.selectie, bijgewerkt_at: new Date().toISOString(),
+        }, { onConflict: "client_id,tabel" });
+        if (error) throw new Error(`google_dag_stand: ${error.message}`);
+      },
+      nuMs: () => Date.now(),
+    }, dagStand.stand, endDate, selectieSleutel(convActionIds), GOOGLE_DAG_BUDGET_MS);
+    for (const u of uitkomsten) {
+      if (u.onaf) logger.info(`[sync] ${u.name} voor ${clientId} gevuld tot ${u.gevuldTot ?? "(nog niets)"}; de volgende run gaat verder`);
+      datasetResults.push({ name: u.name, rows: u.rows, success: u.success, error: u.error });
+    }
+  }
 
   // ── Compute result ──
 

@@ -6,6 +6,17 @@ import { Tabel, Kop, KolomKop, Body, Rij, NaamCel, GetalCel, TotaalRij, TotaalCe
 import { GeoRanglijst } from "./geo-ranglijst";
 import { int, eur, pct, nf, type GeoBreakdownState } from "@/lib/geo/use-geo-breakdown";
 import { Vensterlabel } from "@/components/ui/vensterlabel";
+import { formatVerandering } from "@/lib/geo/geo-dag";
+
+/** De verandering van een code als tekst, met de reden als er geen percentage is. Undefined zonder
+ *  vergelijking: dan staat er geen kolom. */
+function veranderingVan(state: GeoBreakdownState, code: string): { verandering?: string; veranderingUitleg?: string } {
+  if (!state.verandering) return {};
+  const v = state.verandering.get(code);
+  if (!v) return { verandering: "—", veranderingUitleg: "geen data in deze periode" };
+  if (v.pct === null) return { verandering: "—", veranderingUitleg: v.reden ?? undefined };
+  return { verandering: formatVerandering(v.pct), veranderingUitleg: `${state.metric.label} tegen de vergelijkingsperiode` };
+}
 
 // De ranglijst-helft van GeoBreakdown, apart (17.36): verhuisd naar de lege ruimte onder de
 // campagnetype-donut, zodat GeoMapCard ernaast de kaart alleen heeft en dus groter kan. Zelfde
@@ -45,7 +56,7 @@ export function GeoRanglijstInKaart({ state, naast = false }: {
     <>
       <div className={naast ? "px-4 py-3" : "border-t border-border px-4 py-3"}>
         <GeoRanglijst
-          regels={lijst.zichtbaar.map(({ c, v }) => ({ code: c.code, label: labelOf(c.code), waarde: v, weergave: metric.fmt(v) }))}
+          regels={lijst.zichtbaar.map(({ c, v }) => ({ code: c.code, label: labelOf(c.code), waarde: v, weergave: metric.fmt(v), ...veranderingVan(state, c.code) }))}
           metriekLabel={metric.label}
           klikbaar={(code) => canDrillUs && code === "US" && focus == null}
           onKlik={() => setFocus("US")}
@@ -73,6 +84,7 @@ function GeoTabel({ state }: { state: GeoBreakdownState }) {
         <KolomKop getal>Conversies</KolomKop>
         <KolomKop getal>Conv.ratio</KolomKop>
         <KolomKop getal>CPA</KolomKop>
+        {state.verandering && <KolomKop getal>{state.metric.label}: verandering</KolomKop>}
       </Kop>
       <Body>
         {ranked.map(({ c }) => (
@@ -84,6 +96,16 @@ function GeoTabel({ state }: { state: GeoBreakdownState }) {
             <GetalCel>{c.conversions == null ? "—" : nf(1).format(c.conversions)}</GetalCel>
             <GetalCel zacht>{pct(c.clicks > 0 ? c.conversions / c.clicks : null)}</GetalCel>
             <GetalCel zacht>{eur(c.conversions > 0 ? c.cost / c.conversions : null)}</GetalCel>
+            {state.verandering && (() => {
+              const v = veranderingVan(state, c.code);
+              // De reden ook als tekst voor schermlezers (een title is zonder muis niet bereikbaar).
+              return (
+                <GetalCel zacht>
+                  <span title={v.veranderingUitleg} aria-hidden={v.veranderingUitleg ? true : undefined}>{v.verandering}</span>
+                  {v.veranderingUitleg && <span className="sr-only">{v.verandering === "—" ? `geen verandering: ${v.veranderingUitleg}` : v.veranderingUitleg}</span>}
+                </GetalCel>
+              );
+            })()}
           </Rij>
         ))}
       </Body>
@@ -95,6 +117,7 @@ function GeoTabel({ state }: { state: GeoBreakdownState }) {
         <TotaalCel getal>{nf(1).format(totaal.conversions)}</TotaalCel>
         <TotaalCel getal>{pct(totaal.clicks > 0 ? totaal.conversions / totaal.clicks : null)}</TotaalCel>
         <TotaalCel getal>{eur(totaal.conversions > 0 ? totaal.cost / totaal.conversions : null)}</TotaalCel>
+        {state.verandering && <TotaalCel getal>{""}</TotaalCel>}
       </TotaalRij>
     </Tabel>
   );
@@ -141,14 +164,17 @@ export function GeoRanglijstCard({ state, zonderBalken = false }: { state: GeoBr
         <ListOrdered className="w-4.5 h-4.5 text-brand-blue-ink" />
         <h3 className="text-title font-semibold text-brand-gray">{metric.label} per {geoWord}</h3>
         {/* Zelfde bron en dus zelfde venster als de kaart erboven. */}
-        <Vensterlabel soort="vast" venster="laatste 180 dagen" />
+        {state.dagVenster
+          ? <Vensterlabel soort="periode" perDag toevoeging={state.dagVenster.toevoeging ?? undefined}
+            toevoegingUitleg={state.dagVenster.regels.length ? state.dagVenster.regels.join(" ") : undefined} />
+          : <Vensterlabel soort="vast" venster="laatste 180 dagen" />}
       </div>
 
       <div className="flex flex-1 flex-col justify-center px-4 py-3">
         {/* zonderBalken: de balken staan dan al in de kaart erboven (GeoRanglijstInKaart). Alleen
             de totalen tonen voorkomt dat dezelfde rangorde twee keer op het scherm staat. */}
         <GeoRanglijst
-          regels={zonderBalken ? [] : ranked.map(({ c, v }) => ({ code: c.code, label: labelOf(c.code), waarde: v, weergave: metric.fmt(v) }))}
+          regels={zonderBalken ? [] : ranked.map(({ c, v }) => ({ code: c.code, label: labelOf(c.code), waarde: v, weergave: metric.fmt(v), ...veranderingVan(state, c.code) }))}
           metriekLabel={metric.label}
           klikbaar={(code) => canDrillUs && code === "US" && focus == null}
           onKlik={() => setFocus("US")}
@@ -162,6 +188,14 @@ export function GeoRanglijstCard({ state, zonderBalken = false }: { state: GeoBr
           ]}
         />
       </div>
+
+      {/* Per dag: wat elk kanaal telde, leesbaar en niet alleen in de uitleg van het label (die is
+          zonder muis niet te zien). Zoals onder GeoMapCard. */}
+      {state.dagVenster && state.dagVenster.regels.length > 0 && (
+        <div className="border-t border-border px-5 py-2" data-venster-uitleg>
+          {state.dagVenster.regels.map((r) => <p key={r} className="text-micro leading-snug text-muted-foreground">{r}</p>)}
+        </div>
+      )}
 
       <RegioToggle
         open={tabelOpen}

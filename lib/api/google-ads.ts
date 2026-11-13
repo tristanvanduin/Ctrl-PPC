@@ -415,10 +415,10 @@ async function getFilteredMetricsByPeriod(
   startDate: string,
   endDate: string,
   conversionActionIds: string[],
-  segment: "month" | "week",
+  segment: "month" | "week" | "date",
 ): Promise<GoogleAdsMetrics[]> {
-  // Weken op datum, zoals de ongefilterde weekvraag: zie getAccountMetricsByWeek.
-  const sortering = segment === "week" ? "ORDER BY segments.week" : "";
+  // Weken en dagen op datum, zoals de ongefilterde vragen: zie getAccountMetricsByWeek.
+  const sortering = segment === "month" ? "" : `ORDER BY segments.${segment}`;
   // Get base metrics (impressions, clicks, cost) without conversion segmentation
   const baseRows = await queryGoogleAds(credentials, customerId, `
     SELECT
@@ -539,6 +539,141 @@ export async function getAccountMetricsByWeek(
       conversionRate: m.conversionsFromInteractionsRate || m.conversions_from_interactions_rate || 0,
     };
   });
+}
+
+// ── Per dag (migratie 111) ─────────────────────────────────────────────────
+//
+// Dezelfde vragen als per maand en per week, gesegmenteerd op segments.date: de platforms leveren
+// per dag, en wij bewaren dat nu ook zo (lib/sync/google-dagen.ts). Met dezelfde conversieselectie
+// als de maandvraag, anders telden de dagen meer dan de maand waar ze in liggen.
+//
+// Anders dan de maandvraag gooit deze bij een fout niet: een mislukte dagvraag hoort de maandsync
+// niet mee te slepen. De fout wordt genoteerd (recordFetchFailure), zodat syncDataset de dagtabel
+// als mislukt boekt in plaats van "geslaagd met nul rijen".
+
+/** Accountcijfers per dag. */
+export async function getAccountMetricsByDay(
+  credentials: GoogleAdsCredentials,
+  customerId: string,
+  startDate: string,
+  endDate: string,
+  conversionActionIds?: string[]
+): Promise<GoogleAdsMetrics[]> {
+  try {
+    if (conversionActionIds && conversionActionIds.length > 0) {
+      return await getFilteredMetricsByPeriod(credentials, customerId, startDate, endDate, conversionActionIds, "date");
+    }
+    const rows = await queryGoogleAds(credentials, customerId, `
+      SELECT
+        segments.date,
+        metrics.impressions,
+        metrics.clicks,
+        metrics.cost_micros,
+        metrics.conversions,
+        metrics.conversions_value
+      FROM customer
+      WHERE segments.date BETWEEN '${startDate}' AND '${endDate}'
+      ORDER BY segments.date
+    `);
+    return rows.map((row) => {
+      const m = row.metrics as Record<string, number>;
+      const s = row.segments as Record<string, string>;
+      const impressions = Number(m.impressions || 0);
+      const clicks = Number(m.clicks || 0);
+      const cost = Number(m.costMicros || m.cost_micros || 0) / 1_000_000;
+      const conversions = Number(m.conversions || 0);
+      return {
+        date: s.date, impressions, clicks, cost, conversions,
+        conversionsValue: Number(m.conversionsValue || m.conversions_value || 0),
+        ctr: impressions > 0 ? clicks / impressions : 0,
+        avgCpc: clicks > 0 ? cost / clicks : 0,
+        costPerConversion: conversions > 0 ? cost / conversions : 0,
+        conversionRate: clicks > 0 ? conversions / clicks : 0,
+      };
+    });
+  } catch (e) { recordFetchFailure("getAccountMetricsByDay", e); return []; }
+}
+
+export interface GoogleAdsCampagneDag {
+  date: string;
+  campaignId: string;
+  campaignName: string;
+  campaignType: string;
+  impressions: number;
+  clicks: number;
+  cost: number;
+  conversions: number;
+  conversionsValue: number;
+}
+
+/** Campagnecijfers per dag, met dezelfde conversieselectie als getCampaignMetricsByMonth. */
+export async function getCampaignMetricsByDay(
+  credentials: GoogleAdsCredentials,
+  customerId: string,
+  startDate: string,
+  endDate: string,
+  conversionActionIds?: string[]
+): Promise<GoogleAdsCampagneDag[]> {
+  try {
+    const gefilterd = !!conversionActionIds && conversionActionIds.length > 0;
+    const base = await queryGoogleAds(credentials, customerId, `
+      SELECT
+        campaign.id,
+        campaign.name,
+        campaign.advertising_channel_type,
+        segments.date,
+        metrics.impressions,
+        metrics.clicks,
+        metrics.cost_micros${gefilterd ? "" : `,
+        metrics.conversions,
+        metrics.conversions_value`}
+      FROM campaign
+      WHERE segments.date BETWEEN '${startDate}' AND '${endDate}'
+    `);
+    // Met een selectie: de conversies per actie apart, en alleen de gekozen acties opgeteld.
+    const conv = new Map<string, { conversions: number; conversionsValue: number }>();
+    if (gefilterd) {
+      const rows = await queryGoogleAds(credentials, customerId, `
+        SELECT
+          campaign.id,
+          segments.date,
+          segments.conversion_action,
+          metrics.conversions,
+          metrics.conversions_value
+        FROM campaign
+        WHERE segments.date BETWEEN '${startDate}' AND '${endDate}'
+      `);
+      for (const row of rows) {
+        const s = row.segments as Record<string, string>;
+        const m = row.metrics as Record<string, number>;
+        const c = row.campaign as Record<string, string>;
+        const actie = String(s.conversionAction || s.conversion_action || "").split("/").pop() || "";
+        if (!conversionActionIds!.includes(actie)) continue;
+        const sleutel = `${c.id}::${s.date}`;
+        const a = conv.get(sleutel) ?? { conversions: 0, conversionsValue: 0 };
+        a.conversions += Number(m.conversions || 0);
+        a.conversionsValue += Number(m.conversionsValue || m.conversions_value || 0);
+        conv.set(sleutel, a);
+      }
+    }
+    return base.map((row) => {
+      const m = row.metrics as Record<string, number>;
+      const s = row.segments as Record<string, string>;
+      const c = row.campaign as Record<string, string>;
+      const gekozen = conv.get(`${c.id}::${s.date}`) ?? { conversions: 0, conversionsValue: 0 };
+      return {
+        date: s.date,
+        campaignId: String(c.id ?? ""),
+        campaignName: c.name ?? "",
+        campaignType: (c.advertisingChannelType || c.advertising_channel_type || "UNKNOWN") as string,
+        impressions: Number(m.impressions || 0),
+        clicks: Number(m.clicks || 0),
+        cost: Number(m.costMicros || m.cost_micros || 0) / 1_000_000,
+        conversions: gefilterd ? gekozen.conversions : Number(m.conversions || 0),
+        conversionsValue: gefilterd ? gekozen.conversionsValue : Number(m.conversionsValue || m.conversions_value || 0),
+      };
+    });
+  } catch (e) { recordFetchFailure("getCampaignMetricsByDay", e); return []; }
 }
 
 /**
@@ -1996,26 +2131,86 @@ export interface CheckoutFunnelRow {
   purchaseValue: number;
 }
 
-export async function getCheckoutFunnelByMonth(
+/**
+ * Per positie de Google-conversieacties die hem tellen (client_settings.checkout_action_map). Een
+ * lijst sinds de conversietrechter in de instellingen meerdere acties per stap toelaat; een losse
+ * naam (de oude vorm) blijft werken. Een positie zonder acties telt de actie die zo heet.
+ */
+export type CheckoutActieMap = Partial<Record<CheckoutPositie, string | string[]>>;
+
+export type CheckoutPositie = "add_to_cart" | "begin_checkout" | "purchase";
+const CHECKOUT_POSITIES: readonly CheckoutPositie[] = ["add_to_cart", "begin_checkout", "purchase"];
+
+/**
+ * Per actienaam de positie die hem telt, de naam zoals hij is opgeslagen (de query vraagt hem zo
+ * op). De eerste positie wint als een naam bij twee posities staat, ook in andere hoofdletters.
+ */
+export function checkoutActiesPerPositie(actionMap?: CheckoutActieMap | null): Map<string, CheckoutPositie> {
+  const uit = new Map<string, CheckoutPositie>();
+  const gezien = new Set<string>();
+  for (const p of CHECKOUT_POSITIES) {
+    const ruw = actionMap?.[p];
+    const namen = (Array.isArray(ruw) ? ruw : typeof ruw === "string" ? [ruw] : [])
+      .filter((n): n is string => typeof n === "string" && n.trim() !== "");
+    for (const n of namen.length ? namen : [p]) {
+      if (gezien.has(n.toLowerCase())) continue;
+      gezien.add(n.toLowerCase());
+      uit.set(n, p);
+    }
+  }
+  return uit;
+}
+
+/** Een actienaam als GAQL-tekst: een enkel aanhalingsteken in een naam brak de query. */
+const gaqlTekst = (n: string) => `'${n.split("\\").join("\\\\").split("'").join("\\'")}'`;
+
+/** De rijen van de API per campagne, periode en apparaat opgeteld per positie. Zuiver, voor de test. */
+export function checkoutRijenUit(
+  rows: readonly Record<string, unknown>[],
+  perActie: ReadonlyMap<string, CheckoutPositie>,
+  segment: "month" | "date",
+): CheckoutFunnelRow[] {
+  const zonderHoofdletters = new Map([...perActie].map(([n, p]) => [n.toLowerCase(), p] as const));
+  const bucket = new Map<string, CheckoutFunnelRow>();
+  for (const row of rows) {
+    const c = (row.campaign ?? {}) as Record<string, string>;
+    const s = (row.segments ?? {}) as Record<string, string>;
+    const m = (row.metrics ?? {}) as Record<string, number>;
+    const datum = segment === "month" ? s.month : s.date;
+    // De naam in de API heeft zijn eigen hoofdletters; de vergelijking gaat zonder.
+    const positie = zonderHoofdletters.get(String(s.conversionActionName || s.conversion_action_name || "").toLowerCase());
+    if (!datum || !positie) continue;
+    const key = `${c.id}::${datum}::${s.device || "UNSPECIFIED"}`;
+    const existing = bucket.get(key) || {
+      date: datum, campaignId: c.id || "", campaignName: c.name || "", device: s.device || "UNSPECIFIED",
+      addToCartCount: 0, addToCartValue: 0, beginCheckoutCount: 0, beginCheckoutValue: 0, purchaseCount: 0, purchaseValue: 0,
+    };
+    const aantal = m.conversions || 0;
+    const waarde = m.conversionsValue || m.conversions_value || 0;
+    if (positie === "add_to_cart") { existing.addToCartCount += aantal; existing.addToCartValue += waarde; }
+    else if (positie === "begin_checkout") { existing.beginCheckoutCount += aantal; existing.beginCheckoutValue += waarde; }
+    else { existing.purchaseCount += aantal; existing.purchaseValue += waarde; }
+    bucket.set(key, existing);
+  }
+  return Array.from(bucket.values());
+}
+
+async function getCheckoutFunnel(
   credentials: GoogleAdsCredentials,
   customerId: string,
   startDate: string,
   endDate: string,
-  actionMap?: Partial<Record<"add_to_cart" | "begin_checkout" | "purchase", string>>
+  actionMap: CheckoutActieMap | undefined,
+  segment: "month" | "date",
+  bron: string,
 ): Promise<CheckoutFunnelRow[]> {
-  const fallbackMap = {
-    add_to_cart: "add_to_cart",
-    begin_checkout: "begin_checkout",
-    purchase: "purchase",
-    ...actionMap,
-  };
-
+  const perActie = checkoutActiesPerPositie(actionMap);
   try {
     const rows = await queryGoogleAds(credentials, customerId, `
       SELECT
         campaign.id,
         campaign.name,
-        segments.month,
+        segments.${segment},
         segments.device,
         segments.conversion_action_name,
         metrics.conversions,
@@ -2023,45 +2218,35 @@ export async function getCheckoutFunnelByMonth(
       FROM campaign
       WHERE segments.date BETWEEN '${startDate}' AND '${endDate}'
         AND campaign.status IN ('ENABLED', 'PAUSED')
-        AND segments.conversion_action_name IN ('${fallbackMap.add_to_cart}', '${fallbackMap.begin_checkout}', '${fallbackMap.purchase}')
+        AND segments.conversion_action_name IN (${[...perActie.keys()].map(gaqlTekst).join(", ")})
     `);
+    return checkoutRijenUit(rows as Record<string, unknown>[], perActie, segment);
+  } catch (e) { recordFetchFailure(bron, e); return []; }
+}
 
-    const bucket = new Map<string, CheckoutFunnelRow>();
-    for (const row of rows) {
-      const c = row.campaign as Record<string, string>;
-      const s = row.segments as Record<string, string>;
-      const m = row.metrics as Record<string, number>;
-      const key = `${c.id}::${s.month}::${s.device || "UNSPECIFIED"}`;
-      const existing = bucket.get(key) || {
-        date: s.month,
-        campaignId: c.id || "",
-        campaignName: c.name || "",
-        device: s.device || "UNSPECIFIED",
-        addToCartCount: 0,
-        addToCartValue: 0,
-        beginCheckoutCount: 0,
-        beginCheckoutValue: 0,
-        purchaseCount: 0,
-        purchaseValue: 0,
-      };
+export async function getCheckoutFunnelByMonth(
+  credentials: GoogleAdsCredentials,
+  customerId: string,
+  startDate: string,
+  endDate: string,
+  actionMap?: CheckoutActieMap
+): Promise<CheckoutFunnelRow[]> {
+  return getCheckoutFunnel(credentials, customerId, startDate, endDate, actionMap, "month", "getCheckoutFunnelByMonth");
+}
 
-      const actionName = String(s.conversionActionName || s.conversion_action_name || "").toLowerCase();
-      if (actionName === fallbackMap.add_to_cart.toLowerCase()) {
-        existing.addToCartCount += m.conversions || 0;
-        existing.addToCartValue += m.conversionsValue || m.conversions_value || 0;
-      } else if (actionName === fallbackMap.begin_checkout.toLowerCase()) {
-        existing.beginCheckoutCount += m.conversions || 0;
-        existing.beginCheckoutValue += m.conversionsValue || m.conversions_value || 0;
-      } else if (actionName === fallbackMap.purchase.toLowerCase()) {
-        existing.purchaseCount += m.conversions || 0;
-        existing.purchaseValue += m.conversionsValue || m.conversions_value || 0;
-      }
-
-      bucket.set(key, existing);
-    }
-
-    return Array.from(bucket.values());
-  } catch (e) { recordFetchFailure("getCheckoutFunnelByMonth", e); return []; }
+/**
+ * Dezelfde stappen per dag (segments.date), voor google_ads_checkout_funnel_daily (migratie 111).
+ * De dagsync van het dagmodel schrijft die tabel, samen met de andere dagtabellen van migratie 111
+ * en na dezelfde controle of ze bestaan; deze vraag is daarvoor, met dezelfde kaart als per maand.
+ */
+export async function getCheckoutFunnelByDay(
+  credentials: GoogleAdsCredentials,
+  customerId: string,
+  startDate: string,
+  endDate: string,
+  actionMap?: CheckoutActieMap
+): Promise<CheckoutFunnelRow[]> {
+  return getCheckoutFunnel(credentials, customerId, startDate, endDate, actionMap, "date", "getCheckoutFunnelByDay");
 }
 
 // ── Device Performance by Month ───────────────────────────────────────────
@@ -2174,12 +2359,33 @@ export interface GeoPerformanceRow {
   conversionsValue: number;
 }
 
-export async function getGeoPerformanceByMonth(
+export function getGeoPerformanceByMonth(
   credentials: GoogleAdsCredentials,
   customerId: string,
   startDate: string,
   endDate: string
 ): Promise<GeoPerformanceRow[]> {
+  return geoPerformance(credentials, customerId, startDate, endDate, "month");
+}
+
+/** Landcijfers per dag (ads_country_daily, migratie 111): dezelfde vraag, `date` is de dag. */
+export function getGeoPerformanceByDay(
+  credentials: GoogleAdsCredentials,
+  customerId: string,
+  startDate: string,
+  endDate: string
+): Promise<GeoPerformanceRow[]> {
+  return geoPerformance(credentials, customerId, startDate, endDate, "date");
+}
+
+async function geoPerformance(
+  credentials: GoogleAdsCredentials,
+  customerId: string,
+  startDate: string,
+  endDate: string,
+  segment: "month" | "date",
+): Promise<GeoPerformanceRow[]> {
+  const bron = segment === "month" ? "getGeoPerformanceByMonth" : "getGeoPerformanceByDay";
   try {
     const rows = await queryGoogleAds(credentials, customerId, `
       SELECT
@@ -2188,7 +2394,7 @@ export async function getGeoPerformanceByMonth(
         campaign.status,
         geographic_view.country_criterion_id,
         geographic_view.location_type,
-        segments.month,
+        segments.${segment},
         metrics.impressions,
         metrics.clicks,
         metrics.cost_micros,
@@ -2204,10 +2410,10 @@ export async function getGeoPerformanceByMonth(
 
     // Debug: log first row to see actual API response structure
     if (rows.length > 0) {
-      console.log("[getGeoPerformanceByMonth] Total rows:", rows.length);
-      console.log("[getGeoPerformanceByMonth] First raw row:", JSON.stringify(rows[0], null, 2));
+      console.log(`[${bron}] Total rows:`, rows.length);
+      console.log(`[${bron}] First raw row:`, JSON.stringify(rows[0], null, 2));
     } else {
-      console.log("[getGeoPerformanceByMonth] No rows returned from API");
+      console.log(`[${bron}] No rows returned from API`);
     }
 
     const CRITERION_TO_COUNTRY: Record<number, string> = {
@@ -2247,7 +2453,7 @@ export async function getGeoPerformanceByMonth(
       countryCounts.set(countryCode || "(empty)", (countryCounts.get(countryCode || "(empty)") ?? 0) + 1);
 
       return {
-        date: s.month,
+        date: s[segment],
         campaignId: c.id || "",
         campaignName: c.name || "",
         countryCode,
@@ -2267,11 +2473,13 @@ export async function getGeoPerformanceByMonth(
     });
 
     // Log country distribution
-    console.log("[getGeoPerformanceByMonth] Country distribution:", Object.fromEntries(countryCounts));
+    console.log(`[${bron}] Country distribution:`, Object.fromEntries(countryCounts));
 
     return result;
   } catch (err) {
-    logger.error("[getGeoPerformanceByMonth] ERROR:", err instanceof Error ? err.message : err);
+    // De dagvraag noteert zijn fout (zie "Per dag" hierboven); de maandvraag houdt zijn oude gedrag.
+    if (segment === "date") recordFetchFailure(bron, err);
+    else logger.error(`[${bron}] ERROR:`, err instanceof Error ? err.message : err);
     return [];
   }
 }
@@ -2291,11 +2499,31 @@ export interface RegionPerformanceResult {
 /** Batchgrootte voor de tweede query. GAQL-IN-lijsten worden onhandelbaar lang bij honderden ids. */
 const GEO_LABEL_BATCH = 200;
 
-export async function getRegionPerformanceByMonth(
+export function getRegionPerformanceByMonth(
   credentials: GoogleAdsCredentials,
   customerId: string,
   startDate: string,
   endDate: string
+): Promise<RegionPerformanceResult> {
+  return regionPerformance(credentials, customerId, startDate, endDate, "month");
+}
+
+/** Staten per dag (ads_region_daily, migratie 111). In de ruwe rijen draagt `month` dan de dag. */
+export function getRegionPerformanceByDay(
+  credentials: GoogleAdsCredentials,
+  customerId: string,
+  startDate: string,
+  endDate: string
+): Promise<RegionPerformanceResult> {
+  return regionPerformance(credentials, customerId, startDate, endDate, "date");
+}
+
+async function regionPerformance(
+  credentials: GoogleAdsCredentials,
+  customerId: string,
+  startDate: string,
+  endDate: string,
+  segment: "month" | "date",
 ): Promise<RegionPerformanceResult> {
   try {
     const rows = await queryGoogleAds(credentials, customerId, `
@@ -2303,7 +2531,7 @@ export async function getRegionPerformanceByMonth(
         campaign.id,
         campaign.name,
         segments.geo_target_state,
-        segments.month,
+        segments.${segment},
         metrics.impressions,
         metrics.clicks,
         metrics.cost_micros,
@@ -2321,7 +2549,7 @@ export async function getRegionPerformanceByMonth(
       const s = (row.segments ?? {}) as Record<string, string>;
       const m = (row.metrics ?? {}) as Record<string, number>;
       return {
-        month: s.month ?? "",
+        month: s[segment] ?? "",
         campaignId: c.id ?? "",
         campaignName: c.name ?? "",
         geoTargetState: String(s.geoTargetState ?? s.geo_target_state ?? ""),
@@ -2336,7 +2564,8 @@ export async function getRegionPerformanceByMonth(
     const labels = await resolveGeoTargets(credentials, customerId, [...new Set(ruw.map((r) => r.geoTargetState).filter(Boolean))]);
     return { rows: ruw, labels };
   } catch (err) {
-    logger.error("[getRegionPerformanceByMonth] ERROR:", err instanceof Error ? err.message : err);
+    if (segment === "date") recordFetchFailure("getRegionPerformanceByDay", err);
+    else logger.error("[getRegionPerformanceByMonth] ERROR:", err instanceof Error ? err.message : err);
     return { rows: [], labels: new Map() };
   }
 }

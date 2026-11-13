@@ -39,6 +39,9 @@ export type Ranglijstregel = {
   waarde: number | null;
   /** Al opgemaakt door de aanroeper, die de metric en dus het formaat kent. */
   weergave: string;
+  /** Met een vergelijking: de verandering ("+12,4%") of een streep, met de reden in `veranderingUitleg`. */
+  verandering?: string;
+  veranderingUitleg?: string;
 };
 
 export function GeoRanglijst({
@@ -94,6 +97,14 @@ export function GeoRanglijst({
                 <span className="shrink-0 text-body font-semibold tabular-nums text-brand-blue-ink">
                   {r.weergave}
                 </span>
+                {r.verandering !== undefined && (
+                  // De reden staat ook als tekst voor schermlezers: een title is op de telefoon en
+                  // voor een schermlezer niet bereikbaar, en dan bleef alleen een streep over.
+                  <span className="w-14 shrink-0 text-right text-meta tabular-nums text-muted-foreground" title={r.veranderingUitleg} data-verandering>
+                    <span aria-hidden={r.veranderingUitleg ? true : undefined}>{r.verandering}</span>
+                    {r.veranderingUitleg && <span className="sr-only">{r.verandering === "—" ? `geen verandering: ${r.veranderingUitleg}` : `${r.verandering}, ${r.veranderingUitleg}`}</span>}
+                  </span>
+                )}
               </div>
               {/* Baan op --spoor, net als de aandeelstrepen in de tabellen. Hoogte 8px: ruim onder
                   het plafond van 24 waarboven een verzadigde vulling als verfvlak leest. */}

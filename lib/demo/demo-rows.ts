@@ -26,6 +26,8 @@ import { OWNER_TEAM, OWNER_CLIENT } from "../branding/brand";
 import { analyseOutputRows } from "./analyses-demo";
 import { splitInt, splitAlong } from "./split";
 import { microsoftDemoRows } from "./microsoft-demo";
+import { googleDagRijen } from "./google-dag-demo";
+import { checkoutPerDagUitCampagnes } from "./checkout-demo";
 import { DEFAULT_CHANNEL_CONVERSION_CONFIG, sumSelectedConversions } from "@/lib/analysis/channel-conversion-config";
 
 type Row = Record<string, unknown>;
@@ -341,6 +343,17 @@ const metaFrequency = (daysAgo: number): number => 1.8 + 1.4 * (1 - daysAgo / 15
 // e-commerce, dus geen 5-10x. Eerste poging (AOV 130) gaf ~9x: los van de CPA gekozen in plaats
 // van ervan afgeleid.
 const META_ACCOUNT_AOV = 30;
+// De stappen na de klik op Meta (de conversietrechter op het Overzicht, lib/overzicht/conversiestappen.ts).
+// VOORBEELDEN, geen metingen van deze fictieve klant, maar wel samenhangend: van onderaf opgebouwd uit
+// de conversies van de dag, zodat de aankopen exact de conversies blijven die de tegels tellen, en
+// landingspagina >= winkelwagen >= afrekenen >= aankoop op elke dag. Ongeveer de helft van wie begint
+// met afrekenen rondt af, en ongeveer een op de twee winkelwagens gaat door naar afrekenen. De
+// landingspagina zit onder de linkklikken (niet iedereen wacht tot de pagina geladen is).
+function metaStappen(linkClicks: number, conversions: number): Row {
+  const afrekenen = Math.ceil(Math.max(0, conversions) * 1.6);
+  const winkelwagen = Math.ceil(afrekenen * 1.9);
+  return { landing_page_views: Math.max(winkelwagen, Math.round(linkClicks * 0.82)), add_to_cart: winkelwagen, initiate_checkout: afrekenen };
+}
 const metaAccountDailyRecent: Row[] = Array.from({ length: 150 }, (_, d) => {
   const day = 149 - d; const a = metaDayAgg(day);
   const conv = a.conversions * weekdayConvPenalty(day);
@@ -349,7 +362,8 @@ const metaAccountDailyRecent: Row[] = Array.from({ length: 150 }, (_, d) => {
   // telt voor meta_ads standaard conversions+leads op; dezelfde waarde in allebei de velden
   // verdubbelde zo elke Meta-conversie in elke consument die de standaardselectie gebruikt
   // (ChannelPerformance vandaag al, en de kanaalafhankelijke KPI-rij die dit ontdekte).
-  return { client_id: CID, date: dayISO(day), impressions: a.impressions, reach: Math.round(a.impressions / frequency), frequency: Math.round(frequency * 100) / 100, link_clicks: Math.round(a.link_clicks * metaSaturationClicks(day)), spend: Math.round(a.spend * recentSpendBump(day) * metaSaturationSpend(day)), conversions: conv, leads: 0, video_3s_views: a.video_3s_views, video_thruplay: a.video_thruplay, video_p100: a.video_p100, conversion_value: Math.round(conv * META_ACCOUNT_AOV) };
+  const link_clicks = Math.round(a.link_clicks * metaSaturationClicks(day));
+  return { client_id: CID, date: dayISO(day), impressions: a.impressions, reach: Math.round(a.impressions / frequency), frequency: Math.round(frequency * 100) / 100, link_clicks, spend: Math.round(a.spend * recentSpendBump(day) * metaSaturationSpend(day)), conversions: conv, leads: 0, video_3s_views: a.video_3s_views, video_thruplay: a.video_thruplay, video_p100: a.video_p100, conversion_value: Math.round(conv * META_ACCOUNT_AOV), ...metaStappen(link_clicks, conv) };
 });
 // Oudere geschiedenis (dag 150 t/m 729, ~19 maanden extra vóór het gedetailleerde venster
 // hierboven): vlak/licht groeiend, GEEN verzadigings-/frequency-drama (metaSaturationSpend/Clicks
@@ -371,6 +385,7 @@ const metaAccountDailyOlder: Row[] = Array.from({ length: 580 }, (_, i) => {
     client_id: CID, date: dayISO(day), impressions, reach: Math.round(impressions / frequency), frequency,
     link_clicks: Math.round(anchor.link_clicks * groei), spend: Math.round(anchor.spend * groei),
     conversions, leads: 0, conversion_value: Math.round(conversions * META_ACCOUNT_AOV),
+    ...metaStappen(Math.round(anchor.link_clicks * groei), conversions),
   };
 });
 const metaAccountDaily: Row[] = [...metaAccountDailyOlder, ...metaAccountDailyRecent];
@@ -927,6 +942,15 @@ const DIM_MONTHS = [monthISO(3), monthISO(2), monthISO(1), monthISO(0)];
 const ADGROUP_SINCE = monthISO(13); // de SOP kijkt 13 maanden terug
 
 const adsAccountWeekly: Row[] = accountWeeklyRows(CID, adsAccountMonthly, 26);
+// Google per dag (migratie 111): de campagnemaanden over hun dagen verdeeld, exact optellend tot de
+// maanden (lib/demo/google-dag-demo.ts). Voorbeelden, zoals alles hier.
+const googleDagen = googleDagRijen(CID, adsCampaignMonthly);
+
+// ── google_ads_checkout_funnel_daily ───────────────────────────────────────
+// De Google-checkoutstappen per dag (migratie 111), voor de conversietrechter op het Overzicht.
+// VOORBEELDEN, uit dezelfde generator als de seed (lib/demo/checkout-demo.ts). Dertien maanden:
+// genoeg voor een jaar terug vergelijken.
+const googleCheckoutPerDag: Row[] = checkoutPerDagUitCampagnes(CID, adsCampaignMonthly, dayISO(0), monthISO(12).slice(0, 7));
 const adsAdgroupMonthly: Row[] = adgroupMonthlyRows(CID, adsCampaignMonthly, ADGROUP_SINCE);
 // Zoektermen hangen aan dezelfde weken als de weekreeks, zodat de week-sleutels overeenkomen.
 const adsSearchTermsWasteful: Row[] = wastefulSearchTermRows(
@@ -996,15 +1020,18 @@ const clientSettings: Row[] = [{
       // niet in de database.
       //
       // Welke cijfers erbij horen, eerlijk (de mock is klokrelatief en wordt bij elke aanroep opnieuw
-      // opgebouwd, dus "nu" is altijd vandaag): Google heeft maandcijfers over twee jaar en weekcijfers
-      // over de laatste 26 weken, Meta en LinkedIn dagcijfers over twee jaar (730 dagen), Microsoft
-      // dagcijfers over 400 dagen (op 13 november 2026: sinds oktober 2025). Daarom:
+      // opgebouwd, dus "nu" is altijd vandaag): Google heeft maandcijfers over twee jaar, en sinds
+      // migratie 111 ook dagcijfers over dezelfde twee jaar (ads_account_daily, exact optellend tot de
+      // maanden; Black Friday, de Moederdag-actie en de weken voor elke beurs zijn erin terug te zien),
+      // Meta en LinkedIn dagcijfers over twee jaar (730 dagen), Microsoft dagcijfers over 400 dagen
+      // (op 13 november 2026: sinds oktober 2025). Daarom:
       // - Moederdag-actie loopt over hele maanden (mei). 2026 tegen 2025 laat voor Google, Meta en
       //   LinkedIn een vergelijking zien; alleen Microsoft liep in mei 2025 nog niet en valt buiten het
       //   percentage, met de reden erbij.
       // - Black Friday 2025 heeft cijfers van alle vier de kanalen, maar geen eerdere editie in de lijst.
-      //   Google telt een dagperiode per week, en die weken liggen buiten de 26 weken met weekrijen:
-      //   dat meldt het scherm. Black Friday 2026 ligt (op 13 november 2026) nog voor ons: die laat zien
+      //   Google telt hem per dag. Zonder de dagtabel (migratie 111 niet gedraaid, de browser leest de
+      //   echte database) telt Google per week, en die weken liggen buiten de 26 weken met weekrijen:
+      //   dat meldt het scherm dan. Black Friday 2026 ligt (op 13 november 2026) nog voor ons: die laat zien
       //   hoe het scherm zegt dat er nog geen data is, en vult zich vanzelf zodra de dagen voorbij zijn.
       { id: "demo-bf", name: "Black Friday", abbrev: "BF", cadence: "annual", editions: [
         { date: "2025-11-28", label: "2025", start: "2025-11-21", end: "2025-12-01" },
@@ -1085,6 +1112,9 @@ export function demoRows(): Record<string, Row[]> {
     ads_campaign_monthly: adsCampaignMonthly,
     ads_account_monthly: adsAccountMonthly,
     ads_account_weekly: adsAccountWeekly,
+    ads_account_daily: googleDagen.account,
+    ads_campaign_daily: googleDagen.campagnes,
+    google_ads_checkout_funnel_daily: googleCheckoutPerDag,
     ads_adgroup_monthly: adsAdgroupMonthly,
     ads_campaign_impression_share: adsCampaignImpressionShare,
     ads_search_terms_wasteful: adsSearchTermsWasteful,

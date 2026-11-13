@@ -46,6 +46,7 @@ import { addDays } from "../reporting-date";
 import { maandagVanWeek } from "../api/google-weekvensters";
 import { KANAAL_NAAM, type Kanaal } from "../kanalen/beschikbaar";
 import { opsomming } from "../util/tekst";
+import { splitsOpDagOpslag } from "./dag-opslag";
 
 export const EVENT_PARAM = "event";
 export const WEEKDAG_PARAM = "weekdag";
@@ -365,14 +366,23 @@ export function vergelijkZin(staat: DagStaat): string {
 }
 
 /**
- * De regel over Google bij een dagperiode die geen hele maanden is: Google telt per week, en welke
- * weken dat zijn. Null als Google er niet bij is of de periode hele maanden is.
+ * De regel over Google bij een dagperiode die geen hele maanden is. Null als Google er niet bij is of
+ * de periode hele maanden is.
+ *
+ * `googleEersteDag` is de eerste dagrij van Google (ads_account_daily, migratie 111). Met dagopslag
+ * telt Google per dag zoals de rest, en is er alleen een regel als een deel van de periode vóór de
+ * dagopslag ligt (lib/period/dag-opslag.ts): geen terugval, geen regel. Zonder dagopslag (null of
+ * weggelaten) telt Google per week, en zegt de regel welke weken dat zijn.
  */
-export function googleWeekNoot(periode: DagPeriode, kanalen: readonly Kanaal[]): string | null {
+export function googleWeekNoot(periode: DagPeriode, kanalen: readonly Kanaal[], googleEersteDag?: Dag | null): string | null {
   if (!kanalen.includes("google") || alsMaandPeriode(periode)) return null;
-  const weken = { start: maandagVanWeek(periode.start), eind: addDays(maandagVanWeek(periode.eind), 6) };
   const dag = kanalen.filter((k) => k !== "google").map((k) => KANAAL_NAAM[k]);
   const rest = dag.length === 0 ? "" : ` ${opsomming(dag)} ${dag.length === 1 ? "telt" : "tellen"} per dag.`;
+  if (googleEersteDag) {
+    const { label } = splitsOpDagOpslag(periode, googleEersteDag);
+    return label ? `Google: ${label}.${rest}` : null;
+  }
+  const weken = { start: maandagVanWeek(periode.start), eind: addDays(maandagVanWeek(periode.eind), 6) };
   return `Google telt op weekniveau: de weken die de periode raken (${formatDagPeriode(weken)}).${rest}`;
 }
 

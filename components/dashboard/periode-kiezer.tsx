@@ -21,6 +21,7 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import { CalendarDays, ChevronDown } from "lucide-react";
 import { usePeriod } from "@/lib/period/period-context";
+import { useGoogleDagStart } from "@/lib/period/use-dag-telling";
 import {
   googleWeekNoot, kiesPeriode, kiesVergelijk, periodeKnop, SNELLE_PERIODES, VERGELIJK_KEUZES, vergelijkUitleg, vergelijkZin,
   vrijePeriode, schoneDagKeuze, type DagStaat,
@@ -54,9 +55,12 @@ const knopKlasse = (aan: boolean) =>
   `min-h-11 rounded-lg border px-3 text-body font-medium transition-colors ${
     aan ? "border-brand-gray bg-brand-gray text-white" : "border-border bg-card text-brand-gray hover:border-gray-400"}`;
 
-export function PeriodeKiezer({ scope, events, kanalen, laden = false, onNaarEvents }: {
+export function PeriodeKiezer({ scope, clientId, events, kanalen, laden = false, onNaarEvents }: {
   /** Per klant: de sessievlag "zelf een vergelijking gekozen" geldt voor deze klant. */
   scope: string;
+  /** De klant, om te weten waar de dagopslag van Google begint (de regel over Google). Zonder: de
+   *  regel zegt per week, zoals voor de dagopslag. */
+  clientId?: string;
   /** De events van de klant; null zolang ze laden. */
   events: readonly EventPeriode[] | null;
   /** De kanalen van de klant, voor de regel over Google per week. */
@@ -68,6 +72,7 @@ export function PeriodeKiezer({ scope, events, kanalen, laden = false, onNaarEve
 }) {
   const periode = usePeriod();
   const staat = periode.dag;
+  const googleDagStart = useGoogleDagStart(clientId ?? null, !!staat && kanalen.includes("google"));
   const [open, setOpen] = useState(false);
   const opener = useRef<HTMLButtonElement | null>(null);
   const paneel = useRef<HTMLDivElement>(null);
@@ -101,7 +106,8 @@ export function PeriodeKiezer({ scope, events, kanalen, laden = false, onNaarEve
   const knop = periodeKnop(staat, periode.range);
   const vergelijkLabel = VERGELIJK_KEUZES.find((v) => v.modus === staat.keuze.vergelijk)?.label ?? "";
   const zin = vergelijkZin(staat);
-  const noot = googleWeekNoot(staat.periode, kanalen);
+  // Zolang onbekend is of Google per dag telt, geen regel: anders stond er eerst "per week".
+  const noot = clientId && googleDagStart === undefined ? null : googleWeekNoot(staat.periode, kanalen, googleDagStart);
 
   const openMet = (knopEl: HTMLButtonElement) => {
     opener.current = knopEl;

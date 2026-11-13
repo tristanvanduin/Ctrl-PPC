@@ -218,6 +218,8 @@ export interface ClientSettingsRow {
   brand_guide?: unknown;
   rai_events?: unknown;
   channel_conversion_config?: unknown;
+  /** De posities van de Google-checkouttrechter en de conversietrechter na de klik (lib/overzicht/conversiestappen.ts). */
+  checkout_action_map?: unknown;
   full_branding_enabled?: boolean | null;
 }
 

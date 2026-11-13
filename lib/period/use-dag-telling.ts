@@ -11,13 +11,13 @@
 //
 // WAT ER OPGEHAALD WORDT, EN WANNEER. De blended route geeft de browser alleen maandreeksen; voor een
 // periode per dag zijn de dagrijen van Meta, LinkedIn en Microsoft nodig (dezelfde lezer als de
-// terugvalweg van de band, fetchKanaalRijen, 36 maanden) en de weekrijen van Google
-// (ads_account_weekly). Eén keer per klant, bij de eerste keuze die ze nodig heeft, en dan
+// terugvalweg van de band, fetchKanaalRijen, 36 maanden), de dagrijen van Google (ads_account_daily,
+// migratie 111) en zijn weekrijen (ads_account_weekly) voor als er nog geen dagrijen zijn. Eén keer per klant, bij de eerste keuze die ze nodig heeft, en dan
 // bewaard: een volgende periode of vergelijking is rekenwerk, geen verzoek (fase 1). Met de
 // conversieselectie uit de gedeelde client_settings-rij, zoals de band.
 
 import { useEffect, useMemo, useState } from "react";
-import { dbSelect } from "@/lib/data-access/client-read";
+import { dbSelect, TABEL_ONTBREEKT, type LeesFout } from "@/lib/data-access/client-read";
 import { loadClientSettingsRij } from "@/lib/client-settings";
 import { resolveChannelConversionConfig, type ChannelConversionConfig } from "@/lib/analysis/channel-conversion-config";
 import { fetchKanaalRijen } from "@/lib/use-channel-period-data";
@@ -26,15 +26,18 @@ import type { ClientHistoricalData } from "@/lib/types";
 import { NIET_GOOGLE, type NietGoogleKanaal } from "./kanaal-maanden";
 import {
   telDagPeriode, telDagVergelijking,
-  type DagTelInvoer, type DagTelling, type DagVergelijkingTelling, type GoogleWeekRij, type Tellers,
+  type DagTelInvoer, type DagTelling, type DagVergelijkingTelling, type GoogleDagRij, type GoogleWeekRij, type Tellers,
 } from "./dag-telling";
 import type { Month } from "./period-range";
 import type { DagStaat } from "./dag-keuze";
+import type { Dag } from "./dag-periode";
 
 /** Wat er voor een klant opgehaald is. Een bron die niet te laden was, staat in `fouten`. */
 interface DagBronnen {
   dagkanalen: Partial<Record<NietGoogleKanaal, Record<string, unknown>[]>>;
   weken: GoogleWeekRij[] | null;
+  /** De dagrijen van Google; null als de tabel er (nog) niet is of niet te lezen was. */
+  dagen: GoogleDagRij[] | null;
   convConfig: ChannelConversionConfig;
   fouten: string[];
 }
@@ -51,6 +54,67 @@ async function laadWeken(clientId: string): Promise<GoogleWeekRij[]> {
   return data;
 }
 
+// Een pagina per verzoek: de database geeft er niet meer dan dit in een antwoord.
+const DAG_PAGINA = 1000;
+
+/**
+ * De dagrijen van Google, ALLE (de eerste rij zegt waar de dagopslag begint), pagina voor pagina
+ * van nieuw naar oud. Een fout geeft null: dan telt Google per week of maand, zoals voor migratie
+ * 111, en geen half geladen reeks die een latere start van de dagopslag zou suggereren.
+ * `ontbreekt`: de tabel bestaat (nog) niet; dat verandert niet binnen een bezoek.
+ */
+async function laadDagen(clientId: string): Promise<{ rijen: GoogleDagRij[] | null; ontbreekt: boolean }> {
+  const rijen: GoogleDagRij[] = [];
+  let tot: string | null = null;
+  for (;;) {
+    const { data, error }: { data: GoogleDagRij[]; error: LeesFout | null } = await dbSelect<GoogleDagRij>("ads_account_daily", {
+      select: "date,impressions,clicks,cost,conversions,conversions_value", clientId,
+      filters: tot ? [{ op: "lte", column: "date", value: tot }] : undefined,
+      order: { column: "date", ascending: false }, limit: DAG_PAGINA,
+    });
+    if (error) return { rijen: null, ontbreekt: error.code === TABEL_ONTBREEKT };
+    // De grensdag kwam al mee op de vorige pagina: niet dubbel.
+    rijen.push(...data.filter((r: GoogleDagRij) => r.date !== tot));
+    if (data.length < DAG_PAGINA) return { rijen, ontbreekt: false };
+    const oudste: string = data[data.length - 1].date;
+    if (oudste === tot) return { rijen, ontbreekt: false };
+    tot = oudste;
+  }
+}
+
+// De dagrijen van Google per klant één keer: de telling en de regel in de periodekiezer lezen dezelfde.
+// Ontbreekt de tabel (migratie 111 niet gedraaid), dan wordt dat onthouden voor de rest van het
+// bezoek: niet bij elke keuze opnieuw vragen. Een andere fout wordt niet bewaard: een volgende keuze
+// probeert het opnieuw.
+const googleDagen = new Map<string, Promise<GoogleDagRij[] | null>>();
+export function laadGoogleDagen(clientId: string): Promise<GoogleDagRij[] | null> {
+  const er = googleDagen.get(clientId);
+  if (er) return er;
+  const lading = laadDagen(clientId).catch(() => ({ rijen: null, ontbreekt: false }));
+  lading.then((r) => { if (!r.rijen && !r.ontbreekt) googleDagen.delete(clientId); });
+  const belofte = lading.then((r) => r.rijen);
+  googleDagen.set(clientId, belofte);
+  return belofte;
+}
+
+/**
+ * Waar de dagopslag van Google begint, voor de regel in de periodekiezer (googleWeekNoot): de eerste
+ * dagrij, null zonder dagopslag (dan telt Google per week), undefined zolang het laadt.
+ */
+export function useGoogleDagStart(clientId: string | null, actief: boolean): Dag | null | undefined {
+  const [stand, setStand] = useState<{ clientId: string; eerste: Dag | null } | null>(null);
+  useEffect(() => {
+    if (!actief || !clientId) return;
+    let weg = false;
+    laadGoogleDagen(clientId).then((r) => {
+      // Nieuw naar oud geladen: de laatste rij is de eerste dag.
+      if (!weg) setStand({ clientId, eerste: r && r.length ? r[r.length - 1].date : null });
+    });
+    return () => { weg = true; };
+  }, [clientId, actief]);
+  return stand && stand.clientId === clientId ? stand.eerste : undefined;
+}
+
 function laadBronnen(clientId: string, kanalen: readonly Kanaal[]): Promise<DagBronnen> {
   const sleutel = `${clientId}|${[...kanalen].sort().join(",")}`;
   const er = bronnen.get(sleutel);
@@ -60,16 +124,20 @@ function laadBronnen(clientId: string, kanalen: readonly Kanaal[]): Promise<DagB
     const config = loadClientSettingsRij(clientId)
       .then(({ data }) => resolveChannelConversionConfig((data?.channel_conversion_config ?? null) as Partial<ChannelConversionConfig> | null));
     const dag = NIET_GOOGLE.filter((k) => kanalen.includes(k));
-    const [convConfig, weken, ...rijen] = await Promise.all([
+    let weekFout = false;
+    const [convConfig, weken, dagen, ...rijen] = await Promise.all([
       config,
       kanalen.includes("google")
-        ? laadWeken(clientId).catch(() => { fouten.push(`${KANAAL_NAAM.google}: de weekcijfers konden niet geladen worden; Google telt hieronder niet mee.`); return null; })
+        ? laadWeken(clientId).catch(() => { weekFout = true; return null; })
         : Promise.resolve(null),
+      kanalen.includes("google") ? laadGoogleDagen(clientId) : Promise.resolve(null),
       ...dag.map((k) => fetchKanaalRijen(clientId, k).then((r) => r.rijen)),
     ]);
+    // Alleen een melding als Google daardoor niets heeft: met dagrijen zijn de weken niet nodig.
+    if (weekFout && !dagen) fouten.push(`${KANAAL_NAAM.google}: de weekcijfers konden niet geladen worden; Google telt hieronder niet mee.`);
     const dagkanalen: DagBronnen["dagkanalen"] = {};
     dag.forEach((k, i) => { dagkanalen[k] = rijen[i] as Record<string, unknown>[]; });
-    return { dagkanalen, weken: weken as GoogleWeekRij[] | null, convConfig, fouten };
+    return { dagkanalen, weken: weken as GoogleWeekRij[] | null, dagen: dagen as GoogleDagRij[] | null, convConfig, fouten };
   })();
   // Een mislukte lezing niet bewaren: een volgende keuze probeert het opnieuw.
   belofte.catch(() => bronnen.delete(sleutel));
@@ -115,7 +183,7 @@ export function useDagTelling({ clientId, staat, kanalen, gekozen, googleData, g
     laadBronnen(clientId, kanaalSleutel.split(",") as Kanaal[])
       .then((b) => { if (!weg) setGeladen({ sleutel, bronnen: b }); })
       .catch(() => {
-        if (!weg) setGeladen({ sleutel, bronnen: { dagkanalen: {}, weken: null, convConfig: resolveChannelConversionConfig(null), fouten: ["De cijfers per dag konden niet geladen worden."] } });
+        if (!weg) setGeladen({ sleutel, bronnen: { dagkanalen: {}, weken: null, dagen: null, convConfig: resolveChannelConversionConfig(null), fouten: ["De cijfers per dag konden niet geladen worden."] } });
       });
     return () => { weg = true; };
   }, [nodig, clientId, kanaalSleutel, sleutel]);
@@ -128,7 +196,7 @@ export function useDagTelling({ clientId, staat, kanalen, gekozen, googleData, g
       const dagkanalen: DagTelInvoer["dagkanalen"] = {};
       for (const k of NIET_GOOGLE) if (welke.includes(k) && b.dagkanalen[k]) dagkanalen[k] = b.dagkanalen[k];
       const invoer: DagTelInvoer = {
-        google: welke.includes("google") ? { maanden: googleData, weken: b.weken, maandTellers: googleTellers } : null,
+        google: welke.includes("google") ? { maanden: googleData, weken: b.weken, dagen: b.dagen, maandTellers: googleTellers } : null,
         dagkanalen,
         convConfig: b.convConfig,
       };

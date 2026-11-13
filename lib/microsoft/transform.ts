@@ -182,7 +182,7 @@ export function naarBreakdownRij(
   rij: Record<string, string>,
   clientId: string,
   accountId: string,
-  breakdownType: "network" | "device",
+  breakdownType: "network" | "device" | "country" | "region",
   waarde: string
 ): Record<string, unknown> | null {
   const date = naarDatum(rij.TimePeriod);
@@ -200,6 +200,48 @@ export function naarBreakdownRij(
     conversions: conversies(rij) ?? 0,
     conversion_value: parseGetal(rij.Revenue) ?? 0,
   };
+}
+
+/**
+ * De geo-breakdown per dag uit een GeographicPerformanceReport (aggregation Daily), naar
+ * microsoft_breakdown_daily met breakdown_type "country" of "region", voor de kaart per dag.
+ *
+ * - country: breakdown_value is de alpha-2-code; Microsoft geeft de Engelse naam ("Netherlands").
+ * - region: alleen Amerikaanse staten, als ISO 3166-2 ("US-CA"): de kaart kent alleen een
+ *   statenkaart van de VS, en een provincie elders zou daar als niet-tekenbare code landen.
+ *
+ * Rijen met dezelfde dag en waarde worden opgeteld (het rapport kan per locatietype splitsen); een
+ * dedupe zou er een weggooien MET zijn cijfers. Wat niet te vertalen valt, wordt geteld in
+ * `onbekend`, niet stil weggelaten.
+ */
+export function naarGeoBreakdownRijen(
+  rijen: readonly Record<string, string>[],
+  clientId: string,
+  accountId: string,
+  type: "country" | "region",
+  landcode: (naam: string) => string | null,
+  staatcode: (naam: string) => string | null,
+): { rijen: Record<string, unknown>[]; onbekend: number } {
+  const som = new Map<string, Record<string, unknown>>();
+  let onbekend = 0;
+  for (const r of rijen) {
+    const land = landcode(r.Country ?? "");
+    let waarde: string | null = land;
+    if (type === "region") {
+      const staat = land === "US" ? staatcode(r.State ?? "") : null;
+      waarde = staat ? `US-${staat}` : null;
+    }
+    const rij = waarde ? naarBreakdownRij(r, clientId, accountId, type, waarde) : null;
+    if (!rij) { onbekend++; continue; }
+    const sleutel = `${rij.date}|${waarde}`;
+    const a = som.get(sleutel);
+    if (!a) { som.set(sleutel, rij); continue; }
+    for (const k of ["impressions", "clicks", "spend", "conversions", "conversion_value"] as const) {
+      a[k] = Number(a[k]) + Number(rij[k]);
+    }
+    a.spend = rond(Number(a.spend));
+  }
+  return { rijen: [...som.values()], onbekend };
 }
 
 export function naarKeywordMaandRij(rij: Record<string, string>, clientId: string): Record<string, unknown> | null {

@@ -4,10 +4,12 @@
 // WAT ELK KANAAL KAN
 //
 // Meta, LinkedIn en Microsoft hebben dagrijen (meta_account_daily, linkedin_account_daily,
-// microsoft_account_daily): die tellen elke dagperiode exact. Google heeft alleen maand- en
-// weekrijen (ads_account_monthly, ads_account_weekly). Een dagperiode die geen hele maanden is,
-// telt Google dus per hele week (maandag t/m zondag): alle weken die de periode RAKEN, en het
-// resultaat zegt welke weken dat waren. Een week of maand naar rato verdelen doen we niet: het
+// microsoft_account_daily): die tellen elke dagperiode exact. Google ook, sinds migratie 111
+// (ads_account_daily): elke periode telt per dag. Alleen het deel van een periode dat vóór de
+// eerste dagrij ligt, valt terug op hele maanden, en de uitleg zegt dat precies
+// (lib/period/dag-opslag.ts). Zonder dagrijen (de tabel bestaat nog niet, of de sync vulde hem nog
+// niet) telt Google zoals voorheen: hele maanden als dat kan, anders per hele week (maandag t/m
+// zondag): alle weken die de periode RAKEN, en het resultaat zegt welke weken dat waren. Een week of maand naar rato verdelen doen we niet: het
 // tempo binnen een week is niet vlak (Black Friday is geen gemiddelde dag van zijn week), en een
 // verdeling die er als meting uitziet, is een schatting die niet zegt dat hij er een is.
 //
@@ -67,11 +69,23 @@ import {
   alsMaandPeriode, dagIn, formatDag, formatDagPeriode, laatsteDagVanMaand, omhullendeMaanden,
   type Dag, type DagPeriode,
 } from "./dag-periode";
+import { splitsOpDagOpslag } from "./dag-opslag";
 
 export type TelKanaal = "google" | NietGoogleKanaal;
 
-/** Hoe fijn een kanaal over deze periode geteld is. */
-export type Fijnheid = "dag" | "week" | "maand";
+/** Hoe fijn een kanaal over deze periode geteld is. "dag+maand": Google per dag, met het deel vóór
+ *  de dagopslag per maand. */
+export type Fijnheid = "dag" | "week" | "maand" | "dag+maand";
+
+/** Een rij uit ads_account_daily (migratie 111): één per klant per dag. */
+export interface GoogleDagRij {
+  date: string;
+  impressions?: number | null;
+  clicks?: number | null;
+  cost?: number | null;
+  conversions?: number | null;
+  conversions_value?: number | null;
+}
 
 /** Een rij uit ads_account_weekly: week_start is de maandag van de week. */
 export interface GoogleWeekRij {
@@ -98,6 +112,9 @@ export interface DagTelInvoer {
   google?: {
     maanden?: ClientHistoricalData | null;
     weken?: readonly GoogleWeekRij[] | null;
+    /** De dagrijen (ads_account_daily), ALLE rijen van de klant: de eerste rij bepaalt waar de
+     *  dagopslag begint. Null of leeg: geen dagopslag, dan maanden of weken zoals voorheen. */
+    dagen?: readonly GoogleDagRij[] | null;
     maandTellers?: ReadonlyMap<Month, Tellers> | null;
   } | null;
   /** Dagrijen per kanaal, gelezen met kanaalDagbron (lib/period/kanaal-maanden.ts). ALLE rijen van
@@ -138,6 +155,18 @@ export interface KanaalTelling {
   dataTot: Dag | null;
   /** Wat de lezer moet weten als de telling afwijkt of iets mist, anders null. */
   uitleg: string | null;
+  /**
+   * False als een deel van de periode als hele maand telde terwijl er maar een deel van die maand
+   * gevraagd was (Google vóór de dagopslag, splitsOpDagOpslag: maandenRuimer). De totalen gaan dan
+   * over meer dagen dan gevraagd, en telDagVergelijking zet dit kanaal buiten het percentage.
+   * Ontbreekt hij, dan telt de telling zoals hij altijd telde.
+   */
+  exact?: boolean;
+  /**
+   * Het venster in een regel als niet alles per dag telde ("1 t/m 30 nov 2026 per dag; sep 2026 per
+   * maand, voor de dagopslag begon"); null als er niets terugviel. Alleen Google kent dit.
+   */
+  venster?: string | null;
 }
 
 export interface DagTelling {
@@ -163,7 +192,11 @@ function begrens(p: DagPeriode, van: Dag | null, tot: Dag | null): DagPeriode | 
 
 const zelfde = (a: DagPeriode | null, b: DagPeriode): boolean => !!a && a.start === b.start && a.eind === b.eind;
 
-/** Google over een dagperiode: per maand als het hele maanden zijn, anders per week. */
+/**
+ * Google over een dagperiode. Hele maanden met een maandreeks: het bestaande pad (slicePeriod), want
+ * daar zijn de maandrijen en de dagrijen dezelfde optelling en de band rekent met de maandrijen.
+ * Anders per dag als er dagrijen zijn (telGoogleDagen), en zonder dagrijen per week.
+ */
 export function telGoogle(
   p: DagPeriode,
   google: NonNullable<DagTelInvoer["google"]>,
@@ -197,8 +230,103 @@ export function telGoogle(
       uitleg: delen.length ? delen.join(" ") : null,
     };
   }
+  if (google.dagen && google.dagen.length > 0) return telGoogleDagen(p, google);
   if (!google.weken) return null;
   return telGoogleWeken(p, google.weken);
+}
+
+/**
+ * Google per dag (ads_account_daily). Het deel van de periode vóór de eerste dagrij telt per hele
+ * maand uit de maandreeks (splitsOpDagOpslag); de rest per dag, exact. Een dag zonder rij telt als
+ * nul, zoals bij de andere dagkanalen: een dag zonder uitgaven heeft geen rij nodig.
+ */
+export function telGoogleDagen(p: DagPeriode, google: NonNullable<DagTelInvoer["google"]>): KanaalTelling {
+  const naam = KANAAL_NAAM.google;
+  const gisteren = addDays(today(), -1);
+  // Eén rij per dag: een tweede rij voor dezelfde dag (een dubbele sync, rijen van twee klanten) telde
+  // anders stil dubbel. De unieke sleutel (client_id, date) maakt dat in de tabel onmogelijk, maar
+  // een lezer die meer klanten meegeeft, krijgt een melding in plaats van een optelling.
+  const perDag = new Map<Dag, GoogleDagRij>();
+  const dubbel = new Set<Dag>();
+  for (const r of google.dagen ?? []) {
+    const d = String(r.date ?? "").slice(0, 10);
+    if (!isDag(d)) continue;
+    if (perDag.has(d)) { dubbel.add(d); continue; }
+    perDag.set(d, r);
+  }
+  const dagen = [...perDag.keys()].sort();
+  const eersteRij = dagen[0] ?? null;
+  const laatsteRij = dagen[dagen.length - 1] ?? null;
+  const split = splitsOpDagOpslag(p, eersteRij);
+
+  const totalen = nul();
+  const tellers: Tellers = { impressions: 0, clicks: 0 };
+  let tellersBekend = true;
+  if (split.dagDeel) {
+    for (const d of dagen) {
+      if (!dagIn(d, split.dagDeel)) continue;
+      const r = perDag.get(d)!;
+      totalen.conversions += n(r.conversions);
+      totalen.revenue += n(r.conversions_value);
+      totalen.adSpend += n(r.cost);
+      tellers.impressions += n(r.impressions);
+      tellers.clicks += n(r.clicks);
+    }
+  }
+  let ontbrekend: string[] = [];
+  let eenheden: string[] = [];
+  const delen: string[] = [];
+  if (split.maanden) {
+    if (google.maanden) {
+      const s = slicePeriod(google.maanden, split.maanden);
+      totalen.conversions += s.totals.conversions;
+      totalen.revenue += s.totals.revenue;
+      totalen.adSpend += s.totals.adSpend;
+      eenheden = monthsIn(split.maanden);
+      ontbrekend = s.missing;
+      if (google.maandTellers) {
+        const t = maandTellersOver(google.maandTellers, eenheden);
+        tellers.impressions += t.impressions;
+        tellers.clicks += t.clicks;
+      } else tellersBekend = false;
+      if (s.missing.length) delen.push(`${naam} heeft geen data voor ${s.missing.join(", ")}.`);
+    } else {
+      delen.push(`${naam}: vóór de dagopslag zijn er geen maandcijfers geladen; ${formatDagPeriode(split.maandDeel!)} telt niet mee.`);
+    }
+  }
+
+  // Wat er werkelijk geteld is: het maanddeel (hele maanden) en het dagdeel t/m de laatste rij.
+  const maandGeteld = split.maanden && google.maanden
+    ? { start: split.maandenRuimer ? `${split.maanden.start}-01` : split.maandDeel!.start, eind: split.dagDeel ? split.maandDeel!.eind : minDag(laatsteDagVanMaand(split.maanden.end), gisteren) }
+    : null;
+  const dagGeteld = split.dagDeel && laatsteRij ? begrens(split.dagDeel, null, laatsteRij) : null;
+  const geteld = maandGeteld && dagGeteld ? { start: maandGeteld.start, eind: dagGeteld.eind }
+    : maandGeteld ?? dagGeteld;
+  const wijktAf = !zelfde(geteld, p);
+
+  if (split.label) delen.unshift(`${naam}: ${split.label}.`);
+  if (split.dagDeel && laatsteRij && laatsteRij < split.dagDeel.eind) {
+    delen.push(laatsteRij < split.dagDeel.start
+      ? `${naam} heeft nog geen dagdata in ${formatDagPeriode(split.dagDeel)}; de dagrijen lopen t/m ${formatDag(laatsteRij)}.`
+      : `${naam}: data t/m ${formatDag(laatsteRij)}.`);
+  }
+  if (dubbel.size) delen.push(`Voor ${[...dubbel].sort().map(formatDag).join(", ")} stond meer dan één dagrij; alleen de eerste telt.`);
+
+  // De start: de eerste dag met activiteit, of eerder als de maandreeks eerder begint.
+  const actief = dagen.find((d) => { const r = perDag.get(d)!; return !!(n(r.cost) || n(r.conversions) || n(r.conversions_value)); }) ?? null;
+  const maandStart = google.maanden ? bronStart(alsBronReeks("google", google.maanden)).start : null;
+  const vanMaand = maandStart ? `${maandStart}-01` : null;
+  const start = actief && vanMaand ? (vanMaand < actief ? vanMaand : actief) : actief ?? vanMaand;
+
+  return {
+    kanaal: "google", gevraagd: p, geteld,
+    fijnheid: split.dagDeel && split.maanden ? "dag+maand" : split.maanden ? "maand" : "dag",
+    wijktAf, eenheden, ontbrekend, totalen, tellers: tellersBekend ? tellers : null,
+    bronStart: start, dataTot: laatsteRij,
+    uitleg: delen.length ? delen.join(" ") : null,
+    venster: split.label,
+    exact: !split.maandenRuimer,
+  };
 }
 
 function minDag(a: Dag, b: Dag): Dag {
@@ -477,10 +605,15 @@ export function telDagVergelijking(p: DagPeriode, c: DagPeriode, invoer: DagTelI
     } else {
       const teVroeg = ([[p, h, "de gekozen periode"], [c, v, "de vergelijkingsperiode"]] as const)
         .filter(([q, t]) => q.start < t.bronStart!);
+      const ruim = ([[h, "de gekozen periode"], [v, "de vergelijkingsperiode"]] as const).filter(([t]) => t.exact === false);
       if (teVroeg.length) {
         uitleg = teVroeg.map(([q, t, wat]) =>
           `${naam} liep pas vanaf ${formatDag(t.bronStart!)}; ${wat} (${formatDagPeriode(q)}) begint eerder.`).join(" ") +
           " Een periode waarin het kanaal (deels) nog niet liep, telt niet als nul: dit kanaal valt buiten het percentage.";
+      } else if (ruim.length) {
+        // Hele maanden aan een kant, dagen aan de andere: dan vergelijk je niet dezelfde dagen.
+        uitleg = ruim.map(([t, wat]) => `${naam} telt in ${wat} een deel als hele maand${t.venster ? ` (${t.venster})` : ""}.`).join(" ") +
+          " De periodes tellen dan niet even veel dagen: dit kanaal valt buiten het percentage.";
       } else {
         gepaard = { huidig: { ...h.totalen }, vorig: { ...v.totalen } };
         const afwijkend = [h, v].filter((t) => t.wijktAf && t.uitleg).map((t) => t.uitleg!);
