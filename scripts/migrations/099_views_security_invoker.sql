@@ -2,7 +2,16 @@
 -- eigenaar draaiden en daarmee RLS op de onderliggende tabellen omzeilden -- masterplan sectie
 -- 15.6, gevonden bij het (alsnog) leveren van het functionele RLS-bewijs uit 15.1.
 --
--- NIET UITGEVOERD TEGEN DE DATABASE. En dat is hier geen kwestie van ontbrekende
+-- GEDRAAID op 13 november 2026, met akkoord van de eigenaar. De voorwaarde was vervuld:
+-- O1_AUTH_ENFORCED staat op "true" in productie (een uitrol zonder sessie stuurt naar /login, en
+-- alleen middleware.ts doet dat) en de eigenaar logt in met zijn bestaande account. Gecontroleerd:
+-- security_invoker=true op alle negen views; check-rls-scheiding meldt "de views doen mee aan RLS:
+-- anon krijgt 0 van 4787 rijen"; view-dekking, bureaugrens en rpc-rechten groen. Een
+-- platformbeheerder ziet via app_zichtbare_klanten() alle klanten, dus de beheerders verliezen niets.
+--
+-- Wat hieronder staat, is de reden waarom hij eerst NIET gedraaid werd.
+--
+-- (Oorspronkelijk:) NIET UITGEVOERD TEGEN DE DATABASE. En dat is hier geen kwestie van ontbrekende
 -- SUPABASE_ACCESS_TOKEN zoals bij 094/095/096 -- de sleutel is deze keer wel beschikbaar. De
 -- reden is dwingender: deze migratie mag pas draaien NADAT O1_AUTH_ENFORCED=true in productie
 -- staat en bevestigd werkt. Draai je hem eerder, dan krijgt elke lezing die vandaag zonder
