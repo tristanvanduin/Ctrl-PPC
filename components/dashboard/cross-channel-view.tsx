@@ -138,6 +138,11 @@ function CrossChannelViewRuw({ clientId, kanalen = [], edition, nieuw = false, a
   const periode = usePeriod();
   const periodeStart = periode.range.start;
   const periodeEind = periode.range.end;
+  // Bij een periode per dag (nieuwe weergave) is `range` de omhullende maanden, niet de gekozen
+  // periode zelf: 20 t/m 30 nov wordt "nov 2026". Het bijschrift noemt dat dan niet "de gekozen periode".
+  const inPeriode = periode.dag && !periode.dag.maandPad
+    ? `in de maanden die de gekozen periode raken (${formatRange(periode.range)})`
+    : `in de gekozen periode (${formatRange(periode.range)})`;
   const rijenPeriode = useMemo(
     () => (rows ? rijenInPeriode(rows, { start: periodeStart, end: periodeEind }) : null),
     [rows, periodeStart, periodeEind],
@@ -424,7 +429,7 @@ function CrossChannelViewRuw({ clientId, kanalen = [], edition, nieuw = false, a
         eerste
         icoon={<Layers className="w-4.5 h-4.5 text-brand-blue-ink" />}
         titel="Kanaaltotalen"
-        bijschrift={`Wat elk kanaal opleverde in de gekozen periode (${formatRange(periode.range)}), en de maanden erachter`}
+        bijschrift={`Wat elk kanaal opleverde ${inPeriode}, en de maanden erachter`}
         actie={<Vensterlabel soort="periode" />}
       >
         <div className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
@@ -676,7 +681,7 @@ function CrossChannelViewRuw({ clientId, kanalen = [], edition, nieuw = false, a
         <Sectie
           icoon={<TrendingUp className="w-4.5 h-4.5 text-brand-blue-ink" />}
           titel="Verdeling over de kanalen"
-          bijschrift={`Spend per kanaal per maand en de verdeling over de kanalen, binnen de gekozen periode (${formatRange(periode.range)})`}
+          bijschrift={`Spend per kanaal per maand en de verdeling over de kanalen, ${inPeriode}`}
         >
           {/* De staven en de ringen naast elkaar, want het zijn twee helften van dezelfde vraag:
               de staven tonen het VERLOOP per maand, de ringen de VERDELING nu -- en de ringen ook
@@ -726,7 +731,7 @@ function CrossChannelViewRuw({ clientId, kanalen = [], edition, nieuw = false, a
       <Sectie
         icoon={<Layers className="w-4.5 h-4.5 text-brand-blue-ink" />}
         titel="Cross-channel (blended)"
-        bijschrift={`Wat elk kanaal opleverde in de gekozen periode (${formatRange(periode.range)}), en de maanden erachter`}
+        bijschrift={`Wat elk kanaal opleverde ${inPeriode}, en de maanden erachter`}
         actie={<Vensterlabel soort="periode" />}
       >
       <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">

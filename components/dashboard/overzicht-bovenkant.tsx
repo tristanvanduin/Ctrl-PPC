@@ -14,6 +14,13 @@
 //
 // Fase 4 zet het logboek "Wat er gebeurde" naast de grafiek (overzicht-logboek.tsx). Dat is het
 // enige blok hier dat zelf iets ophaalt: één verzoek bij het laden, niets bij een wissel.
+//
+// EEN PERIODE PER DAG (stap 3 van het periodemodel). Kiest de gebruiker een event, vrije datums of
+// een vergelijking die maanden niet kunnen, dan rekenen de tegels en de kaarten via
+// telDagVergelijking (lib/period/use-dag-telling.ts). Die haalt één keer per klant de dagrijen en de
+// Google-weekrijen op, bij de eerste zo'n keuze; daarna is elke wissel weer rekenwerk. Hele maanden
+// met een maandvergelijking lopen over het bestaande pad, en tonen dus exact dezelfde cijfers. De
+// grafiek telt altijd per maand, en zijn vensterlabel zegt dan welke maanden.
 
 import { memo, useEffect, useMemo, useState, type AnimationEvent } from "react";
 import type { ClientHistoricalData } from "@/lib/types";
@@ -22,7 +29,8 @@ import type { ChannelPeriodData } from "@/lib/use-channel-period-data";
 import { ALLE_KANALEN, zichtbareTabs, type Kanaal, type Kanaalkeuze } from "@/lib/kanalen/beschikbaar";
 import { usePeriod } from "@/lib/period/period-context";
 import { bandDataStand } from "@/lib/period/band-stand";
-import { grafiekMaanden, kaartCijfers, kaartStand } from "@/lib/overzicht/bovenkant";
+import { grafiekMaanden, kaartCijfers, kaartCijfersUitDagen, kaartDagRegel, kaartStand } from "@/lib/overzicht/bovenkant";
+import { useDagTelling } from "@/lib/period/use-dag-telling";
 import { opbouwVertraging, useEersteOpbouw } from "@/lib/beweging";
 import { heeftGecachteInstellingen, loadClientSettings } from "@/lib/client-settings";
 import { INSTELLINGEN_WACHT_MS } from "@/lib/client-data-provider";
@@ -34,6 +42,7 @@ import { today } from "@/lib/reporting-date";
 import { kanaalScores } from "./kanaal-health-ranking";
 import { Kanaalkaarten, KAARTENRIJ_HOOGTE, type KaartHealth, type Kanaalkaart } from "./kanaalkaarten";
 import { PeriodSummary } from "./period-summary";
+import { DagKerncijfers } from "./dag-kerncijfers";
 import { BandUitZaad, type BandZaad } from "./band-uit-zaad";
 import { OverzichtHoofdgrafiek } from "./overzicht-hoofdgrafiek";
 import { OverzichtLogboek } from "./overzicht-logboek";
@@ -135,10 +144,18 @@ function OverzichtBovenkantRuw({ clientId, channel, kanalen, onKies, onBeoordeel
   const inhoudKlaar = bandKlaar && band.data !== null;
   const { speel, klaar } = useEersteOpbouw(inhoudKlaar && !zaadAangeboden);
 
-  const cijfers = useMemo(
-    () => (bandKlaar ? kaartCijfers(band.perKanaal, lijst, periode.range) : null),
-    [bandKlaar, band.perKanaal, lijst, periode.range],
-  );
+  // De grafiek en de tegels tonen alle kanalen of het ene gekozen kanaal.
+  const gekozen = channel === "blended" ? null : channel;
+  // Een periode per dag die maanden niet kunnen: de tegels en de kaarten uit de telling per dag.
+  const dagPad = !!periode.dag && !periode.dag.maandPad;
+  const dagTelling = useDagTelling({ clientId, staat: dagPad ? periode.dag : null, kanalen: lijst, gekozen, googleData });
+  const cijfers = useMemo(() => {
+    if (!bandKlaar) return null;
+    if (!dagPad) return kaartCijfers(band.perKanaal, lijst, periode.range);
+    const alle = dagTelling.alle;
+    const t = alle ? (alle.vergelijking?.huidig ?? alle.alleen) : null;
+    return t ? kaartCijfersUitDagen(t.perKanaal, lijst) : null;
+  }, [bandKlaar, band.perKanaal, lijst, periode.range, dagPad, dagTelling.alle]);
   // Dezelfde toewijzing als de ranking eronder: de health van een dagkanaal is het object uit
   // perKanaalTab, die van Google de score hierboven.
   const scores = useMemo(
@@ -158,9 +175,15 @@ function OverzichtBovenkantRuw({ clientId, channel, kanalen, onKies, onBeoordeel
     // De stand van dit kanaal zoals zijn eigen tabblad hem zou tonen (bandDataStand per kanaal).
     const stand = bandDataStand({ channel: kanaal, kanalen: lijst, google: googleStand, laatsteDag: band.laatsteDag, route: route.dataStand });
     const bron = route.dataStand?.bronnen?.find((b) => b.bron === kanaal);
+    const alle = dagPad ? dagTelling.alle : null;
     return {
       kanaal,
       cijfers: cijfers?.find((c) => c.kanaal === kanaal) ?? null,
+      dag: alle ? kaartDagRegel(
+        (alle.vergelijking?.huidig ?? alle.alleen)?.perKanaal.find((t) => t.kanaal === kanaal) ?? null,
+        alle.vergelijking?.perKanaal.find((v) => v.kanaal === kanaal) ?? null,
+        alle.vergelijking !== null,
+      ) : null,
       health,
       stand: kaartStand({
         dataTot: stand?.dataTot, vandaag, demo,
@@ -168,10 +191,8 @@ function OverzichtBovenkantRuw({ clientId, channel, kanalen, onKies, onBeoordeel
         bekend: kanaal === "google" ? googleData !== null : band.klaar[kanaal],
       }),
     };
-  }), [lijst, scores, google.laadt, route.error, route.dataStand, googleStand, googleData, band.laatsteDag, band.klaar, cijfers, vandaag, demo]);
+  }), [lijst, scores, google.laadt, route.error, route.dataStand, googleStand, googleData, band.laatsteDag, band.klaar, cijfers, vandaag, demo, dagPad, dagTelling.alle]);
 
-  // De grafiek toont wat de tegels tellen: alle kanalen, of het ene gekozen kanaal.
-  const gekozen = channel === "blended" ? null : channel;
   // Eén lijst per (gekozen, lijst): `gekozen ? [gekozen] : lijst` maakte bij een gekozen kanaal elke
   // render een nieuwe, en dan krijgt de grafiek elke render een andere prop.
   const grafiekKanalen = useMemo(() => (gekozen ? [gekozen] : lijst), [gekozen, lijst]);
@@ -202,8 +223,12 @@ function OverzichtBovenkantRuw({ clientId, channel, kanalen, onKies, onBeoordeel
         <div className={`${KAARTENRIJ_HOOGTE} rounded-xl bg-muted/40`} aria-hidden />
       ) : null}
       <div className={speel ? "opbouw" : undefined} style={stap(voor)}>
-        <PeriodSummary data={bandKlaar ? band.data : null} bronnen={band.bronnen} laden={!bandKlaar} vorm="tegels"
-          zolangLaden={bandZaad && <BandUitZaad zaad={bandZaad} vorm="tegels" />} />
+        {dagPad ? (
+          <DagKerncijfers cijfers={bandKlaar ? dagTelling.getoond : null} laden={!bandKlaar || dagTelling.laden} />
+        ) : (
+          <PeriodSummary data={bandKlaar ? band.data : null} bronnen={band.bronnen} laden={!bandKlaar} vorm="tegels"
+            zolangLaden={bandZaad && <BandUitZaad zaad={bandZaad} vorm="tegels" />} />
+        )}
       </div>
       {/* De grafiek en het logboek naast elkaar (8 en 4 van de 12 kolommen); op een telefoon onder
           elkaar met het logboek EERST: wat er gebeurde lees je voor je het verloop bekijkt.

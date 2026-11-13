@@ -14,6 +14,11 @@
 //   vast venster · laatste 28 dagen  het blok heeft een eigen venster en kan de periode niet
 //                                    volgen zonder extra verzoek; dan staat dat venster er eerlijk bij
 //
+// EEN PERIODE PER DAG (de nieuwe periodekiezer: een event, vrije datums). Een blok dat per maand
+// telt, kan zo'n periode niet precies volgen; het toont de maanden die de periode raken. Dan zegt
+// het label dat ook: "volgt periode · per maand: nov 2026", met de dagperiode in de uitleg. Zo
+// toont geen blok stil een ander venster dan zijn label zegt.
+//
 // Eén component en geen losse tekstjes per kaart: dezelfde woorden, dezelfde plek, en de meting
 // (scripts/meet-overzicht.mjs) vindt de blokken aan `data-venster`. "Volgt periode" is licht
 // gekleurd, de andere twee neutraal: zo zie je in één blik welke blokken meebewegen.
@@ -28,6 +33,7 @@
 
 import { usePeriod } from "@/lib/period/period-context";
 import { formatRange, formatRangeKort } from "@/lib/period/period-range";
+import { formatDagPeriode } from "@/lib/period/dag-periode";
 import { today } from "@/lib/reporting-date";
 
 /**
@@ -57,10 +63,17 @@ export function Vensterlabel(props: Props) {
   const periode = usePeriod();
   const { soort, toevoeging, toevoegingUitleg, className = "" } = props;
   const jaar = soort === "jaar" ? props.jaar ?? Number(today().slice(0, 4)) : null;
-  const tekst = soort === "periode" ? (props.kaal ? "volgt periode" : `volgt periode · ${formatRangeKort(periode.range)}`)
+  // Een periode per dag die geen hele maanden is: dit blok telt de maanden die hij raakt.
+  const perMaand = periode.dag && !periode.dag.maandPad && periode.dag.keuze.periode.soort === "dagen" ? periode.dag.periode : null;
+  const tekst = soort === "periode" && perMaand ? `volgt periode · per maand: ${formatRangeKort(periode.range)}`
+    : soort === "periode" ? (props.kaal ? "volgt periode" : `volgt periode · ${formatRangeKort(periode.range)}`)
     : soort === "jaar" ? `jaarblok · ${jaar}`
     : `vast venster · ${props.venster}`;
-  const uitleg = soort === "periode" ? `Dit blok volgt de gekozen periode: ${formatRange(periode.range)}.`
+  const uitleg = soort === "periode" && perMaand
+    ? `Dit blok telt per maand: de maanden die de gekozen periode (${formatDagPeriode(perMaand)}) raken, ${formatRange(periode.range)}.`
+      // Het venster loopt bewust door tot na de datastand: dan staat er een halve maand naast hele.
+      + (periode.range.end > periode.eindMaand ? " De laatste maand is nog niet compleet." : "")
+    : soort === "periode" ? `Dit blok volgt de gekozen periode: ${formatRange(periode.range)}.`
     : soort === "jaar" ? `Dit blok gaat over het kalenderjaar ${jaar} en volgt de gekozen periode niet.`
     : `Dit blok heeft een eigen venster (${props.venster}) en volgt de gekozen periode niet.`;
   const kleur = soort === "periode"

@@ -306,10 +306,8 @@ const TOEGESTANE_WEZEN = new Map([
   ["components/marketing/product-video.tsx",
     "wacht op Engelstalige productbeelden; zie de koptekst voor waarom de Nederlandse video eruit is"],
 
-  // De dagperiode (13 november 2026). lib/period/dag-periode.ts en lib/events/event-periodes.ts
-  // hangen hieronder en vallen daarom niet op als wees; ze hebben net zo goed nog geen scherm.
-  ["lib/period/dag-telling.ts",
-    "stap 1 van het periodemodel; wordt in stap 3 aangesloten op de periodekiezer"],
+  // lib/period/dag-telling.ts stond hier (stap 1 van het periodemodel) en is in stap 3 aangesloten
+  // op de periodekiezer van de nieuwe weergave, via lib/period/use-dag-telling.ts.
 
   // lib/adoptie/account-stoplicht.ts en lib/adoptie/code-rood.ts stonden hier ("wacht op de
   // UI/API-consument") en zijn aangesloten: app/api/cron/evaluate-code-rood en de God View-churn.

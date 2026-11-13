@@ -24,15 +24,32 @@
 // kosten en conversies, en de vergelijking zakte in zonder dat er iets gebeurd was. De pagina
 // geeft daarom de datastand mee; de presets eindigen op de laatste volle maand MET data
 // (vensterEindMaand). Zonder datastand -- het portfolio -- blijft het de kalender.
+//
+// PER DAG, IN DE NIEUWE WEERGAVE (stap 3 van het periodemodel)
+//
+// Met `dagModus` kiest de pagina ook events, vrije datums, de vorige editie en een vrije
+// vergelijkingsperiode (lib/period/dag-keuze.ts). De staat blijft één keuze: de maandkeuze, met
+// `dag` erbij als maanden niet volstaan. Daaruit volgen twee dingen. `range` en `compareRange` zijn
+// de MAANDEN die de periode en de vergelijking raken, voor de blokken die per maand tellen (hun
+// vensterlabel zegt dat). En `dag` is de keuze per dag, uitgerekend, voor de kerncijfers en de
+// kanaalkaarten. Kan de keuze als maandkeuze (hele maanden, een oude vergelijking), dan zegt
+// `dag.maandPad` dat, en rekent alles zoals het altijd deed. Zonder `dagModus` (de vertrouwde
+// weergave, het portfolio) is `dag` null en verandert er niets.
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import {
   periodeOpEind, resolveComparison, vensterEindMaand, PERIOD_PRESETS, COMPARISON_MODES,
   DEFAULT_PRESET, DEFAULT_COMPARISON, isValidMonth,
-  type ComparisonMode, type Month, type PeriodPreset, type PeriodRange, type PeriodeKeuze,
+  type ComparisonMode, type Month, type PeriodPreset, type PeriodRange,
 } from "./period-range";
 import { schonePeriodeKeuze } from "./periode-url";
 import { periodeCookieRegel } from "./periode-cookie";
+import {
+  dagKeuzeUitParams, dagVan, lostDagKeuzeOp, metDag, zetDagKeuzeParams, zonderDag,
+  type DagKeuze, type DagStaat, type PeriodeKeuzeMetDag,
+} from "./dag-keuze";
+import { omhullendeMaanden } from "./dag-periode";
+import type { EventPeriode } from "../events/event-periodes";
 import { useUrlKeuze, type UrlKoppeling } from "../adresbalk";
 import { today } from "../reporting-date";
 
@@ -65,6 +82,10 @@ export interface PeriodState {
   /** De meegegeven datastand, voor de melding bij de cijfers; null zonder. */
   dataStand: PeriodDataStand | null;
   set: (preset: PeriodPreset, custom: PeriodRange | null, comparison: ComparisonMode) => void;
+  /** Alleen in de nieuwe weergave (dagModus): de keuze per dag, uitgerekend. Anders null. */
+  dag: DagStaat | null;
+  /** Zet een keuze per dag. Buiten de nieuwe weergave doet hij niets. */
+  setDag: (k: DagKeuze) => void;
 }
 
 // Buiten een provider werkt alles gewoon door op de standaardperiode in plaats van te crashen.
@@ -94,6 +115,8 @@ function standaardPeriode(): PeriodState {
         eindMaand,
         dataStand: null,
         set: () => {},
+        dag: null,
+        setDag: () => {},
       },
     };
   }
@@ -123,8 +146,30 @@ export function vasteStand(dataStand: PeriodDataStand | null | undefined): Perio
  * De periode die de provider uitgeeft, uit de keuze en de datastand. Zuiver: de provider en de
  * kerncijfers uit het zaad rekenen hem met dezelfde functie, en dus met hetzelfde venster.
  */
-export function periodeWaarde(keuze: PeriodeKeuze, stand: PeriodDataStand | null, set: PeriodState["set"]): PeriodState {
+export function periodeWaarde(
+  keuze: PeriodeKeuzeMetDag, stand: PeriodDataStand | null, set: PeriodState["set"],
+  dagOpties?: { events: readonly EventPeriode[] | null; setDag: PeriodState["setDag"] },
+): PeriodState {
   const eindMaand = vensterEindMaand(stand?.laatsteVolleMaand);
+  if (dagOpties) {
+    // De nieuwe weergave. Een periode per dag: de maanden die hij raakt, NIET geklemd op de
+    // datastand. Een actie in de lopende maand hoort de blokken per maand die maand te laten tonen
+    // (deels gevuld, en zo gelabeld), niet stil de maand ervoor.
+    const dk = dagVan(keuze);
+    const range = dk.periode.soort === "dagen" ? omhullendeMaanden(dk.periode) : periodeOpEind(keuze.preset, keuze.custom, eindMaand);
+    const dag = lostDagKeuzeOp(dk, range, dagOpties.events);
+    return {
+      preset: keuze.preset, custom: keuze.custom, comparison: keuze.comparison,
+      range,
+      compareRange: dag.maandPad ? resolveComparison(range, keuze.comparison)
+        : dag.vergelijking.periode ? omhullendeMaanden(dag.vergelijking.periode) : null,
+      eindMaand,
+      dataStand: stand,
+      set,
+      dag,
+      setDag: dagOpties.setDag,
+    };
+  }
   // Een eigen periode wordt op eindMaand geklemd, net als de presets (periodeOpEind). Ongeklemd
   // telden de maanden na het eind van de data als nullen (de demo: -26,5% conversies waar -1,5%
   // hoort), en zo'n periode ontstaat vanzelf: opgeslagen onder de kalender als grens, gekozen op
@@ -133,12 +178,14 @@ export function periodeWaarde(keuze: PeriodeKeuze, stand: PeriodDataStand | null
   // de data later verder, dan krijg je hem weer heel.
   const range = periodeOpEind(keuze.preset, keuze.custom, eindMaand);
   return {
-    ...keuze,
+    preset: keuze.preset, custom: keuze.custom, comparison: keuze.comparison,
     range,
     compareRange: resolveComparison(range, keuze.comparison),
     eindMaand,
     dataStand: stand,
     set,
+    dag: null,
+    setDag: () => {},
   };
 }
 
@@ -155,6 +202,8 @@ interface Opgeslagen {
   preset?: string;
   custom?: { start?: string; end?: string } | null;
   comparison?: string;
+  /** De keuze per dag in de vorm van de adresbalk, alleen als maanden niet volstaan. */
+  dag?: string;
 }
 
 function sleutel(scope: string): string {
@@ -163,12 +212,22 @@ function sleutel(scope: string): string {
 
 // Zonder koppeling: de adresbalk zegt nooit iets en er wordt niets geschreven. Eén vast object,
 // zodat de hook hieronder altijd aangeroepen kan worden.
-const GEEN_ADRES: UrlKoppeling<PeriodeKeuze> = { waarde: null, leesNu: () => null, schrijf: () => {} };
+const GEEN_ADRES: UrlKoppeling<PeriodeKeuzeMetDag> = { waarde: null, leesNu: () => null, schrijf: () => {} };
 
-function bewaar(scope: string, keuze: PeriodeKeuze, inCookie: boolean): void {
+/** De keuze in de vaste vorm van de weergave: met dagModus de keuze per dag waar nodig, anders zonder. */
+function inVorm(k: PeriodeKeuzeMetDag, dagModus: boolean): PeriodeKeuzeMetDag {
+  return dagModus ? metDag(dagVan(k)) : zonderDag(k);
+}
+
+function bewaar(scope: string, keuze: PeriodeKeuzeMetDag, inCookie: boolean): void {
   if (typeof window === "undefined") return;
   try {
-    localStorage.setItem(sleutel(scope), JSON.stringify({ preset: keuze.preset, custom: keuze.custom, comparison: keuze.comparison }));
+    // De maandkeuze altijd (die leest de vertrouwde weergave), de keuze per dag erbij als hij er is.
+    const p = new URLSearchParams();
+    if (keuze.dag) zetDagKeuzeParams(p, keuze.dag);
+    localStorage.setItem(sleutel(scope), JSON.stringify({
+      preset: keuze.preset, custom: keuze.custom, comparison: keuze.comparison, ...(keuze.dag ? { dag: p.toString() } : {}),
+    }));
   } catch {
     // Vol of geblokkeerd geheugen mag de keuze niet tegenhouden; hij geldt dan alleen
     // voor deze sessie.
@@ -177,7 +236,7 @@ function bewaar(scope: string, keuze: PeriodeKeuze, inCookie: boolean): void {
 }
 
 /** Dezelfde keuze in de cookie van deze klantpagina (lib/period/periode-cookie.ts), voor de server. */
-function bewaarCookie(keuze: PeriodeKeuze): void {
+function bewaarCookie(keuze: PeriodeKeuzeMetDag): void {
   try {
     const regel = periodeCookieRegel(keuze, window.location.pathname);
     if (regel) document.cookie = regel;
@@ -186,7 +245,7 @@ function bewaarCookie(keuze: PeriodeKeuze): void {
   }
 }
 
-function lees(scope: string): PeriodeKeuze {
+function lees(scope: string, dagModus: boolean): PeriodeKeuzeMetDag {
   const leeg = { preset: DEFAULT_PRESET, custom: null, comparison: DEFAULT_COMPARISON };
   if (typeof window === "undefined") return leeg;
   try {
@@ -201,29 +260,35 @@ function lees(scope: string): PeriodeKeuze {
       ? (o.comparison as ComparisonMode) : DEFAULT_COMPARISON;
     const custom = o.custom && isValidMonth(o.custom.start) && isValidMonth(o.custom.end)
       ? { start: o.custom.start, end: o.custom.end } : null;
-    return { preset, custom, comparison };
+    // De keuze per dag alleen in de nieuwe weergave, en gecontroleerd zoals een adres.
+    const dag = dagModus && typeof o.dag === "string" ? dagKeuzeUitParams(new URLSearchParams(o.dag)) : null;
+    return dag ? metDag(dag) : { preset, custom, comparison };
   } catch {
     return leeg;
   }
 }
 
-export function PeriodProvider({ scope, dataStand, adres, beginKeuze = null, bewaarInCookie = false, children }: {
+export function PeriodProvider({ scope, dataStand, adres, beginKeuze = null, bewaarInCookie = false, dagModus = false, events = null, children }: {
   scope: string;
   /** Tot waar de data loopt. Weglaten of null: de presets volgen de kalender. */
   dataStand?: PeriodDataStand | null;
   /** De koppeling met de adresbalk (?periode=, ?vergelijk=). Weglaten: alleen localStorage. */
-  adres?: UrlKoppeling<PeriodeKeuze>;
+  adres?: UrlKoppeling<PeriodeKeuzeMetDag>;
   /**
    * De bewaarde keuze zoals de SERVER hem uit de cookie las (lib/period/periode-cookie.ts). Server
    * en eerste client-render krijgen dezelfde prop, dus mag hij er meteen in, net als de adresbalk.
    * Null: geen cookie, dan de standaard tot localStorage gelezen is, zoals altijd.
    */
-  beginKeuze?: PeriodeKeuze | null;
+  beginKeuze?: PeriodeKeuzeMetDag | null;
   /**
    * Schrijf de keuze ook in de cookie van deze klantpagina, zodat de server hem bij de volgende
    * paginalaad kent. Alleen op een klantpagina; het portfolio laat hem uit.
    */
   bewaarInCookie?: boolean;
+  /** De nieuwe weergave: kies ook per dag (zie de kop). Uit: precies zoals het was. */
+  dagModus?: boolean;
+  /** De events van de klant (lib/events/event-periodes.ts), voor de dagmodus; null zolang ze laden. */
+  events?: readonly EventPeriode[] | null;
   children: React.ReactNode;
 }) {
   // De keuze uit de adresbalk, met de directe echo van de eigen klik (zie lib/adresbalk.ts).
@@ -233,9 +298,12 @@ export function PeriodProvider({ scope, dataStand, adres, beginKeuze = null, bew
   // de server meegaf -- en anders op de standaard; localStorage komt er in een effect achteraan.
   // Zonder de cookie startte ook wie een andere periode bewaard had op de standaard: de server
   // kan de kerncijfers dan niet vooraf renderen, want ze zouden na het laden verspringen.
-  const [staat, setStaat] = useState<PeriodeKeuze>(() => uitAdres ?? beginKeuze ?? {
+  const [staat, setStaat] = useState<PeriodeKeuzeMetDag>(() => inVorm(uitAdres ?? beginKeuze ?? {
     preset: DEFAULT_PRESET, custom: null, comparison: DEFAULT_COMPARISON,
-  });
+  }, dagModus));
+  // Schakelt de weergave om, dan dezelfde keuze in de vorm van de andere weergave (uitgerekend, niet
+  // bewaard: pas een eigen keuze overschrijft wat er bewaard is).
+  const keuzeInVorm = useMemo(() => inVorm(staat, dagModus), [staat, dagModus]);
 
   // Als tekst: de keuze is elke render een nieuw object, en het effect hoort alleen te lopen als
   // de adresbalk echt iets anders zegt.
@@ -248,10 +316,12 @@ export function PeriodProvider({ scope, dataStand, adres, beginKeuze = null, bew
   // Via een ref, zoals het adres: het effect hoort alleen op de scope en de adresbalk te lopen.
   const inCookie = useRef(bewaarInCookie);
   useEffect(() => { inCookie.current = bewaarInCookie; });
+  const dagNu = useRef(dagModus);
+  useEffect(() => { dagNu.current = dagModus; });
   useEffect(() => {
     if (adresSleutel === null) {
       // Zelfde inhoud: dezelfde staat, zodat er niets opnieuw rekent.
-      const bewaard = lees(scope);
+      const bewaard = inVorm(lees(scope, dagNu.current), dagNu.current);
       setStaat((huidig) => (JSON.stringify(huidig) === JSON.stringify(bewaard) ? huidig : bewaard));
       // De cookie gelijk met localStorage: wie al een keuze had van vóór de cookie, of een cookie
       // die verliep, krijgt bij de volgende paginalaad de cijfers vooraf. Ook als er niets bewaard
@@ -267,7 +337,7 @@ export function PeriodProvider({ scope, dataStand, adres, beginKeuze = null, bew
     // De adresbalk gaat voor, en wordt meteen de bewaarde keuze van deze klant: wie daarna naar
     // een beurs klikt (een link zonder periode) houdt zo de periode waar hij naar keek, in plaats
     // van terug te vallen op een keuze van weken geleden.
-    const keuze = JSON.parse(adresSleutel) as PeriodeKeuze;
+    const keuze = JSON.parse(adresSleutel) as PeriodeKeuzeMetDag;
     setStaat((huidig) => (JSON.stringify(huidig) === adresSleutel ? huidig : keuze));
     bewaar(scope, keuze, inCookie.current);
   }, [scope, adresSleutel]);
@@ -277,12 +347,24 @@ export function PeriodProvider({ scope, dataStand, adres, beginKeuze = null, bew
     (preset: PeriodPreset, custom: PeriodRange | null, comparison: ComparisonMode) => {
       // Met een adresbalk in de vaste vorm van de adresbalk (schonePeriodeKeuze): dan is de eigen
       // keuze letterlijk wat er straks uit terugkomt, en hoeft niets een tweede keer te renderen.
-      const keuze = heeftAdres ? schonePeriodeKeuze({ preset, custom, comparison }) : { preset, custom, comparison };
+      const maand = heeftAdres ? schonePeriodeKeuze({ preset, custom, comparison }) : { preset, custom, comparison };
+      // In de dagmodus in de vorm van die modus, zodat een oude bediening dezelfde staat geeft.
+      const keuze = inVorm(maand, dagModus);
       setStaat(keuze);
       bewaar(scope, keuze, bewaarInCookie);
       if (heeftAdres) kiesAdres(keuze);
     },
-    [scope, heeftAdres, kiesAdres, bewaarInCookie],
+    [scope, heeftAdres, kiesAdres, bewaarInCookie, dagModus],
+  );
+  const setDag = useCallback(
+    (k: DagKeuze) => {
+      if (!dagModus) return;
+      const keuze = metDag(k);
+      setStaat(keuze);
+      bewaar(scope, keuze, bewaarInCookie);
+      if (heeftAdres) kiesAdres(keuze);
+    },
+    [scope, heeftAdres, kiesAdres, bewaarInCookie, dagModus],
   );
 
   // Op de losse velden en niet op het object: een pagina die elke render een nieuw object
@@ -303,7 +385,10 @@ export function PeriodProvider({ scope, dataStand, adres, beginKeuze = null, bew
     return vasteStand({ laatsteVolleMaand: volle, partieel, dataTot, uitgeslotenBronnen });
   }, [heeftStand, volle, dataTot, pMaand, pTmDag, pDagen, uitSleutel]);
 
-  const waarde = useMemo<PeriodState>(() => periodeWaarde(staat, stand, set), [staat, set, stand]);
+  const waarde = useMemo<PeriodState>(
+    () => periodeWaarde(keuzeInVorm, stand, set, dagModus ? { events, setDag } : undefined),
+    [keuzeInVorm, set, stand, dagModus, events, setDag],
+  );
 
   return <PeriodContext.Provider value={waarde}>{children}</PeriodContext.Provider>;
 }

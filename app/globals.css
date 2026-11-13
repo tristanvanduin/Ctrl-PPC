@@ -694,6 +694,26 @@
   animation: opbouw-in var(--duur-lang, 300ms) var(--ease-aankomst, cubic-bezier(0, 0, 0.2, 1)) backwards;
 }
 
+/* Het paneel van de periodekiezer (components/dashboard/periode-kiezer.tsx): in 200 ms (--duur-middel)
+ * binnen. Op een telefoon en tablet schuift het blad van onderen omhoog, vanaf 1024 px zakt het paneel
+ * vier pixels en komt het op. Bij "minder beweging" staat het er direct (de regel onderaan). */
+@keyframes kiezer-blad-in {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+@keyframes kiezer-paneel-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.kiezer-paneel {
+  animation: kiezer-blad-in var(--duur-middel, 200ms) var(--ease-aankomst, cubic-bezier(0, 0, 0.2, 1)) backwards;
+}
+@media (min-width: 64rem) {
+  .kiezer-paneel {
+    animation-name: kiezer-paneel-in;
+  }
+}
+
 /* Herbruikbare teller-typografie: monospace, 'high-density' letter-spacing. Los van .terminal,
  * zodat <Counter isLive> overal in de app dezelfde cijfertypografie draagt, niet alleen op de
  * nieuwe schermen. */
@@ -913,6 +933,11 @@
 
   /* De opbouw heeft een vertraging per blok; zonder dit bleef een blok die tijd onzichtbaar. */
   .opbouw {
+    animation: none !important;
+  }
+
+  /* Het paneel van de periodekiezer staat er direct. */
+  .kiezer-paneel {
     animation: none !important;
   }
 

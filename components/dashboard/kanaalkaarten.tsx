@@ -15,11 +15,12 @@
 
 import { AlertTriangle, X } from "lucide-react";
 import { KANAAL_NAAM, KANAAL_KLEUR, type Kanaal, type Kanaalkeuze } from "@/lib/kanalen/beschikbaar";
-import { volgendeKanaalkeuze, type KaartCijfers } from "@/lib/overzicht/bovenkant";
+import { volgendeKanaalkeuze, type KaartCijfers, type KaartDagRegel } from "@/lib/overzicht/bovenkant";
 import type { HealthScore } from "@/lib/health-score";
 import { opbouwVertraging, useTellendeTekst } from "@/lib/beweging";
 import { usePeriod } from "@/lib/period/period-context";
 import { formatRangeKort } from "@/lib/period/period-range";
+import { formatDagPeriode } from "@/lib/period/dag-periode";
 import { Vensterlabel } from "@/components/ui/vensterlabel";
 import { kleurVanScore } from "./kanaal-health-ranking";
 
@@ -36,6 +37,8 @@ export interface Kanaalkaart {
   health: KaartHealth;
   /** De koppel- en datastand in een paar woorden ("data t/m 26 aug"), en of dat aandacht vraagt. */
   stand: { tekst: string; alarm: boolean } | null;
+  /** Alleen bij een periode per dag: hoe fijn het kanaal telt, en de verandering of waarom niet. */
+  dag?: KaartDagRegel | null;
 }
 
 const heel = (v: number) => new Intl.NumberFormat("nl-NL", { maximumFractionDigits: 0 }).format(v);
@@ -95,7 +98,8 @@ function Kaart({ kaart, actief, onKlik, vertraging, opbouw, periode }: {
   /** De gekozen periode in een paar woorden, voor de uitleg bij de kaart. */
   periode: string;
 }) {
-  const { kanaal, cijfers, health, stand } = kaart;
+  const { kanaal, cijfers, health, stand, dag } = kaart;
+  const dagTekst = dag ? `${dag.fijnheid}${dag.delta ? ` · ${dag.delta}` : dag.buiten ? " · buiten het percentage" : ""}` : null;
   const kleur = KANAAL_KLEUR[kanaal];
   const naam = KANAAL_NAAM[kanaal];
   // Bij een periodewissel telt het conversiecijfer naar zijn nieuwe waarde, zoals de tegels eronder.
@@ -188,6 +192,11 @@ function Kaart({ kaart, actief, onKlik, vertraging, opbouw, periode }: {
           <span className="h-4 w-4/5 self-center rounded bg-muted/70" aria-hidden />
         )}
       </span>
+      {/* Bij een periode per dag: hoe fijn dit kanaal telt (Google per week) en de verandering, of
+          dat het buiten het percentage valt. De reden staat in de uitleg en onder de tegels. */}
+      {dagTekst && (
+        <span data-kaartdag className="w-full truncate text-meta text-muted-foreground" title={dag?.uitleg ?? undefined}>{dagTekst}</span>
+      )}
       {/* De beschrijving voor een schermlezer, in één zin: de knop heet naar zijn kanaal
           (aria-label), dus wat erin staat wordt niet voorgelezen en moet hier voluit staan. */}
       <span id={beschrijving} className="sr-only">
@@ -196,6 +205,7 @@ function Kaart({ kaart, actief, onKlik, vertraging, opbouw, periode }: {
           ? ` Over ${periode}. Conversies: ${heel(cijfers.conversions)}${cijfers.aandeelConversies !== null ? `, dat is ${cijfers.aandeelConversies} procent van alle kanalen` : ""}. Kosten: ${euro(cijfers.adSpend)}${cijfers.aandeelKosten !== null ? `, ${cijfers.aandeelKosten} procent van alle kanalen` : ""}. CPA: ${cijfers.cpa === null ? "niet te berekenen" : euro(cijfers.cpa)}.`
           : " Cijfers worden geladen."}
         {toelichting ? ` ${toelichting}.` : ""}
+        {dagTekst ? ` Telt ${dagTekst}.${dag?.uitleg ? ` ${dag.uitleg}` : ""}` : ""}
         {actief ? " Gekozen; nog een klik toont alle kanalen." : ""}
       </span>
     </button>
@@ -244,7 +254,7 @@ export function Kanaalkaarten({ kaarten, gekozen, onKies, opbouw = false, opbouw
           actief={gekozen === kaart.kanaal}
           onKlik={() => onKies(volgendeKanaalkeuze(gekozen, kaart.kanaal))}
           opbouw={opbouw}
-          periode={formatRangeKort(periode.range)}
+          periode={periode.dag && !periode.dag.maandPad ? formatDagPeriode(periode.dag.periode) : formatRangeKort(periode.range)}
           vertraging={opbouwVertraging(opbouwVanaf + i, opbouwAantal ?? kaarten.length)}
         />
       ))}

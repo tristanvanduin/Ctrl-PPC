@@ -102,7 +102,11 @@ export function kaartCijfers(
 ): KaartCijfers[] | null {
   const lijst = ALLE_KANALEN.filter((k) => kanalen.includes(k));
   if (lijst.some((k) => !perKanaal[k])) return null;
-  const totalen = lijst.map((k) => kanaalTotalen(perKanaal[k], periode));
+  return metAandelen(lijst, lijst.map((k) => kanaalTotalen(perKanaal[k], periode)));
+}
+
+/** De kaartcijfers bij de totalen per kanaal: de CPA en de aandelen over alle kanalen. */
+function metAandelen(lijst: readonly Kanaal[], totalen: readonly Totalen[]): KaartCijfers[] {
   const kosten = heleProcenten(totalen.map((t) => t.adSpend));
   const conversies = heleProcenten(totalen.map((t) => t.conversions));
   return lijst.map((kanaal, i) => ({
@@ -112,6 +116,53 @@ export function kaartCijfers(
     aandeelKosten: kosten ? kosten[i] : null,
     aandeelConversies: conversies ? conversies[i] : null,
   }));
+}
+
+/**
+ * De kaartcijfers over een periode per dag (de nieuwe periodekiezer): de totalen per kanaal uit
+ * telDagPeriode of telDagVergelijking (lib/period/dag-telling.ts), met dezelfde CPA en aandelen.
+ * Een kanaal zonder telling (Google als zijn weekrijen niet te laden waren) krijgt geen cijfers en
+ * telt niet mee in de aandelen; nullen zouden een gemeten niets suggereren. De tegels zeggen waarom.
+ */
+export function kaartCijfersUitDagen(
+  perKanaal: readonly { kanaal: string; totalen: Totalen }[],
+  kanalen: readonly Kanaal[],
+): KaartCijfers[] {
+  const lijst = ALLE_KANALEN.filter((k) => kanalen.includes(k) && perKanaal.some((t) => t.kanaal === k));
+  return metAandelen(lijst, lijst.map((k) => perKanaal.find((t) => t.kanaal === k)!.totalen));
+}
+
+/** De regel op een kanaalkaart bij een periode per dag: hoe fijn hij telt, en de verandering of
+ *  waarom hij buiten het percentage valt. */
+export interface KaartDagRegel {
+  fijnheid: "per dag" | "per week" | "per maand";
+  /** "+12,4% conversies", of null zonder vergelijking of zonder paar. */
+  delta: string | null;
+  /** Waarom het kanaal buiten het percentage valt, of wat er anders geteld is; anders null. */
+  uitleg: string | null;
+  /** Valt het kanaal helemaal buiten het percentage? */
+  buiten: boolean;
+}
+
+const PROCENT = new Intl.NumberFormat("nl-NL", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+
+/**
+ * De regel per kanaal uit de telling. Zonder vergelijking alleen de fijnheid. De verandering gaat
+ * over de gepaarde conversies, zoals het percentage in de tegels.
+ */
+export function kaartDagRegel(
+  telling: { fijnheid: "dag" | "week" | "maand"; uitleg: string | null } | null,
+  vergelijking: { gepaard: { huidig: Totalen; vorig: Totalen } | null; uitleg: string | null } | null,
+  metVergelijking: boolean,
+): KaartDagRegel | null {
+  if (!telling) return null;
+  const fijnheid = telling.fijnheid === "dag" ? "per dag" : telling.fijnheid === "week" ? "per week" : "per maand";
+  if (!metVergelijking) return { fijnheid, delta: null, uitleg: telling.uitleg, buiten: false };
+  const g = vergelijking?.gepaard ?? null;
+  if (!g) return { fijnheid, delta: null, uitleg: vergelijking?.uitleg ?? null, buiten: true };
+  const pct = g.vorig.conversions > 0 ? ((g.huidig.conversions - g.vorig.conversions) / g.vorig.conversions) * 100 : null;
+  const delta = pct === null ? null : `${pct >= 0 ? "+" : ""}${PROCENT.format(pct)}% conversies`;
+  return { fijnheid, delta, uitleg: vergelijking?.uitleg ?? null, buiten: false };
 }
 
 // ── De koppel- en datastand op een kaart ────────────────────────────────────────────────────────

@@ -14,25 +14,27 @@
 // DE WAARDE is de keuze in de vorm van de adresbalk (lib/period/periode-url.ts): dezelfde
 // schrijfwijze en dezelfde controle bij het lezen, geen tweede formaat dat uit de pas kan lopen.
 
-import { periodeUitParams, zetPeriodeParams } from "./periode-url";
 import { kanaalbalkPad } from "../overzicht/kaartenrij";
-import type { PeriodeKeuze } from "./period-range";
+import { metDagUitParams, zetMetDagParams, type PeriodeKeuzeMetDag } from "./dag-keuze";
 
 /** De naam van de cookie. */
 export const PERIODE_COOKIE = "overzicht-periode";
 
-/** De keuze als cookiewaarde: "periode=last_3m&vergelijk=previous_period". */
-export function periodeCookieWaarde(keuze: PeriodeKeuze): string {
+/** De keuze als cookiewaarde: "periode=last_3m&vergelijk=previous_period". Een keuze per dag (de
+ *  nieuwe weergave, lib/period/dag-keuze.ts) in dezelfde vorm als in de adresbalk; een maandkeuze
+ *  precies zoals altijd. */
+export function periodeCookieWaarde(keuze: PeriodeKeuzeMetDag): string {
   const p = new URLSearchParams();
-  zetPeriodeParams(p, keuze);
+  zetMetDagParams(p, keuze);
   return p.toString();
 }
 
-/** De keuze uit de cookie, of null als hij er niet is of geen geldige periode draagt. */
-export function periodeUitCookie(ruw: string | null | undefined): PeriodeKeuze | null {
+/** De keuze uit de cookie, of null als hij er niet is of geen geldige periode draagt. Een maandkeuze
+ *  komt terug als maandkeuze; alleen een keuze die maanden niet kunnen, draagt `dag`. */
+export function periodeUitCookie(ruw: string | null | undefined): PeriodeKeuzeMetDag | null {
   if (!ruw) return null;
   try {
-    return periodeUitParams(new URLSearchParams(ruw));
+    return metDagUitParams(new URLSearchParams(ruw));
   } catch {
     return null;
   }
@@ -42,7 +44,7 @@ export function periodeUitCookie(ruw: string | null | undefined): PeriodeKeuze |
  * De cookie-regel voor document.cookie: een jaar, alleen onder het pad van deze klant. Null buiten
  * een klantpagina: daar valt voor de server niets te onthouden.
  */
-export function periodeCookieRegel(keuze: PeriodeKeuze, padnaam: string | null | undefined): string | null {
+export function periodeCookieRegel(keuze: PeriodeKeuzeMetDag, padnaam: string | null | undefined): string | null {
   const pad = kanaalbalkPad(padnaam);
   return pad ? `${PERIODE_COOKIE}=${periodeCookieWaarde(keuze)}; path=${pad}; max-age=31536000; samesite=lax` : null;
 }

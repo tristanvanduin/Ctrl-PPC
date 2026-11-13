@@ -106,7 +106,7 @@ const dagVan = (r: Record<string, unknown>): string => String(r.date ?? "").slic
 //
 // Lukt een pagina niet, dan houdt het laden daar op en schuift `geladenVanaf` mee: de band zegt dan
 // dat die maanden niet geladen zijn, in plaats van ze als nul of als start te lezen.
-async function fetchKanaalRijen(clientId: string, kanaal: NietGoogleKanaal): Promise<{ rijen: Record<string, unknown>[]; geladenVanaf: Month }> {
+export async function fetchKanaalRijen(clientId: string, kanaal: NietGoogleKanaal): Promise<{ rijen: Record<string, unknown>[]; geladenVanaf: Month }> {
   const bron = kanaalDagbron(kanaal);
   const vanaf = monthsAgo(MAANDEN_TERUG);
   const rijen: Record<string, unknown>[] = [];

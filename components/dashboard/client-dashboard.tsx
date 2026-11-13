@@ -29,7 +29,8 @@ import {
 } from "@/lib/kanalen/beschikbaar";
 import { GEO_PARAM, leesAdresbalk, schrijfAdresbalk, useUrlKeuze, type UrlKoppeling } from "@/lib/adresbalk";
 import { periodeUitParams, zetPeriodeParams } from "@/lib/period/periode-url";
-import type { PeriodeKeuze } from "@/lib/period/period-range";
+import { metDagUitParams, zetMetDagParams, type PeriodeKeuzeMetDag } from "@/lib/period/dag-keuze";
+import { useEventPeriodes } from "@/lib/events/use-event-periodes";
 import { googleHeeftData } from "@/lib/period/apply-period";
 
 // laadBeschikbareKanalen() neemt structureel een client aan met .from(); de browser-singleton
@@ -69,6 +70,7 @@ import { PeriodProvider, usePeriod, type PeriodDataStand } from "@/lib/period/pe
 import { bandDataStand } from "@/lib/period/band-stand";
 import { NIET_GOOGLE } from "@/lib/period/kanaal-maanden";
 import { PeriodSelector, PeriodeSnelkoppelingen } from "./period-selector";
+import { PeriodeKiezer } from "./periode-kiezer";
 import { PeriodSummary } from "./period-summary";
 import { GeenBeursfilter } from "./geen-beursfilter";
 import { overzichtBeursmelding } from "@/lib/overzicht/beursfilter";
@@ -300,7 +302,7 @@ export function ClientDashboard({ client, bewaardeWeergave = null, kanaalbalkVan
   /** Het antwoord van de Google-route, idem; alleen een geslaagd antwoord (zaad-server.ts). */
   googleVanServer?: Promise<Zaad<GoogleAntwoord> | null> | null;
   /** De bewaarde periode zoals de server hem uit de cookie las (lib/period/periode-cookie.ts). */
-  periodeVanServer?: PeriodeKeuze | null;
+  periodeVanServer?: PeriodeKeuzeMetDag | null;
   /** Vandaag volgens de server: de kerncijfers uit het zaad rekenen in de browser met dezelfde dag. */
   vandaagVanServer?: string | null;
 }) {
@@ -327,26 +329,6 @@ export function ClientDashboard({ client, bewaardeWeergave = null, kanaalbalkVan
     schrijf: (k) => schrijfAdresbalk((p) => { if (k) p.set(KANAAL_PARAM, k); else p.delete(KANAAL_PARAM); }, "push"),
   });
   const setChannel = useCallback((c: Channel) => kiesKanaalInAdres(c === "blended" ? null : c), [kiesKanaalInAdres]);
-  // De periode in de adresbalk (?periode=, ?vergelijk=): dezelfde keuze als de PeriodProvider al
-  // bewaart, geen tweede model. Bijstellen vervangt het adres (replace): Terug hoort naar het
-  // vorige kanaal te gaan, niet door vijf periodes terug te lopen.
-  const periodeAdres = useMemo((): UrlKoppeling<PeriodeKeuze> => ({
-    waarde: periodeUitParams(searchParams),
-    leesNu: () => periodeUitParams(leesAdresbalk()),
-    schrijf: (k) => schrijfAdresbalk((p) => zetPeriodeParams(p, k), "replace"),
-  }), [searchParams]);
-  // De kerncijfers die de server al uit het zaad rekent (band-uit-zaad.tsx), zolang de hooks
-  // hieronder laden. Alleen met beide antwoorden van de server, en alleen als server en browser
-  // dezelfde periode kennen: uit de adresbalk, of uit de cookie die de server meegaf. Zonder een
-  // van beide begint de PeriodProvider op de standaard en leest hij daarna localStorage; dan zou
-  // het getal uit het zaad kunnen verspringen, en wacht de band op de hooks zoals altijd. En niet
-  // met een belofte die de router na meer dan een minuut terugbrengt (zaadNogVers, zaadbak.ts).
-  const periodeBekend = periodeVanServer !== null || periodeUitParams(searchParams) !== null;
-  const zaadAanbod = useMemo((): BandZaad | null => (
-    googleVanServer && blendedVanServer && vandaagVanServer && periodeBekend && zaadNogVers(googleVanServer)
-      ? { clientId: client.id, google: googleVanServer, blended: blendedVanServer, kanaal: kanaalUitAdres, vandaag: vandaagVanServer }
-      : null
-  ), [client.id, googleVanServer, blendedVanServer, vandaagVanServer, periodeBekend, kanaalUitAdres]);
   // De schakelaar "Nieuwe weergave" (bouwplan fase 3): per gebruiker bewaard, standaard uit, en met
   // ?weergave=nieuw voorop zodat de meting hem kan openen (lib/weergave.ts; de server geeft de
   // bewaarde keuze mee uit de cookie, zodat de kop niet verspringt bij het laden). Uit: de pagina is wat
@@ -355,6 +337,37 @@ export function ClientDashboard({ client, bewaardeWeergave = null, kanaalbalkVan
   // prop `nieuw` van CrossChannelView, GoogleView, MetaView, LinkedInView en MicrosoftView).
   const [weergave, zetWeergave] = useWeergave(searchParams.get(WEERGAVE_PARAM), bewaardeWeergave);
   const nieuweWeergave = weergave === "nieuw";
+  // De periode in de adresbalk (?periode=, ?vergelijk=): dezelfde keuze als de PeriodProvider al
+  // bewaart, geen tweede model. Bijstellen vervangt het adres (replace): Terug hoort naar het
+  // vorige kanaal te gaan, niet door vijf periodes terug te lopen.
+  //
+  // In de nieuwe weergave met de keuze per dag erbij (lib/period/dag-keuze.ts): een event, vrije
+  // datums, de vorige editie, een vrije vergelijking. Een oud adres leest daar precies zoals hier.
+  const periodeAdres = useMemo((): UrlKoppeling<PeriodeKeuzeMetDag> => (nieuweWeergave ? {
+    waarde: metDagUitParams(searchParams),
+    leesNu: () => metDagUitParams(leesAdresbalk()),
+    schrijf: (k) => schrijfAdresbalk((p) => zetMetDagParams(p, k), "replace"),
+  } : {
+    waarde: periodeUitParams(searchParams),
+    leesNu: () => periodeUitParams(leesAdresbalk()),
+    schrijf: (k) => schrijfAdresbalk((p) => zetPeriodeParams(p, k), "replace"),
+  }), [searchParams, nieuweWeergave]);
+  // De kerncijfers die de server al uit het zaad rekent (band-uit-zaad.tsx), zolang de hooks
+  // hieronder laden. Alleen met beide antwoorden van de server, en alleen als server en browser
+  // dezelfde periode kennen: uit de adresbalk, of uit de cookie die de server meegaf. Zonder een
+  // van beide begint de PeriodProvider op de standaard en leest hij daarna localStorage; dan zou
+  // het getal uit het zaad kunnen verspringen, en wacht de band op de hooks zoals altijd. En niet
+  // met een belofte die de router na meer dan een minuut terugbrengt (zaadNogVers, zaadbak.ts).
+  //
+  // En niet bij een keuze per dag (een event, vrije datums): die telt de server niet uit het zaad
+  // (dat zijn maandreeksen), dus dan wachten de tegels op de telling per dag.
+  const periodeBekend = periodeVanServer !== null || periodeUitParams(searchParams) !== null;
+  const dagKeuzeBekend = nieuweWeergave && !!(periodeAdres.waarde ?? periodeVanServer)?.dag;
+  const zaadAanbod = useMemo((): BandZaad | null => (
+    googleVanServer && blendedVanServer && vandaagVanServer && periodeBekend && !dagKeuzeBekend && zaadNogVers(googleVanServer)
+      ? { clientId: client.id, google: googleVanServer, blended: blendedVanServer, kanaal: kanaalUitAdres, vandaag: vandaagVanServer }
+      : null
+  ), [client.id, googleVanServer, blendedVanServer, vandaagVanServer, periodeBekend, dagKeuzeBekend, kanaalUitAdres]);
   // Alleen gebruikt voor het bronbijschrift verderop. isDemoMode() leest window.location, dus dit
   // hoort in een effect en niet in de eerste render -- anders rendert de server iets anders dan de
   // client en klapt de hydratie eruit.
@@ -492,6 +505,8 @@ export function ClientDashboard({ client, bewaardeWeergave = null, kanaalbalkVan
   // Met de gekozen beurs: zonder geo stond in de hero de naam van de gekozen beurs naast de
   // aftelling van welke ingestelde beurs toevallig de eerstvolgende was.
   const upcomingEdition = useUpcomingEdition(client.id, geoClone);
+  // De events van de klant als kiesbare periodes, alleen voor de kiezer van de nieuwe weergave.
+  const eventPeriodes = useEventPeriodes(client.id, nieuweWeergave, activeTab);
   const [tijdas, setTijdas] = useState<"beurs" | "maand">("beurs");
 
   useEffect(() => {
@@ -595,7 +610,14 @@ export function ClientDashboard({ client, bewaardeWeergave = null, kanaalbalkVan
   const kiezerHier = kiezerOpTab(activeTab, nieuweWeergave);
   // Eén regel voor beide weergaven (lib/overzicht/beursfilter.ts).
   const beursmelding = overzichtBeursmelding(geoClone, activeTab, channel);
-  const periodeKiezer = kiezerHier.toon ? (
+  //
+  // In de nieuwe weergave de kiezer van stap 3 (components/dashboard/periode-kiezer.tsx): twee knoppen,
+  // Periode en Vergelijk met, met de events van de klant en vrije datums. Met de schakelaar uit de
+  // vertrouwde kiezer, precies zoals hij was.
+  const periodeKiezer = kiezerHier.toon && nieuweWeergave ? (
+    <PeriodeKiezer scope={`client-${client.id}`} events={eventPeriodes} kanalen={kanalen ?? GEEN_KANALEN} laden={!bandKlaar}
+      onNaarEvents={() => setActiveTab("settings")} />
+  ) : kiezerHier.toon ? (
     <DashboardPeriodPicker klaar={bandKlaar} jaarlijkseEditie={upcomingEdition?.cadence === "annual"} snelVanafTablet={nieuweWeergave} />
   ) : (
     <span className="text-meta text-muted-foreground" data-venster="vast">{kiezerHier.uitleg}</span>
@@ -778,7 +800,8 @@ export function ClientDashboard({ client, bewaardeWeergave = null, kanaalbalkVan
   const codeRood = clientData.data && <CodeRoodBanner clientId={client.id} />;
 
   return (
-    <PeriodProvider scope={`client-${client.id}`} dataStand={dataStand} adres={periodeAdres} beginKeuze={periodeVanServer} bewaarInCookie>
+    <PeriodProvider scope={`client-${client.id}`} dataStand={dataStand} adres={periodeAdres} beginKeuze={periodeVanServer} bewaarInCookie
+      dagModus={nieuweWeergave} events={eventPeriodes}>
     <BrandThemeProvider clientId={client.id} geoClone={geoClone}>
     <div className="space-y-6">
       {nieuweWeergave ? (

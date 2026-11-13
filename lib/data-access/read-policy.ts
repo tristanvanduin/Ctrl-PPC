@@ -150,6 +150,11 @@ export const READABLE_TABLES: Record<string, TableReadPolicy> = {
   // dbSelect-adapter mee in plaats van de singleton; de functie zelf en haar server-side
   // aanroepers blijven ongewijzigd.
   ads_account_monthly: { capability: "client:read", clientColumn: "client_id" },
+  // De weekrijen van Google, voor een periode per dag in de nieuwe periodekiezer (stap 3 van het
+  // periodemodel, lib/period/use-dag-telling.ts): Google heeft geen dagrijen, en telt een vrije
+  // periode of een event daarom per hele week (lib/period/dag-telling.ts). Alleen lezen, per klant,
+  // zoals de maandrijen hierboven.
+  ads_account_weekly: { capability: "client:read", clientColumn: "client_id" },
 
   // 23 augustus 2026: channel-forecast-overview.tsx (Meta/LinkedIn's "Jaaroverzicht 2026") is de
   // eerste browser-lezer van client_targets. De tabel bestond al (migratie 002/082, fase 2

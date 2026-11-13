@@ -28,11 +28,11 @@ const EURO_OPMAAK = new Intl.NumberFormat("nl-NL", {
 });
 const AANTAL_OPMAAK = new Intl.NumberFormat("nl-NL", { maximumFractionDigits: 0 });
 
-function euro(v: number): string {
+export function euro(v: number): string {
   return EURO_OPMAAK.format(v);
 }
 
-function aantal(v: number): string {
+export function aantal(v: number): string {
   return AANTAL_OPMAAK.format(v);
 }
 
@@ -195,7 +195,7 @@ interface Props {
  * over een deel van de kanalen, dan staan de twee waarden van dat deel erbij, nu en toen; anders
  * alleen de vorige waarde. Zo staat een percentage nooit naast een getal waar het niet bij hoort.
  */
-function alsDelta(v: DeelVergelijking, hogerIsBeter: boolean, opmaak: (v: number) => string): KerncijferDelta | undefined {
+export function alsDelta(v: DeelVergelijking, hogerIsBeter: boolean, opmaak: (v: number) => string): KerncijferDelta | undefined {
   switch (v.soort) {
     case "geen": return undefined;
     case "leeg": return { pct: null, hogerIsBeter, leegTekst: "geen vergelijking mogelijk" };
