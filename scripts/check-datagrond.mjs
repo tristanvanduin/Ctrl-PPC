@@ -40,7 +40,7 @@ if (process.argv.includes("--vernieuw")) {
   }
   // Een waarde per regel: dan is een nieuwe tabel of kolom in de diff een paar regels, geen
   // herschreven bestand van 2.500 regels.
-  writeFileSync(SNAPSHOT_PAD, JSON.stringify(snap, null, "") + "\n");
+  writeFileSync(SNAPSHOT_PAD, JSON.stringify(snap, null, 1).replace(/^ +/gm, "") + "\n");
   console.log(`Snapshot ververst: ${Object.keys(snap).length} tabellen/views.`);
   process.exit(0);
 }
