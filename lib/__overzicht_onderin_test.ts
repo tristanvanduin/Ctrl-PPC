@@ -356,8 +356,8 @@ console.log("Alle kanalen: de schakelaar, en de kanaaltabel op Campagnes");
   check("zonder de prop en met de schakelaar uit is het dezelfde uitvoer", zonder === uit);
   check("uit: de vertrouwde secties, met de kanaaltabel open en de Microsoft-regel erboven",
     /Jaar, beurs en markten/.test(tekst(uit)) && /Cross-channel \(blended\)/.test(tekst(uit)) && /Microsoft Ads telt mee in de kerncijfers/.test(tekst(uit)) && /indicatief is/.test(tekst(uit)));
-  check("aan: één sectie, de kanaaltabel achter een knop die dicht is",
-    /Gezondheid, pacing en markten/.test(tekst(aan)) && !/Jaar, beurs en markten/.test(tekst(aan)) && !/Cross-channel \(blended\)/.test(tekst(aan))
+  check("aan: de kaart bovenaan, dan gezondheid en pacing, de kanaaltabel achter een knop die dicht is",
+    /Gezondheid en pacing/.test(tekst(aan)) && tekst(aan).indexOf("Waar komt het vandaan") < tekst(aan).indexOf("Gezondheid en pacing") && !/Jaar, beurs en markten/.test(tekst(aan)) && !/Cross-channel \(blended\)/.test(tekst(aan))
       && /<button type="button" aria-expanded="false"[^>]*>(?:(?!<\/button>).)*Toon als tabel/.test(aan) && !/indicatief is/.test(tekst(aan)));
   check("aan: de kop van de kanaaltabel draagt zijn venster en zegt waar hij open staat", /Kanaaltotalen en maanden per kanaal/.test(tekst(aan)) && /staat ook open op Campagnes/.test(tekst(aan)));
   const tabel = toon({ alleenTabel: true });

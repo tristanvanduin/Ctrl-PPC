@@ -84,10 +84,21 @@ export function KanaalOverzichtNieuw({ clientId, kanaal, geoClone, edition, kop,
     <div className="space-y-6">
       {geoClone ? kop : waarschuwing}
 
+      {/* De markten bovenaan, zoals op Alle kanalen en in de vertrouwde weergave: op verzoek van de
+          eigenaar weer hoog. De kaart heeft een eigen kop, dus geen sectiekop erboven. */}
+      {geo && (
+        <GeoMapCard
+          state={geo}
+          channel={kanaal === "microsoft" ? undefined : kanaal}
+          naast={<GeoRanglijstInKaart state={geo} naast />}
+          voet={<GeoTabelLade state={geo} />}
+        />
+      )}
+
       <Sectie
-        eerste={!geoClone && !waarschuwing}
+        eerste={!geoClone && !waarschuwing && !geo}
         icoon={<Target className="w-4.5 h-4.5 text-brand-blue-ink" />}
-        titel={geo ? "Gezondheid, pacing en markten" : "Gezondheid en pacing"}
+        titel="Gezondheid en pacing"
         bijschrift="Elk blok zegt in zijn kop welk venster het gebruikt: het kalenderjaar, de lopende maand of een eigen venster."
       >
         {/* `items-start`: de twee kaarten rekken elkaar niet op. Pas naast elkaar vanaf 1800 px,
@@ -112,14 +123,6 @@ export function KanaalOverzichtNieuw({ clientId, kanaal, geoClone, edition, kop,
 
         <PacingJaaroverzichtKanaal kanaal={kanaal} />
 
-        {geo && (
-          <GeoMapCard
-            state={geo}
-            channel={kanaal === "microsoft" ? undefined : kanaal}
-            naast={<GeoRanglijstInKaart state={geo} naast />}
-            voet={<GeoTabelLade state={geo} />}
-          />
-        )}
       </Sectie>
 
       {verdeling && (

@@ -471,12 +471,29 @@ function CrossChannelViewRuw({ clientId, kanalen = [], edition, nieuw = false, a
   // Alles leest dezelfde hook-aanroepen als hierboven: de herschikking kost geen verzoek, en een
   // wissel van kanaal of periode ook niet.
   if (nieuw) {
-    const metBeurs = Boolean(blendedForecast && edition);
     return (
       <div>
+        {/* De markten bovenaan, zoals in de vertrouwde weergave (daar direct na gezondheid en pacing,
+            voor de beurs). Bij GreenTech zijn de landen de beurzen: "waar zit het" is daar net zo
+            goed een vraag per land als per kanaal. Op verzoek van de eigenaar weer hoog geplaatst;
+            hij stond in deze weergave eerst onderaan in "Gezondheid, pacing en markten". Geen eigen
+            sectiekop: de kaart heeft er zelf een. */}
+        <div>
+          <GeoMapCard
+            state={geo}
+            channel="blended"
+            naast={<GeoRanglijstInKaart state={geo} naast />}
+            voet={<GeoTabelLade state={geo} toelichting={kanalen.includes("microsoft") ? MICROSOFT_UITLEG : undefined} />}
+            vensterToevoeging={kanalen.includes("microsoft") ? "zonder Microsoft" : undefined}
+            // De volledige zin, zoals hij in de vertrouwde weergave boven de sectie staat: waar
+            // Microsoft WEL meetelt, waar niet, en waar de eigen cijfers staan. Alleen "zonder
+            // Microsoft" liet de vraag open of de andere blokken het dan wel meetellen.
+            vensterUitleg={kanalen.includes("microsoft") ? MICROSOFT_UITLEG : undefined}
+          />
+        </div>
+
         {blendedForecast && edition && (
           <Sectie
-            eerste
             icoon={<CalendarClock className="w-4.5 h-4.5 text-brand-blue-ink" />}
             titel="Prestaties richting de beurs"
             bijschrift={`Per week: hoeveel weken zijn we van ${edition.eventName} en lopen we op schema?`}
@@ -486,9 +503,8 @@ function CrossChannelViewRuw({ clientId, kanalen = [], edition, nieuw = false, a
         )}
 
         <Sectie
-          eerste={!metBeurs}
           icoon={<Target className="w-4.5 h-4.5 text-brand-blue-ink" />}
-          titel="Gezondheid, pacing en markten"
+          titel="Gezondheid en pacing"
           bijschrift="Elk blok zegt in zijn kop welk venster het gebruikt: het kalenderjaar, de gekozen periode of een eigen venster."
         >
           {/* `items-start`: de twee kaarten rekken elkaar niet op. Klapt de onderbouwing van Health
@@ -538,17 +554,6 @@ function CrossChannelViewRuw({ clientId, kanalen = [], edition, nieuw = false, a
             </section>
           )}
 
-          <GeoMapCard
-            state={geo}
-            channel="blended"
-            naast={<GeoRanglijstInKaart state={geo} naast />}
-            voet={<GeoTabelLade state={geo} toelichting={kanalen.includes("microsoft") ? MICROSOFT_UITLEG : undefined} />}
-            vensterToevoeging={kanalen.includes("microsoft") ? "zonder Microsoft" : undefined}
-            // De volledige zin, zoals hij in de vertrouwde weergave boven de sectie staat: waar
-            // Microsoft WEL meetelt, waar niet, en waar de eigen cijfers staan. Alleen "zonder
-            // Microsoft" liet de vraag open of de andere blokken het dan wel meetellen.
-            vensterUitleg={kanalen.includes("microsoft") ? MICROSOFT_UITLEG : undefined}
-          />
         </Sectie>
       </div>
     );

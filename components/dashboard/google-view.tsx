@@ -189,10 +189,21 @@ function GoogleViewRuw({
     return (
       <>
         {landfilter}
+        {/* De markten bovenaan, zoals op Alle kanalen en in de vertrouwde weergave: op verzoek van de
+            eigenaar weer hoog. De kaart heeft een eigen kop. */}
+        <GeoMapCard
+          state={geo}
+          naast={<GeoRanglijstInKaart state={geo} naast />}
+          voet={
+            <>
+              <GeoTabelLade state={geo} />
+              {meerdereKanalen ? <GeoChannelMatrix clientId={clientId} /> : null}
+            </>
+          }
+        />
         <Sectie
-          eerste
           icoon={<Target className="w-4.5 h-4.5 text-brand-blue-ink" />}
-          titel="Gezondheid, pacing en markten"
+          titel="Gezondheid en pacing"
           bijschrift="Elk blok zegt in zijn kop welk venster het gebruikt: het kalenderjaar, de lopende maand of een eigen venster."
         >
           {/* `items-start`: de twee kaarten rekken elkaar niet op. De grens van 1800 px is die van de
@@ -220,16 +231,6 @@ function GoogleViewRuw({
 
           <PacingJaaroverzichtGoogle clientId={clientId} countryFilter={countryFilter} titelToevoeging={countryFilter ? countryLabel(countryFilter) : undefined} />
 
-          <GeoMapCard
-            state={geo}
-            naast={<GeoRanglijstInKaart state={geo} naast />}
-            voet={
-              <>
-                <GeoTabelLade state={geo} />
-                {meerdereKanalen ? <GeoChannelMatrix clientId={clientId} /> : null}
-              </>
-            }
-          />
         </Sectie>
 
         <Sectie
