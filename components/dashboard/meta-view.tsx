@@ -161,9 +161,9 @@ function MetaViewRuw({ clientId, geoClone, edition, meerdereKanalen = true, nieu
           koppelstatus={koppelstatus}
           geo={geo}
           verdeling={
-            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-              <BreakdownDonuts clientId={clientId} channel="meta" groep="levering" />
-              <BreakdownDonuts clientId={clientId} channel="meta" groep="doelgroep" />
+            <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-2">
+              <BreakdownDonuts clientId={clientId} channel="meta" groep="levering" samenvatten />
+              <BreakdownDonuts clientId={clientId} channel="meta" groep="doelgroep" samenvatten />
             </div>
           }
           verdelingBijschrift="Waar het budget heen ging en wie we bereikten"

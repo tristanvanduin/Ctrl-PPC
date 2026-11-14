@@ -5,12 +5,14 @@ import { Clock, Target, Zap, AlertTriangle, TrendingUp, Calendar, Flag } from "l
 import { useClientHistoricalData } from "@/lib/client-data-provider";
 import { useCountryFilteredData } from "@/lib/use-country-filtered-data";
 import { computeForecast, MONTH_LABELS, type ClientForecast } from "@/lib/forecast";
+import type { ClientHistoricalData } from "@/lib/types";
 import { editieNaam, fairCountdown, type UpcomingEdition } from "@/lib/fair/fair-weeks";
 import { today } from "@/lib/reporting-date";
 import { berekenLanding, seizoensduiding } from "@/lib/pacing/landing";
 import { jaardoelTekst, metToelichting } from "@/lib/analysis/standaard-jaardoel";
 import { Vensterlabel } from "@/components/ui/vensterlabel";
 import { RINGCEL } from "./channel-pacing";
+import { Uitklap } from "@/components/ui/disclosure";
 
 function fmt(v: number): string {
   return new Intl.NumberFormat("nl-NL", {
@@ -137,9 +139,32 @@ export function BeursAftelling({ edition, vandaag }: { edition?: UpcomingEdition
   );
 }
 
-export function PacingMonitor({ clientId, countryFilter, edition, stapelSmal = false }: { stapelSmal?: boolean; clientId: string; countryFilter?: string | null; edition?: UpcomingEdition | null }) {
+export function PacingMonitor({ clientId, countryFilter, edition, stapelSmal = false, samenvatten = false }: {
+  stapelSmal?: boolean;
+  clientId: string;
+  countryFilter?: string | null;
+  edition?: UpcomingEdition | null;
+  /**
+   * De nieuwe weergave: de twee ringen (conversies en budget tegen het jaardoel, met hun oordeel)
+   * open en kleiner; het tempo per dag, wat er nodig is, waar het jaar op uitkomt en de duiding
+   * achter "Toon tempo en waar het jaar uitkomt". Loopt een van beide STERK achter (rood), dan
+   * staat dat deel open: dan is "nodig per dag" precies de vraag die volgt. De seizoensduiding
+   * staat altijd open: hij verschijnt alleen bij een afwijking.
+   */
+  samenvatten?: boolean;
+}) {
   const fullData = useClientHistoricalData(clientId);
   const data = useCountryFilteredData(clientId, countryFilter ?? null) ?? fullData;
+  return <PacingMonitorView data={data} edition={edition} stapelSmal={stapelSmal} samenvatten={samenvatten} />;
+}
+
+/** De kaart zelf, op data die de aanroeper meegeeft: los van de provider, zodat hij te toetsen is. */
+export function PacingMonitorView({ data, edition, stapelSmal = false, samenvatten = false }: {
+  data: ClientHistoricalData;
+  edition?: UpcomingEdition | null;
+  stapelSmal?: boolean;
+  samenvatten?: boolean;
+}) {
   const forecast = useMemo(() => computeForecast(data), [data]);
 
   const conv = forecast.conversions.kpi;
@@ -217,7 +242,7 @@ export function PacingMonitor({ clientId, countryFilter, edition, stapelSmal = f
     // Rasterrijen rekken naar de hoogste cel, dus stond het verschil als wit ONDER de zes blokken.
     // Nu rekken de blokken zelf mee en staat hun inhoud verticaal gecentreerd: dezelfde hoogte,
     // maar gevuld in plaats van afgetopt.
-    <div className="@container flex h-full flex-col bg-card rounded-xl border border-border p-5 shadow-sm">
+    <div className={`@container flex h-full flex-col bg-card rounded-xl border border-border p-5 shadow-sm${samenvatten ? " overflow-hidden" : ""}`}>
       <div className="flex flex-wrap items-center gap-2 mb-4">
         <Zap className="w-4.5 h-4.5 text-brand-blue-ink" />
         <h3 className="text-sm font-semibold text-brand-blue-ink uppercase tracking-wide">Pacing</h3>
@@ -254,15 +279,17 @@ export function PacingMonitor({ clientId, countryFilter, edition, stapelSmal = f
           Vijf kolommen i.p.v. zes zonder "volgens prognose" (geen seizoensmodel voor dit account):
           met een vaste zes-koloms grid en maar vijf blokken bleef de laatste kolom leeg -- geen
           witruimte maar een gat, precies waar de eigen comment hierboven al voor waarschuwt. */}
-      <div className={`grid flex-1 grid-cols-2 items-stretch gap-4 @6xl:grid-cols-3 ${
-        convLanding.volgensPrognose !== null ? "@7xl:grid-cols-6" : "@7xl:grid-cols-5"
-      }`}>
+      {(() => {
+      const ringMaat = samenvatten ? 88 : undefined;
+      const ringCijfer = samenvatten ? "text-xl" : "text-figure";
+      const ringen = (
+        <>
         {/* Conversions pacing */}
         <div className={stapelSmal ? RINGCEL.stapelSmal : RINGCEL.vertrouwd}>
           <div className="relative">
-            <PacingRing pct={convPacingPct} color={convColor} />
+            <PacingRing pct={convPacingPct} color={convColor} size={ringMaat} />
             <div className="absolute inset-0 flex items-center justify-center">
-              <span className="text-figure font-bold leading-none tabular-nums" style={{ color: convColor }}>
+              <span className={`${ringCijfer} font-bold leading-none tabular-nums`} style={{ color: convColor }}>
                 {Math.round(convPacingPct)}%
               </span>
             </div>
@@ -277,9 +304,9 @@ export function PacingMonitor({ clientId, countryFilter, edition, stapelSmal = f
         {/* Spend pacing */}
         <div className={stapelSmal ? RINGCEL.stapelSmal : RINGCEL.vertrouwd}>
           <div className="relative">
-            <PacingRing pct={spendPacingPct} color={spendColor} />
+            <PacingRing pct={spendPacingPct} color={spendColor} size={ringMaat} />
             <div className="absolute inset-0 flex items-center justify-center">
-              <span className="text-figure font-bold leading-none tabular-nums" style={{ color: spendColor }}>
+              <span className={`${ringCijfer} font-bold leading-none tabular-nums`} style={{ color: spendColor }}>
                 {Math.round(spendPacingPct)}%
               </span>
             </div>
@@ -290,7 +317,10 @@ export function PacingMonitor({ clientId, countryFilter, edition, stapelSmal = f
             <p className="text-body font-semibold" style={{ color: spendColor }}>{spendStatus}</p>
           </div>
         </div>
-
+        </>
+      );
+      const tempo = (
+        <>
         {/* Daily run rate — conversions */}
         <div className="flex flex-col justify-center border-l border-border pl-4">
           <div className="flex items-center gap-1.5 mb-1">
@@ -366,16 +396,48 @@ export function PacingMonitor({ clientId, countryFilter, edition, stapelSmal = f
             <p className="text-micro mt-1 text-muted-foreground">seizoen meegerekend</p>
           </div>
         )}
-      </div>
-
-      {/* De duiding onder de hele rij en niet in een kolom: het is een zin over het VERSCHIL tussen
-          twee van die blokken, dus hij hoort bij geen van beide alleen. Alleen bij een afwijking
-          die ertoe doet -- een zin over elke afwijking leert de lezer hem over te slaan. */}
-      {convSeizoen && (
+        </>
+      );
+      // De duiding onder de hele rij en niet in een kolom: het is een zin over het VERSCHIL tussen
+      // twee van die blokken, dus hij hoort bij geen van beide alleen. Alleen bij een afwijking
+      // die ertoe doet -- een zin over elke afwijking leert de lezer hem over te slaan.
+      const duiding = convSeizoen && (
         <p className="mt-4 border-t border-border pt-3 text-meta leading-snug text-muted-foreground">
           {convSeizoen}
         </p>
-      )}
+      );
+      if (!samenvatten) {
+        return (
+          <>
+            <div className={`grid flex-1 grid-cols-2 items-stretch gap-4 @6xl:grid-cols-3 ${
+              convLanding.volgensPrognose !== null ? "@7xl:grid-cols-6" : "@7xl:grid-cols-5"
+            }`}>
+              {ringen}
+              {tempo}
+            </div>
+            {duiding}
+          </>
+        );
+      }
+      // Rood (sterk achter) is een afwijking: dan staat het tempo en wat er nodig is open.
+      const rood = convStatus === "Sterk achter" || spendStatus === "Sterk achter";
+      // De seizoensduiding staat OPEN, onder de ringen en buiten de knop: hij verschijnt alleen bij
+      // een verschil boven SEIZOEN_DREMPEL tussen de prognose en de rechte lijn, en is dus per
+      // definitie iets dat afwijkt.
+      return (
+        <>
+          <div className="grid grid-cols-2 items-start gap-4">{ringen}</div>
+          {duiding && <div data-pacing-duiding>{duiding}</div>}
+          <div className="-mx-5 -mb-5 mt-4">
+            <Uitklap id="pacing-google-tempo" label="Toon tempo per dag en waar het jaar uitkomt" labelOpen="Verberg tempo en eindstand" afwijkend={rood}>
+              <div className="px-5 pb-5 pt-3">
+                <div className={`grid grid-cols-2 items-stretch gap-4 ${convLanding.volgensPrognose !== null ? "@6xl:grid-cols-4" : "@6xl:grid-cols-3"}`}>{tempo}</div>
+              </div>
+            </Uitklap>
+          </div>
+        </>
+      );
+      })()}
     </div>
   );
 }

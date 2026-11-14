@@ -17,7 +17,11 @@ import { Laadvlak } from "@/components/ui/laadvlak";
 // Geen countryFilter-prop: die filtert Google's dagdata per land (useCountryFilteredData), en dat
 // pad bestaat voor Meta en LinkedIn niet. Zodra het er is, hoort hij hier ook.
 
-export function ChannelFairWeeks({ edition }: { edition: UpcomingEdition }) {
+export function ChannelFairWeeks({ edition, compact = false }: {
+  edition: UpcomingEdition;
+  /** De nieuwe weergave: één regel "deze week" en de strook achter een knop (FairWeeksView). */
+  compact?: boolean;
+}) {
   const { forecast: gebouwd } = useKanaalData();
 
   if (gebouwd === null) return <Laadvlak vorm="grafiek" hoogte={280} titel="Weken tot het event" />;
@@ -25,5 +29,5 @@ export function ChannelFairWeeks({ edition }: { edition: UpcomingEdition }) {
   // ChannelForecastOverview eronder, zodat de twee secties niet tegenstrijdig zijn.
   if (gebouwd === "leeg") return null;
 
-  return <FairWeeksView data={gebouwd.data} forecast={gebouwd.forecast} edition={edition} />;
+  return <FairWeeksView data={gebouwd.data} forecast={gebouwd.forecast} edition={edition} compact={compact} />;
 }

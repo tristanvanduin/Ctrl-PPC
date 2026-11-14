@@ -460,10 +460,11 @@ function CrossChannelViewRuw({ clientId, kanalen = [], edition, nieuw = false, a
   //                           "Toon onderbouwing"
   //   Pacing + Jaaroverzicht  één kaart (pacing-jaaroverzicht.tsx) met de lade "Verloop en
   //                           prognose"; het budgetadvies in de kaart zelf
-  //   Beurs                   de strook en het weekvenster blijven; de drie weekkaarten zijn één
-  //                           regel "deze week"
+  //   Beurs                   de drie weekkaarten zijn één regel "deze week"; de strook staat
+  //                           achter een knop, open als deze week onder verwachting ligt
   //   Spend per kanaal        de schakelaar Kosten in de hoofdgrafiek bovenaan
-  //   Ring per kanaal         blijft, volgt de periode
+  //   Ring per kanaal         de kostenverdeling als één regel open, de ringen (kosten én
+  //                           conversies) achter "Toon de ringen"; volgt de periode
   //   Kanaaltabel en maanden  achter "Toon als tabel", met de voorbehouden erbij
   //   Wereldkaart             de ranglijst naast de projectie, de tabel per land achter "Toon als
   //                           tabel"; de zes tegels "per land" staan in de totaalrij van die tabel
@@ -514,7 +515,13 @@ function CrossChannelViewRuw({ clientId, kanalen = [], edition, nieuw = false, a
           <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-2">
             <KanaalHealthRanking clientId={clientId} kanalen={kanalen} onderbouwingAchterKlik />
             {rows && rows.length > 0 && (
-              chartMonths.length === 0 ? legePeriode : <CampaignTypeSplit clientId={clientId} toon={["kanaal"]} kanaalRijen={rows} />
+              chartMonths.length === 0 ? legePeriode : (
+                // De ringen achter een knop, met de verdeling van de kosten als één regel open: dezelfde
+                // kaart (één kop, één vensterlabel) en dezelfde aandelen als de legenda van de ring
+                // (buildNetworkSplit en pct in CampaignTypeSplit). De ringen zelf, ook die voor de
+                // conversies, staan één tik verder en blijven in de pagina.
+                <CampaignTypeSplit clientId={clientId} toon={["kanaal"]} kanaalRijen={rows} samenvatten />
+              )
             )}
           </div>
 

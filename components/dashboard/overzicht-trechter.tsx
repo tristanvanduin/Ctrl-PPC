@@ -24,6 +24,7 @@ import {
   type BijdrageRij, type Trechter, type TrechterStap,
 } from "@/lib/overzicht/trechter";
 import { KANAAL_GLYPH } from "./kanaalkaarten";
+import { Uitklap } from "@/components/ui/disclosure";
 
 const AANTAL = new Intl.NumberFormat("nl-NL", { maximumFractionDigits: 0 });
 const EURO_HEEL = new Intl.NumberFormat("nl-NL", { style: "currency", currency: "EUR", maximumFractionDigits: 0 });
@@ -94,7 +95,7 @@ function BijdrageRegel({ rij }: { rij: BijdrageRij }) {
     : p ? "CPA in een van beide periodes niet te berekenen" : rij.uitleg;
   return (
     <li data-bijdrage={rij.kanaal} data-kenmerk={rij.kenmerk ?? undefined}
-      className={`rounded-lg border px-3 py-2.5 ${rij.kenmerk === "duur" ? "border-brand-gray/40" : "border-border/70"}`}>
+      className={`rounded-lg border px-3 py-2 sm:py-2.5 ${rij.kenmerk === "duur" ? "border-brand-gray/40" : "border-border/70"}`}>
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
         <span aria-hidden className="flex h-6 w-6 items-center justify-center rounded-md text-micro font-bold"
           style={{ color: kleur, background: `color-mix(in srgb, ${kleur} 14%, transparent)` }}>{KANAAL_GLYPH[rij.kanaal]}</span>
@@ -109,11 +110,11 @@ function BijdrageRegel({ rij }: { rij: BijdrageRij }) {
         )}
         <span className="ml-auto text-meta tabular-nums text-brand-gray"><TelTekst tekst={cpaTekst} /></span>
       </div>
-      <div className="mt-2 space-y-1">
+      <div className="mt-1.5 space-y-0.5 sm:mt-2 sm:space-y-1">
         <Aandeelbalk label="van de kosten" pct={rij.aandeelKosten} kleur="var(--color-brand-gray, #4b5563)" />
         <Aandeelbalk label="van de conversies" pct={rij.aandeelConversies} kleur={kleur} />
       </div>
-      {vergelijking && <p className="mt-1.5 text-micro text-muted-foreground">CPA: {vergelijking}</p>}
+      {vergelijking && <p className="mt-1 text-micro text-muted-foreground sm:mt-1.5">CPA: {vergelijking}</p>}
     </li>
   );
 }
@@ -138,11 +139,17 @@ export function BijdragePerKanaal({ rijen, venster }: { rijen: readonly Bijdrage
           <ul className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
             {rijen.map((r) => <BijdrageRegel key={r.kanaal} rij={r} />)}
           </ul>
-          <p className="mt-2 text-micro text-muted-foreground">
-            De aandelen gaan over alle kanalen samen en tellen elk op tot 100. Een kanaal krijgt een kenmerk als zijn aandeel in de
-            kosten minstens {BIJDRAGE_VERSCHIL_VANAF} punten van dat in de conversies afwijkt. De CPA-verandering gaat alleen over wat
-            in beide periodes liep, zoals de tegels erboven.
-          </p>
+          {/* De uitleg achter een "waarom": hij is voor elke klant en elke periode dezelfde, en op een
+              telefoon kostte hij vier regels onder elke blik op de kanalen. Hij blijft in de pagina. */}
+          <div className="mt-1">
+            <Uitklap id="bijdrage-waarom" vorm="regel" label="Waarom deze kenmerken en aandelen?" labelOpen="Verberg de uitleg">
+              <p className="pb-1 text-micro text-muted-foreground">
+                De aandelen gaan over alle kanalen samen en tellen elk op tot 100. Een kanaal krijgt een kenmerk als zijn aandeel in de
+                kosten minstens {BIJDRAGE_VERSCHIL_VANAF} punten van dat in de conversies afwijkt. De CPA-verandering gaat alleen over wat
+                in beide periodes liep, zoals de tegels erboven.
+              </p>
+            </Uitklap>
+          </div>
         </>
       )}
     </section>

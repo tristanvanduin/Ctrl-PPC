@@ -36,7 +36,7 @@ import { formatMonth, formatRange } from "@/lib/period/period-range";
 import { doelVoetregel, gemiddeldPerMaand, pacingJaarRijen, verschilTekst, vergelijkbaarDeelTekst, zichtbareMetriek, type PacingJaarRij } from "@/lib/overzicht/pacing-jaar";
 import type { BlendedKanaalReeks } from "@/lib/api/blended-historical";
 import { Vensterlabel } from "@/components/ui/vensterlabel";
-import { Lade } from "@/components/ui/disclosure";
+import { Lade, Uitklap } from "@/components/ui/disclosure";
 import { useBlendedPacing, type BlendedPacingCijfers, type PacingDataStand } from "./blended-pacing";
 import { BudgetAdvies, PerformanceChartView } from "./performance-chart";
 import { useKanaalData } from "./channel-data-provider";
@@ -105,7 +105,7 @@ export function PacingJaaroverzicht({ data, forecast, perKanaal = null, dataStan
 
   return (
     <section aria-label={`Pacing en jaaroverzicht ${data.currentYear}${kanaalNaam ? `, ${kanaalNaam}` : ""}`} className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
-      <div className="px-5 pb-4 pt-5">
+      <div className="px-5 pt-5">
         <div className="mb-3 flex flex-wrap items-center gap-2">
           <Zap className="h-4 w-4 text-brand-blue-ink" aria-hidden />
           <h3 className="text-sm font-semibold uppercase tracking-wide text-brand-blue-ink">Pacing &amp; jaaroverzicht {data.currentYear}{titelToevoeging ? ` — ${titelToevoeging}` : ""}</h3>
@@ -115,6 +115,37 @@ export function PacingJaaroverzicht({ data, forecast, perKanaal = null, dataStan
 
         {/* Een signaal dat om actie vraagt staat in de kaart, niet in de lade. */}
         <BudgetAdvies forecast={forecast} reeks={reeks} className="mb-3" />
+
+        {/* DE SAMENVATTING: per metriek de eindstand en het oordeel tegen het doel, open. Daaronder
+            de volle tabel (gerealiseerd, tegen vorig jaar, jaardoel, voortgang) en de voetregel
+            achter een knop; ze blijven in de pagina staan. Een metriek die achterloopt, staat hier
+            met zijn kleur, zijn icoon en het woord "ongunstig": die afwijking zit niet achter de
+            knop. Op een telefoon was de tabel een schuifvak van zes kolommen. */}
+        <ul className="grid gap-x-4 gap-y-1.5 sm:grid-cols-2 xl:grid-cols-3" data-pacing-samenvatting>
+          {rijen.map((rij) => {
+            const f = formaat(rij);
+            const kleur = rij.gunstig === null ? "text-muted-foreground" : rij.gunstig ? "text-green-700" : "text-red-700";
+            return (
+              <li key={rij.sleutel} className="flex flex-wrap items-baseline gap-x-1.5 rounded-lg bg-muted/30 px-3 py-1.5 text-body" data-pacing-metriek={rij.sleutel}>
+                <span className="font-semibold text-brand-gray">{rij.label}</span>
+                <span className="text-muted-foreground">prognose</span>
+                <span className="font-semibold tabular-nums text-brand-blue-ink">{ofStreep(rij.prognose, f)}</span>
+                {rij.vsDoelPct !== null && (
+                  <span className={`ml-auto inline-flex items-center gap-1 font-semibold tabular-nums ${kleur}`} data-oordeel={rij.gunstig ? "gunstig" : "ongunstig"}>
+                    {rij.gunstig ? <Check className="h-3.5 w-3.5 shrink-0" aria-hidden /> : <AlertTriangle className="h-3.5 w-3.5 shrink-0" aria-hidden />}
+                    {formatDeltaPercent(rij.vsDoelPct)}
+                    <span className="font-normal text-muted-foreground">vs doel {ofStreep(rij.doel, f)}</span>
+                    <span className="sr-only"> {rij.gunstig ? "gunstig" : "ongunstig"}</span>
+                  </span>
+                )}
+                {rij.vsDoelPct === null && rij.doel === null && <span className="ml-auto text-micro text-muted-foreground">geen doel</span>}
+              </li>
+            );
+          })}
+        </ul>
+        <div className="-mx-5 mt-3">
+        <Uitklap id={`pacing-tabel${kanaalNaam ? "-kanaal" : ""}`} label={metVorigJaar ? "Toon de tabel: gerealiseerd, tegen vorig jaar, jaardoel en voortgang" : "Toon de tabel: gerealiseerd, jaardoel en voortgang"} labelOpen="Verberg de tabel">
+        <div className="px-5 pb-4 pt-3">
 
         {/* Zes kolommen passen niet op een telefoon: de tabel schuift dan binnen zijn eigen vak in
             plaats van de pagina breder te maken. */}
@@ -199,6 +230,9 @@ export function PacingJaaroverzicht({ data, forecast, perKanaal = null, dataStan
           {metVorigJaar && " De conversies zijn de som over de kanalen, elk met zijn eigen attributievenster: een bovengrens, geen exacte telling."}
           {uitgesloten && ` ${uitgesloten}`}
         </p>
+        </div>
+        </Uitklap>
+        </div>
       </div>
 
       <Lade id={ladeId} label="Verloop en prognose" labelOpen="Verberg verloop en prognose">

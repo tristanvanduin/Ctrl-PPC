@@ -16,8 +16,14 @@
 //                                                           de status zelf niet te lezen was; de
 //                                                           statuspil staat dicht in de kop van
 //                                                           het paneel
-//   64  Account Health van het kanaal                       blijft, open
-//   65  pacing tegen vorige maand                           blijft, open, naast Health
+//   64  Account Health van het kanaal                       de score, het oordeel, de zwakste
+//                                                           factor en de kritieke signalen open;
+//                                                           radar en factoren achter "Toon
+//                                                           onderbouwing" (open bij een rode score)
+//   65  pacing tegen vorige maand                           de twee ringen met hun oordeel open;
+//                                                           tempo en eindstand achter een knop
+//   66  de beursweken                                       "deze week" open, de strook achter een
+//                                                           knop (open als deze week achterloopt)
 //   71  de vier jaarkaarten en "Prognose per maand"         Pacing & jaaroverzicht met de lade
 //                                                           "Verloop en prognose"
 //   53  de zes landentegels                                 de totaalrij van "Toon als tabel" in
@@ -105,9 +111,9 @@ export function KanaalOverzichtNieuw({ clientId, kanaal, geoClone, edition, kop,
             dezelfde grens als de vertrouwde weergave: daaronder staat Account Health gestapeld en is
             hij in een halve kolom hoger dan over de volle breedte. */}
         <div className="grid grid-cols-1 items-start gap-4 min-[1800px]:grid-cols-2">
-          <ChannelHealthBadge clientId={clientId} channel={kanaal} />
+          <ChannelHealthBadge clientId={clientId} channel={kanaal} samenvatten />
           {/* In een eigen div met automatische hoogte: de pacingkaart is `h-full`. */}
-          <div><ChannelPacing edition={edition} stapelSmal /></div>
+          <div><ChannelPacing edition={edition} stapelSmal samenvatten /></div>
         </div>
 
         {edition && (
@@ -117,7 +123,7 @@ export function KanaalOverzichtNieuw({ clientId, kanaal, geoClone, edition, kop,
               titel="Prestaties richting de beurs"
               bijschrift={`Per week: hoeveel weken zijn we van ${edition.eventName} en lopen we op schema?`}
             />
-            <ChannelFairWeeks edition={edition} />
+            <ChannelFairWeeks edition={edition} compact />
           </>
         )}
 

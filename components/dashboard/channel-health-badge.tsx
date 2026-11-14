@@ -1,7 +1,7 @@
 "use client";
 
 import { useKanaalData } from "./channel-data-provider";
-import { HealthBadgeView } from "./health-badge";
+import { HealthBadgeView, HealthSamenvatting } from "./health-badge";
 import { Vensterlabel } from "@/components/ui/vensterlabel";
 
 /**
@@ -25,9 +25,15 @@ import { Vensterlabel } from "@/components/ui/vensterlabel";
  *
  * De props blijven zoals de views ze meegeven; de data komt uit de provider die eromheen staat.
  */
-export function ChannelHealthBadge(_props: { clientId: string; channel: "meta" | "linkedin" | "microsoft" }) {
+export function ChannelHealthBadge({ channel, samenvatten = false }: {
+  clientId: string;
+  channel: "meta" | "linkedin" | "microsoft";
+  /** De nieuwe weergave: score en oordeel open, de onderbouwing achter een knop (HealthSamenvatting). */
+  samenvatten?: boolean;
+}) {
   const { forecast } = useKanaalData();
   // Laden (null) en "leeg" (geen dagcijfers): geen kaart, zoals voorheen zonder score.
   if (!forecast || forecast === "leeg") return null;
+  if (samenvatten) return <HealthSamenvatting id={`health-${channel}`} health={forecast.health} venster={<Vensterlabel soort="jaar" />} />;
   return <HealthBadgeView health={forecast.health} venster={<Vensterlabel soort="jaar" />} />;
 }

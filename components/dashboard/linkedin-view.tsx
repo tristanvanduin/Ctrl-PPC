@@ -94,7 +94,7 @@ function LinkedInViewRuw({ clientId, geoClone, edition, meerdereKanalen = true, 
           edition={edition}
           kop={kop}
           geo={geo}
-          verdeling={<BreakdownDonuts clientId={clientId} channel="linkedin" groep="doelgroep" />}
+          verdeling={<BreakdownDonuts clientId={clientId} channel="linkedin" groep="doelgroep" samenvatten />}
           verdelingBijschrift="Wie we bereikten"
           video
         />

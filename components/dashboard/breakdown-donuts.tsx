@@ -7,7 +7,8 @@ import { dbSelect } from "@/lib/data-access/client-read";
 import { maakBronCache } from "@/lib/data-access/bron-cache";
 import { CHART_CATEGORICAL } from "@/lib/branding/chart-colors";
 import { DonutChart, type DonutSlice } from "./donut-chart";
-import { useRememberedOpen, RegioToggle } from "@/components/ui/disclosure";
+import { useRememberedOpen, RegioToggle, Uitklap } from "@/components/ui/disclosure";
+import { VerdelingRegel } from "./verdeling-regel";
 import { buildNetworkSplit, findImbalances, networkTotals, type NetworkRow } from "@/lib/pmax/network-split";
 import { BREAKDOWN_DIMENSIES, metaWaardeLabel, type BreakdownKanaal } from "@/lib/analysis/breakdown-dimensions";
 import { Tabel, Kop, KolomKop, Body, Rij, NaamCel, GetalCel, TotaalRij, TotaalCel } from "./data-table";
@@ -179,7 +180,18 @@ async function laadSegmenten(sb: NonNullable<typeof supabase>, clientId: string,
   return [...opgeteld.values()];
 }
 
-export function BreakdownDonuts({ clientId, channel, groep = "levering", overslaan }: { clientId: string; channel: Kanaal; groep?: "levering" | "doelgroep"; overslaan?: readonly string[] }) {
+export function BreakdownDonuts({ clientId, channel, groep = "levering", overslaan, samenvatten = false }: {
+  clientId: string;
+  channel: Kanaal;
+  groep?: "levering" | "doelgroep";
+  overslaan?: readonly string[];
+  /**
+   * De nieuwe weergave: de scheefheid (wat duur is of het account trekt) en de verdeling van de
+   * spend als één regel open; de ring en het strepenraster achter "Toon de ring en de aandelen".
+   * Ze blijven in de pagina (hidden). Het voorbehoud zonder conversies en de tabel blijven staan.
+   */
+  samenvatten?: boolean;
+}) {
   // De beginstaat uit de cache: bij een tweede bezoek staat de kaart er meteen, zonder laadvlak.
   const [segmenten, setSegmenten] = useState<Segment[] | null>(() => segmentCache.kijk(segmentSleutel(clientId, channel)) ?? null);
   const [dimensie, setDimensie] = useState<string | null>(null);
@@ -323,7 +335,8 @@ export function BreakdownDonuts({ clientId, channel, groep = "levering", oversla
           het vergelijken van waarden die dicht bij elkaar liggen is een ring de verkeerde vorm;
           strepen op één gedeelde nullijn zijn de goede. De ring die blijft doet wat een ring wél
           kan: in één oogopslag het geheel en het totaalbedrag in het midden. */}
-      <div className="flex flex-1 flex-col justify-center px-5 py-5">
+      {(() => {
+      const ringEnRaster = (
         <div className="flex flex-wrap items-center gap-8">
           <figure className="flex shrink-0 flex-col items-center gap-2">
             <DonutChart
@@ -345,13 +358,37 @@ export function BreakdownDonuts({ clientId, channel, groep = "levering", oversla
             />
           </div>
         </div>
-
-        {!totalen.hasConversions && (
+      );
+      const geenConversies = !totalen.hasConversions && (
           <p className="text-meta text-muted-foreground mt-3">
             Er zijn in dit venster geen {conversieWoord} per segment geregistreerd, dus alleen de kostenverdeling is te tonen.
           </p>
-        )}
+      );
+      if (!samenvatten) {
+        return (
+      <div className="flex flex-1 flex-col justify-center px-5 py-5">
+        {ringEnRaster}
+        {geenConversies}
       </div>
+        );
+      }
+      return (
+        <div data-samenvatting="verdeling">
+          <div className="px-5 py-3">
+            <VerdelingRegel
+              delen={slices.map((s) => ({ sleutel: s.networkType, label: s.label, aandeel: pct(s.costShare), kleur: kleur(s.networkType) }))}
+              waarvan="van de spend"
+            />
+            {geenConversies}
+          </div>
+          <Uitklap id={`breakdown-ring-${channel}-${groep}`}
+            label={totalen.hasConversions ? `Toon de ring en de aandelen in spend en ${conversieWoord}` : "Toon de ring en de aandelen in spend"}
+            labelOpen="Verberg de ring">
+            <div className="px-5 pb-5 pt-2">{ringEnRaster}</div>
+          </Uitklap>
+        </div>
+      );
+      })()}
 
       <RegioToggle
         open={tabelOpen}

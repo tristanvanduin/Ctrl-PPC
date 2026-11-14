@@ -214,6 +214,43 @@ export function MeerKnop({
 }
 
 /**
+ * "Toon meer" onder een lijst die op een telefoon korter begint dan daarboven (het logboek, de
+ * ranglijst naast de wereldkaart): onder lg staan er `smal` regels, vanaf lg `breed`. De regels
+ * tussen die twee staan er wel (in de boom, verborgen onder lg met `max-lg:hidden` bij de
+ * aanroeper), zodat het aantal achter de knop per breedte klopt zonder te meten. Twee teksten in
+ * één knop, elk op zijn eigen breedte, en geen knop op een breedte waar niets verborgen is. Een
+ * knop met aria-expanded, een tikvlak van 44 px, en een pijl die niet draait bij "minder beweging".
+ */
+export function MeerKnopPerBreedte({ totaal, smal, breed, uitgeklapt, onToggle, eenheid = "regels" }: {
+  totaal: number;
+  smal: number;
+  breed: number;
+  uitgeklapt: boolean;
+  onToggle: () => void;
+  eenheid?: string;
+}) {
+  const verborgenSmal = Math.max(0, totaal - smal);
+  const verborgenBreed = Math.max(0, totaal - breed);
+  if (verborgenSmal === 0) return null;
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      aria-expanded={uitgeklapt}
+      className={`${verborgenBreed === 0 ? "lg:hidden " : ""}flex min-h-11 w-full items-center justify-center gap-1.5 border-t border-border px-5 py-2.5 text-meta font-medium text-brand-blue-ink transition-colors hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-blue`}
+    >
+      <ChevronDown className={`h-3.5 w-3.5 transition-transform motion-reduce:transition-none ${uitgeklapt ? "rotate-180" : ""}`} aria-hidden />
+      {uitgeklapt ? "Toon minder" : (
+        <>
+          <span className="lg:hidden">Toon {verborgenSmal} {eenheid} meer</span>
+          {verborgenBreed > 0 && <span className="hidden lg:inline">Toon {verborgenBreed} {eenheid} meer</span>}
+        </>
+      )}
+    </button>
+  );
+}
+
+/**
  * Een lade: een knop die een deel van een kaart opent, met de stand per gebruiker onthouden.
  *
  * Waarom naast RegioToggle. Die schrijft zelf "Toon …" en "Verberg …" om zijn label en laat de
@@ -271,6 +308,94 @@ export function Lade({
         {open ? labelOpen ?? label : label}
       </button>
       {open && <div id={inhoudId} className="border-t border-border">{typeof children === "function" ? children() : children}</div>}
+    </>
+  );
+}
+
+/**
+ * Een deel van een kaart achter een knop, met het oordeel en het belangrijkste getal ERBOVEN in de
+ * kaart zelf (het Overzicht in de nieuwe weergave, de hoogte van de pagina).
+ *
+ * WAAROM NAAST LADE. Lade rendert dicht niets, en dat is goed voor een grafiek of een tabel van
+ * veertig regels. Dit is voor het detail van een blok waarvan de samenvatting open staat: de
+ * tempo's onder de pacingringen, de factoren onder een health-score, de weekstrook van de beurs.
+ * Dat detail blijft IN de pagina, alleen met `hidden`: een merkteken (data-cijfer) of een cijfer
+ * dat een controle of een schermlezer zoekt, verdwijnt niet uit de boom omdat iemand een knop
+ * niet indrukte. Zoeken in de pagina (Ctrl+F) vindt het ook dicht niet; daarom zegt het label
+ * altijd wat erachter zit.
+ *
+ * WAT AFWIJKT, STAAT OPEN. `afwijkend` (een rode score, een pacing die sterk achterloopt, een week
+ * onder verwachting) opent het deel, ook als de kijker het eerder dichtklapte toen er niets aan de
+ * hand was. Alleen de keuze bij een gewone stand wordt bewaard (localStorage, onder `<id>`). Een
+ * afwijkend deel dat de kijker zelf dichtklapt, blijft dat alleen zolang dit onderdeel in beeld is:
+ * die keuze staat in het geheugen en niet in de opslag. Een bewaarde "dicht bij een afwijking"
+ * gold eerst voor elke klant en elke latere afwijking, ook in een volgende sessie, en dan stond de
+ * volgende rode score van een andere klant dicht omdat iemand weken eerder één keer klikte.
+ *
+ * Een echte knop met aria-expanded en aria-controls (het deel staat er altijd, dus de verwijzing is
+ * nooit een dood spoor), een tikvlak van 44 px, en bedienbaar met Tab, Enter en de spatiebalk. De
+ * pijl draait mee, behalve bij "minder beweging".
+ */
+/** Onder welke sleutel een Uitklap zijn keuze bewaart; null bij een afwijking (zie Uitklap). */
+export function uitklapOpslagSleutel(id: string, afwijkend: boolean): string | null {
+  return afwijkend ? null : id;
+}
+
+export function Uitklap({
+  id,
+  label,
+  labelOpen,
+  afwijkend = false,
+  vorm = "balk",
+  children,
+}: {
+  /** Stabiele sleutel voor het onthouden van open of dicht. */
+  id: string;
+  /** Wat er achter de knop zit, als de knop dicht is: "Toon tempo en eindstand". */
+  label: string;
+  /** De tekst als hij open is; zonder deze blijft het label staan en zegt de pijl de stand. */
+  labelOpen?: string;
+  /** Er is iets dat afwijkt: open, tenzij de kijker het bij deze afwijking zelf dichtklapte. */
+  afwijkend?: boolean;
+  /** `balk`: over de volle breedte met een lijn erboven, in de voet van een kaart. `regel`: een
+   *  tekstknop in de lopende tekst, voor een "waarom". */
+  vorm?: "balk" | "regel";
+  children: React.ReactNode;
+}) {
+  // De keuze hoort bij een toestand: wisselt die (de data komt binnen en er blijkt iets af te
+  // wijken, of de afwijking is voorbij), dan geldt de standaard van de nieuwe toestand tot er een
+  // keuze voor is. Bij een gewone stand is dat de bewaarde keuze; bij een afwijking open.
+  const sleutel = afwijkend ? `${id}:afwijkend` : id;
+  const opslag = uitklapOpslagSleutel(id, afwijkend);
+  const [stand, setStand] = useState<{ sleutel: string; open: boolean } | null>(null);
+  useEffect(() => {
+    const opgeslagen = opslag === null ? null : leesOpgeslagen(opslag);
+    setStand(opgeslagen === null ? null : { sleutel, open: opgeslagen });
+  }, [sleutel, opslag]);
+  const open = stand && stand.sleutel === sleutel ? stand.open : afwijkend;
+  const toggle = () => {
+    if (opslag !== null) schrijfOpgeslagen(opslag, !open);
+    setStand({ sleutel, open: !open });
+  };
+  const inhoudId = `uitklap-${id}`;
+  const klasse = vorm === "balk"
+    ? "flex min-h-11 w-full items-center justify-center gap-1.5 border-t border-border px-5 py-2.5 text-meta font-medium text-brand-blue-ink transition-colors hover:bg-gray-50"
+    : "inline-flex min-h-11 items-center gap-1 text-left text-meta font-medium text-brand-blue-ink underline-offset-2 hover:underline";
+  return (
+    <>
+      <button
+        type="button"
+        onClick={toggle}
+        aria-expanded={open}
+        aria-controls={inhoudId}
+        data-uitklap={id}
+        data-afwijkend={afwijkend ? "ja" : undefined}
+        className={`${klasse} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-blue`}
+      >
+        <ChevronDown className={`h-3.5 w-3.5 shrink-0 transition-transform motion-reduce:transition-none ${open ? "rotate-180" : ""}`} aria-hidden />
+        {open ? labelOpen ?? label : label}
+      </button>
+      <div id={inhoudId} hidden={!open} data-uitklap-inhoud={id}>{children}</div>
     </>
   );
 }

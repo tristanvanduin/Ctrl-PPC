@@ -423,7 +423,8 @@ console.log("De bedrading: de schakelaar bereikt elk tabblad");
   for (const [naam, patroon] of [
     ["Pacing & jaaroverzicht in plaats van de vier kaarten en de grafiek", /<PacingJaaroverzichtGoogle /],
     ["de ranglijst naast de projectie en de tabel in de voet", /naast=\{<GeoRanglijstInKaart state=\{geo\} naast \/>\}[\s\S]*<GeoTabelLade state=\{geo\} \/>/],
-    ["de ringen van PacingMonitor en Account Health blijven open", /<HealthBadge clientId=\{clientId\} \/>[\s\S]*<PacingMonitor /],
+    // Samengevat: score, oordeel en de twee ringen open, de onderbouwing en het tempo achter een knop.
+    ["de score van Account Health en de ringen van PacingMonitor blijven open (samengevat)", /<HealthBadge clientId=\{clientId\} samenvatten \/>[\s\S]*<PacingMonitor [^>]*samenvatten/],
     ["het landfilter en de keuze maand of beurs blijven", /\{landfilter\}[\s\S]*<TijdasKeuze /],
     ["de losse trendgrafieken, video en de kopkaart achter een klik", /<CollapsiblePanel[\s\S]*<MonthlyTrendLine [\s\S]*<CollapsiblePanel[\s\S]*<VideoPerformance [\s\S]*<CollapsiblePanel[\s\S]*\{kop\}/],
   ] as [string, RegExp][]) check(`Google, nieuw: ${naam}`, patroon.test(tak));

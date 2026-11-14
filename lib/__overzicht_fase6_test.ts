@@ -62,7 +62,7 @@ import { WeergaveSchakelaar } from "../components/dashboard/weergave-schakelaar"
 import { Kanaalkaarten, type Kanaalkaart } from "../components/dashboard/kanaalkaarten";
 import { volgendeKanaalkeuze } from "./overzicht/bovenkant";
 import { GeoMapCard } from "../components/dashboard/geo-map-card";
-import { GEO_NAAST_ZICHTBAAR, GeoRanglijstInKaart } from "../components/dashboard/geo-ranglijst-card";
+import { GEO_NAAST_ZICHTBAAR, GEO_NAAST_ZICHTBAAR_SMAL, GeoRanglijstInKaart } from "../components/dashboard/geo-ranglijst-card";
 import { PacingJaaroverzicht } from "../components/dashboard/pacing-jaaroverzicht";
 import { blendedPacingCijfers, blendedPacingVoetregel } from "../components/dashboard/blended-pacing";
 import { RINGCEL } from "../components/dashboard/channel-pacing";
@@ -227,7 +227,9 @@ async function main() {
     check("Beoordeel: 44 px op een telefoon, compact vanaf sm", knop(/^Beoordeel/).length > 0 && knop(/^Beoordeel/).every((c) => /\bmin-h-11\b/.test(c) && /sm:min-h-7/.test(c)), knop(/^Beoordeel/)[0]);
     check("Bekijk <kanaal>: idem", knop(/^Bekijk /).length > 0 && knop(/^Bekijk /).every((c) => /\bmin-h-11\b/.test(c) && /sm:min-h-7/.test(c)));
     check("Naar Bevindingen: idem", knop(/^Naar Bevindingen/).length === 1 && /\bmin-h-11\b/.test(knop(/^Naar Bevindingen/)[0]));
-    check("Toon meer: idem", knop(/^Toon 2 regels meer/).length === 1 && /\bmin-h-11\b/.test(knop(/^Toon 2 regels meer/)[0]), JSON.stringify(knop(/Toon/)));
+    // Op een telefoon staan er drie regels (LOGBOEK_ZICHTBAAR_SMAL), daarboven vier: één knop met
+    // het aantal voor beide breedtes, elk zichtbaar op zijn eigen breedte.
+    check("Toon meer: idem", knop(/^Toon 3 regels meer/).length === 1 && /\bmin-h-11\b/.test(knop(/^Toon 3 regels meer/)[0]) && /Toon 2 regels meer/.test(JSON.stringify(html)), JSON.stringify(knop(/Toon/)));
     const gewoon = renderToStaticMarkup(createElement(MeerKnop, { verborgen: 3, uitgeklapt: false, onToggle: () => {} }));
     check("de gewone 'toon meer' elders op de pagina is wat hij was", !/min-h-11/.test(gewoon) && /Toon 3 regels meer/.test(gewoon));
   }
@@ -362,8 +364,15 @@ async function main() {
     const nieuw = renderToStaticMarkup(createElement(GeoRanglijstInKaart, { state: staat, naast: true }));
     check("de ranglijst onder de kaart toont alle landen, zonder knop", rijen(oud) === 10 && !/meer/.test(tekst(oud)), String(rijen(oud)));
     check("naast de kaart begint hij kort, met de rest achter een knop die het aantal noemt", rijen(nieuw) === GEO_NAAST_ZICHTBAAR && tekst(nieuw).includes(`Toon ${10 - GEO_NAAST_ZICHTBAAR} landen meer`), tekst(nieuw).slice(-80));
+    // Op een telefoon begint hij met GEO_NAAST_ZICHTBAAR_SMAL: de vierde tot en met de zesde staan
+    // in de boom, verborgen onder lg, achter een knop die alleen daar staat.
+    check("... op een telefoon korter: de regels na de derde zijn verborgen onder lg", [...nieuw.matchAll(/<li class="[^"]*max-lg:hidden/g)].length === GEO_NAAST_ZICHTBAAR - GEO_NAAST_ZICHTBAAR_SMAL
+      && tekst(nieuw).includes(`Toon ${10 - GEO_NAAST_ZICHTBAAR_SMAL} landen meer`));
     const kort = { ...staat, ranked: (staat.ranked as unknown[]).slice(0, 4) } as unknown as GeoBreakdownState;
-    check("... en met weinig landen staat er geen knop", !/meer/.test(tekst(renderToStaticMarkup(createElement(GeoRanglijstInKaart, { state: kort, naast: true })))));
+    const kortHtml = renderToStaticMarkup(createElement(GeoRanglijstInKaart, { state: kort, naast: true }));
+    check("... met vier landen alleen op een telefoon een knop (vanaf lg staan ze er alle vier)", /<button[^>]*class="lg:hidden /.test(kortHtml) && !/lg:inline/.test(kortHtml));
+    const drie = { ...staat, ranked: (staat.ranked as unknown[]).slice(0, 3) } as unknown as GeoBreakdownState;
+    check("... en met drie landen staat er geen knop", !/meer/.test(tekst(renderToStaticMarkup(createElement(GeoRanglijstInKaart, { state: drie, naast: true })))));
 
     // De kop van een sectie, zonder de context van de nieuwe weergave: letterlijk de HTML van vóór
     // deze ronde. Sectie en Deelkop staan op tien schermen; daar hoort niets te verschuiven.

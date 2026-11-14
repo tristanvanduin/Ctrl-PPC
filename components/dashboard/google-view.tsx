@@ -170,9 +170,14 @@ function GoogleViewRuw({
   //
   //   63  de kopkaart van het tabblad          onderaan achter "Over dit tabblad"
   //   56  het landfilter                       blijft, bovenaan
-  //   64  Account Health                       blijft, open
-  //   46  PacingMonitor (de ringen)            blijft, open, naast Health
-  //   66  maand- of beursweergave met keuze    blijft, met dezelfde keuzeknop
+  //   64  Account Health                       score, oordeel, zwakste factor en kritieke signalen
+  //                                            open; radar en factoren achter "Toon onderbouwing"
+  //                                            (open bij een rode score)
+  //   46  PacingMonitor (de ringen)            de twee ringen met hun oordeel open; tempo, wat er
+  //                                            nodig is en de landing achter een knop (open als
+  //                                            een van beide sterk achterloopt)
+  //   66  maand- of beursweergave met keuze    blijft, met dezelfde keuzeknop; de beursweergave
+  //                                            compact: "deze week" open, de strook achter een knop
   //   71  vier jaarkaarten en de grafiek       Pacing & jaaroverzicht met de lade "Verloop en prognose"
   //   53  de zes landentegels                  de totaalrij van "Toon als tabel" in de wereldkaart
   //   51  de ranglijst onder de projectie      naast de projectie
@@ -209,9 +214,9 @@ function GoogleViewRuw({
           {/* `items-start`: de twee kaarten rekken elkaar niet op. De grens van 1800 px is die van de
               vertrouwde weergave (zie de toelichting bij de hero hieronder). */}
           <div className="grid grid-cols-1 items-start gap-4 min-[1800px]:grid-cols-2">
-            <HealthBadge clientId={clientId} />
+            <HealthBadge clientId={clientId} samenvatten />
             {/* In een eigen div met automatische hoogte: de pacingkaart is `h-full`. */}
-            <div><PacingMonitor clientId={clientId} countryFilter={countryFilter} edition={edition} stapelSmal /></div>
+            <div><PacingMonitor clientId={clientId} countryFilter={countryFilter} edition={edition} stapelSmal samenvatten /></div>
           </div>
 
           <Deelkop
@@ -226,7 +231,7 @@ function GoogleViewRuw({
             actie={edition && <TijdasKeuze value={tijdas} onChange={onTijdasChange} />}
           />
           {beursAs
-            ? <FairWeeksOverview clientId={clientId} countryFilter={countryFilter} edition={edition!} />
+            ? <FairWeeksOverview clientId={clientId} countryFilter={countryFilter} edition={edition!} compact />
             : <MonthlyOverview clientId={clientId} countryFilter={countryFilter} />}
 
           <PacingJaaroverzichtGoogle clientId={clientId} countryFilter={countryFilter} titelToevoeging={countryFilter ? countryLabel(countryFilter) : undefined} />
@@ -238,7 +243,8 @@ function GoogleViewRuw({
           titel="Verdeling"
           bijschrift="Waar de spend naartoe ging, binnen de gekozen periode"
         >
-          <CampaignTypeSplit clientId={clientId} />
+          {/* De verdeling als regel open, de ringen achter een knop (zie CampaignTypeSplit). */}
+          <CampaignTypeSplit clientId={clientId} samenvatten />
         </Sectie>
 
         <Sectie

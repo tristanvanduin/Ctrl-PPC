@@ -50,8 +50,12 @@ export function GeoRanglijst({
   onKlik,
   klikbaar,
   totalen,
+  smalTot,
 }: {
   regels: readonly Ranglijstregel[];
+  /** Op een telefoon (onder lg) alleen de eerste zoveel regels in beeld; de rest staat in de boom
+   *  met `max-lg:hidden`, achter de knop van de aanroeper (MeerKnopPerBreedte). */
+  smalTot?: number;
   metriekLabel: string;
   /** Onderaan de kolom, als samenvatting. Losse regels zodat de aanroeper de opmaak bepaalt. */
   totalen?: readonly { label: string; waarde: string }[];
@@ -80,7 +84,7 @@ export function GeoRanglijst({
             <li
               key={r.code}
               onClick={kanKlikken ? () => onKlik!(r.code) : undefined}
-              className={`rounded-md px-1 py-0.5 ${kanKlikken ? "cursor-pointer hover:bg-muted/60" : ""}`}
+              className={`rounded-md px-1 py-0.5 ${kanKlikken ? "cursor-pointer hover:bg-muted/60" : ""}${smalTot !== undefined && i >= smalTot ? " max-lg:hidden" : ""}`}
               title={kanKlikken ? "Klik om een niveau dieper te gaan" : undefined}
             >
               {/* Naam en getal op één regel, de balk eronder over de volle kolombreedte. Naast

@@ -7,7 +7,8 @@ import { maakBronCache } from "@/lib/data-access/bron-cache";
 import { CHART_CATEGORICAL } from "@/lib/branding/chart-colors";
 import { KANAAL_KLEUR, type Kanaal } from "@/lib/kanalen/beschikbaar";
 import { DonutChart, type DonutSlice } from "./donut-chart";
-import { useRememberedOpen, RegioToggle } from "@/components/ui/disclosure";
+import { useRememberedOpen, RegioToggle, Uitklap } from "@/components/ui/disclosure";
+import { VerdelingRegel } from "./verdeling-regel";
 import { Tabel, Kop, KolomKop, Body, Rij, NaamCel, GetalCel, TotaalRij, TotaalCel } from "./data-table";
 import { buildNetworkSplit, networkTotals, type NetworkRow, type NetworkSlice } from "@/lib/pmax/network-split";
 import { Laadvlak } from "@/components/ui/laadvlak";
@@ -201,10 +202,17 @@ export function vensterVanaf(vandaag: string): string {
  * ongeveer negentig dagen; die de periode laten volgen kost bij elke wissel een verzoek. Ze houden
  * daarom hun eigen venster, en het label in de kop zegt welke maanden dat zijn.
  */
-export function CampaignTypeSplit({ clientId, toon = UITSPLITSINGEN.map((u) => u.key), kanaalRijen }: {
+export function CampaignTypeSplit({ clientId, toon = UITSPLITSINGEN.map((u) => u.key), kanaalRijen, samenvatten = false }: {
   clientId: string;
   toon?: readonly Uitsplitsing[];
   kanaalRijen?: readonly KanaalMaandRij[] | null;
+  /**
+   * De nieuwe weergave: de verdeling van de kosten als één regel open (VerdelingRegel, met dezelfde
+   * aandelen als de legenda), de ringen voor kosten en conversies met hun legenda en het filter
+   * achter "Toon de ringen". Ze blijven in de pagina (hidden). De kop met het venster en de kiezer,
+   * het voorbehoud zonder conversies en de tabel staan er zoals altijd.
+   */
+  samenvatten?: boolean;
 }) {
   const keuzes = UITSPLITSINGEN.filter((u) => toon.includes(u.key));
   const start = keuzes[0]?.key ?? "type";
@@ -395,11 +403,8 @@ export function CampaignTypeSplit({ clientId, toon = UITSPLITSINGEN.map((u) => u
     );
   }
 
-  return (
-    <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
-      {kop}
-
-      <div className="px-3 py-5 @2xl:px-5">
+  const ringenEnLegenda = (
+        <>
         {/* justify-start op de donutrij, niet -center: de titel erboven en de tabel eronder lijnen
             links uit. 22 augustus 2026: de legenda stond ERONDER, wat op een brede kaart rechts van
             de donuts een groot leeg vlak overliet -- de legenda staat nu DAARNAAST (met het aandeel
@@ -463,6 +468,11 @@ export function CampaignTypeSplit({ clientId, toon = UITSPLITSINGEN.map((u) => u
           </ul>
         </div>
 
+        </>
+  );
+
+  const filterEnVoorbehoud = (
+        <>
         {selected && (
           <div className="mt-3 flex items-center gap-2 text-meta">
             <span className="rounded-full bg-brand-blue/10 px-2.5 py-1 font-medium text-brand-blue-ink">
@@ -478,12 +488,44 @@ export function CampaignTypeSplit({ clientId, toon = UITSPLITSINGEN.map((u) => u
           </div>
         )}
 
-        {!totals.hasConversions && (
+        </>
+  );
+  const geenConversies = !totals.hasConversions && (
           <p className="text-meta text-muted-foreground text-center mt-3">
             Er zijn in dit venster geen conversies per {actief.label.toLowerCase()} geregistreerd, dus alleen de kostenverdeling is te tonen.
           </p>
-        )}
+  );
+
+  return (
+    <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden" data-samenvatting={samenvatten ? "verdeling" : undefined}>
+      {kop}
+
+      {samenvatten ? (
+        <>
+          {/* Open: de verdeling van de kosten in woorden en getallen, en het voorbehoud. */}
+          <div className="px-5 pb-3 pt-3">
+            <VerdelingRegel
+              delen={slices.map((s) => ({ sleutel: s.networkType, label: s.label, aandeel: pct(s.costShare), kleur: colorFor(uitsplitsing, s.networkType, order) }))}
+              waarvan="van de kosten"
+            />
+            {geenConversies}
+          </div>
+          <Uitklap id={`verdeling-ringen-${toon.join("-")}`}
+            label={totals.hasConversions ? `Toon de ringen: kosten en conversies per ${actief.label.toLowerCase()}` : `Toon de ring: kosten per ${actief.label.toLowerCase()}`}
+            labelOpen="Verberg de ringen">
+            <div className="px-3 pb-5 pt-2 @2xl:px-5">
+              {ringenEnLegenda}
+              {filterEnVoorbehoud}
+            </div>
+          </Uitklap>
+        </>
+      ) : (
+      <div className="px-3 py-5 @2xl:px-5">
+        {ringenEnLegenda}
+        {filterEnVoorbehoud}
+        {geenConversies}
       </div>
+      )}
 
       <RegioToggle
         open={tabelOpen}

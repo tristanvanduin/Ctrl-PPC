@@ -10,6 +10,7 @@ import { useKanaalData } from "./channel-data-provider";
 import { eur, fmt } from "./channel-performance";
 import { BeursAftelling, PacingRing } from "./pacing-monitor";
 import { Laadvlak } from "@/components/ui/laadvlak";
+import { Uitklap } from "@/components/ui/disclosure";
 import { Vensterlabel } from "@/components/ui/vensterlabel";
 
 // Pacing voor Meta en LinkedIn, als eigen kaart in de hero -- naast Account Health, op dezelfde
@@ -39,10 +40,17 @@ export const RINGCEL = {
   stapelSmal: "flex min-w-0 flex-col items-center justify-center gap-3 text-center @lg:flex-row @lg:text-left",
 } as const;
 
-export function ChannelPacing({ edition, stapelSmal = false }: {
+export function ChannelPacing({ edition, stapelSmal = false, samenvatten = false }: {
   edition?: UpcomingEdition | null;
   /** De nieuwe weergave: ring en tekst onder elkaar zolang de kaart smal is (zie RINGCEL). */
   stapelSmal?: boolean;
+  /**
+   * De nieuwe weergave: de twee ringen met hun oordeel ("In de pas", "Loopt achter") en hun getal
+   * open, kleiner; het tempo per dag, de eindstand van de maand en de voetregel achter "Toon tempo
+   * en eindstand van de maand". Een kanaal dat achterloopt, staat zo in de samenvatting zelf: dat
+   * oordeel IS de ring. Rood bestaat hier niet (zie kleurVan), dus er gaat niets vanzelf open.
+   */
+  samenvatten?: boolean;
 }) {
   const ringcel = stapelSmal ? RINGCEL.stapelSmal : RINGCEL.vertrouwd;
   const { rijen, convVan, convLabel, fout } = useKanaalData();
@@ -89,11 +97,13 @@ export function ChannelPacing({ edition, stapelSmal = false }: {
   const convEindeMaand = convPerDag * dagenInMaand;
 
   const pctVan = (ratio: number | null) => (ratio == null ? 0 : Math.round(ratio * 100));
+  const ringMaat = samenvatten ? 88 : undefined;
+  const ringCijfer = samenvatten ? "text-xl" : "text-figure";
 
   return (
     // Zelfde opbouw als pacing-monitor.tsx: `flex h-full flex-col` met het blokkenraster als
     // `flex-1`, zodat deze kaart de opvanger van zijn kolom kan zijn (zie meta-view.tsx).
-    <div className="@container flex h-full flex-col bg-card rounded-xl border border-border p-5 shadow-sm">
+    <div className={`@container flex h-full flex-col bg-card rounded-xl border border-border p-5 shadow-sm${samenvatten ? " overflow-hidden" : ""}`}>
       <div className="flex items-center gap-2 mb-4 flex-wrap">
         <Zap className="w-4.5 h-4.5 text-brand-blue-ink" />
         <h3 className="text-sm font-semibold text-brand-blue-ink uppercase tracking-wide">Pacing</h3>
@@ -105,12 +115,14 @@ export function ChannelPacing({ edition, stapelSmal = false }: {
         </span>
       </div>
 
-      <div className="grid flex-1 grid-cols-2 items-stretch gap-4 @6xl:grid-cols-3 @7xl:grid-cols-6">
+      {(() => {
+      const ringen = (
+        <>
         <div className={ringcel}>
           <div className="relative">
-            <PacingRing pct={pctVan(spendRatio)} color={spendKleur} />
+            <PacingRing pct={pctVan(spendRatio)} color={spendKleur} size={ringMaat} />
             <div className="absolute inset-0 flex items-center justify-center">
-              <span className="text-figure font-bold leading-none tabular-nums" style={{ color: spendKleur }}>
+              <span className={`${ringCijfer} font-bold leading-none tabular-nums`} style={{ color: spendKleur }}>
                 {spendRatio == null ? "—" : `${pctVan(spendRatio)}%`}
               </span>
             </div>
@@ -124,9 +136,9 @@ export function ChannelPacing({ edition, stapelSmal = false }: {
 
         <div className={ringcel}>
           <div className="relative">
-            <PacingRing pct={pctVan(convRatio)} color={convKleur} />
+            <PacingRing pct={pctVan(convRatio)} color={convKleur} size={ringMaat} />
             <div className="absolute inset-0 flex items-center justify-center">
-              <span className="text-figure font-bold leading-none tabular-nums" style={{ color: convKleur }}>
+              <span className={`${ringCijfer} font-bold leading-none tabular-nums`} style={{ color: convKleur }}>
                 {convRatio == null ? "—" : `${pctVan(convRatio)}%`}
               </span>
             </div>
@@ -137,7 +149,10 @@ export function ChannelPacing({ edition, stapelSmal = false }: {
             <p className="text-body font-semibold" style={{ color: convKleur }}>{tekstVan(convRatio)}</p>
           </div>
         </div>
-
+        </>
+      );
+      const tempo = (
+        <>
         <div className="flex flex-col justify-center border-l border-border pl-4">
           <div className="flex items-center gap-1.5 mb-1">
             <Calendar className="w-3.5 h-3.5 text-muted-foreground" />
@@ -179,13 +194,42 @@ export function ChannelPacing({ edition, stapelSmal = false }: {
           <span className="text-figure font-bold leading-none text-brand-gray">{fmt(convEindeMaand, 1)}</span>
           <p className="text-micro mt-1 text-muted-foreground">{convLabel || "conversies"} eind van de maand</p>
         </div>
-      </div>
-
+        </>
+      );
+      const voet = (
       <p className="mt-4 border-t border-border pt-3 text-meta leading-snug text-muted-foreground">
         Rechte lijn tot het eind van de maand, geen seizoensmodel: voor dit kanaal is er geen
         jaardoel en geen seizoenspatroon in het systeem, dus dit is wat het tempo van vandaag
         oplevert als het niet verandert.
       </p>
+      );
+      if (!samenvatten) {
+        return (
+          <>
+            <div className="grid flex-1 grid-cols-2 items-stretch gap-4 @6xl:grid-cols-3 @7xl:grid-cols-6">
+              {ringen}
+              {tempo}
+            </div>
+            {voet}
+          </>
+        );
+      }
+      // Samengevat: de ringen open, de rest in de voet van de kaart achter een knop. -mx-5 -mb-5:
+      // de knop loopt van rand tot rand, zoals de andere uitklapdelen.
+      return (
+        <>
+          <div className="grid grid-cols-2 items-start gap-4">{ringen}</div>
+          <div className="-mx-5 -mb-5 mt-4">
+            <Uitklap id="pacing-kanaal-tempo" label="Toon tempo per dag en eindstand van de maand" labelOpen="Verberg tempo en eindstand">
+              <div className="px-5 pb-5 pt-3">
+                <div className="grid grid-cols-2 items-stretch gap-4 @6xl:grid-cols-4">{tempo}</div>
+                {voet}
+              </div>
+            </Uitklap>
+          </div>
+        </>
+      );
+      })()}
     </div>
   );
 }

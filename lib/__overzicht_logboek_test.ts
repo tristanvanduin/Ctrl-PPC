@@ -495,7 +495,7 @@ async function main() {
     check(`de eerste ${LOGBOEK_ZICHTBAAR} regels, de rest achter 'toon meer'`, (html.match(/<li /g) ?? []).length === LOGBOEK_ZICHTBAAR && txt.includes("Toon 1 regels meer"), String((html.match(/<li /g) ?? []).length));
     check("twee regels zijn nieuw sinds het vorige bezoek, met het woord erbij", (html.match(/data-nieuw="ja"/g) ?? []).length === 2 && (txt.match(/\bnieuw Voorstel|\bnieuw Datastand/g) ?? []).length === 2, txt.slice(0, 400));
     check("bovenaan staat hoeveel er nieuw is, en sinds wanneer", txt.includes("2 nieuw sinds je vorige bezoek (gisteren 15:00)"), txt.slice(0, 200));
-    check("elke regel is een knop die zijn onderbouwing opent", (html.match(/aria-expanded="false"/g) ?? []).length === LOGBOEK_ZICHTBAAR && /aria-controls="logboek-voorstel-1"/.test(html) && /id="logboek-voorstel-1"/.test(html));
+    check("elke regel is een knop die zijn onderbouwing opent", (html.match(/aria-expanded="false" aria-controls="logboek-/g) ?? []).length === LOGBOEK_ZICHTBAAR && /aria-controls="logboek-voorstel-1"/.test(html) && /id="logboek-voorstel-1"/.test(html));
     check("de onderbouwing staat in het paneel", txt.includes("De CTR halveerde.") && txt.includes("Verwacht: lagere CPA"));
     check("alleen wat te beoordelen is krijgt 'Beoordeel'", (html.match(/>Beoordeel </g) ?? []).length === 1, String((html.match(/>Beoordeel </g) ?? []).length));
     check("een regel met een kanaal biedt dat kanaal als filter", txt.includes("Bekijk Meta") && txt.includes("Bekijk Google Ads"));

@@ -175,6 +175,7 @@ const ZONDER: Record<string, string> = {
   GeoTabelLade: "staat ín de wereldkaart, onder diens label",
   CollapsiblePanel: "een uitklapblok ('Detail op aanvraag'); wat erin staat draagt zijn eigen label",
   LadeInhoud: "het vlak binnen een uitklapblok",
+  Uitklap: "een knop in de voet van een kaart die zijn label al draagt (de ringen onder 'Spend per kanaal')",
 };
 const ICOON = /^(Calendar|CalendarClock|Target|Globe|LayoutGrid|TrendingUp|Sparkles|AlertTriangle|Users|Gauge|SearchIcon|Search|Megaphone|Briefcase|PieChart|Info|Layers|Loader2)$/;
 

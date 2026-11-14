@@ -2,6 +2,7 @@
 
 import { useMemo, type ReactNode } from "react";
 import { AlertTriangle, CheckCircle2, Info, Activity } from "lucide-react";
+import { Uitklap } from "@/components/ui/disclosure";
 import { useClientHistoricalData, useClientDataState } from "@/lib/client-data-provider";
 import { computeForecast } from "@/lib/forecast";
 import { googleHealthScore, type HealthScore } from "@/lib/health-score";
@@ -9,7 +10,11 @@ import { magRadarTonen } from "@/lib/health-radar";
 import { HealthRadar } from "./health-radar";
 import { Vensterlabel } from "@/components/ui/vensterlabel";
 
-export function HealthBadge({ clientId }: { clientId: string }) {
+export function HealthBadge({ clientId, samenvatten = false }: {
+  clientId: string;
+  /** De nieuwe weergave: de score en het oordeel open, de onderbouwing achter een knop (HealthSamenvatting). */
+  samenvatten?: boolean;
+}) {
   const data = useClientHistoricalData(clientId);
   const dataState = useClientDataState();
   const forecast = useMemo(() => computeForecast(data), [data]);
@@ -20,7 +25,9 @@ export function HealthBadge({ clientId }: { clientId: string }) {
 
   // De score komt uit de jaarprognose (tempo tegen het jaardoel, efficiëntie tegen het doel), dus
   // dit is een jaarblok: de periodekiezer verandert hem niet, en dat staat in de kop.
-  return <HealthBadgeView health={health} venster={<Vensterlabel soort="jaar" jaar={data.currentYear} />} />;
+  const venster = <Vensterlabel soort="jaar" jaar={data.currentYear} />;
+  if (samenvatten) return <HealthSamenvatting id="health-google" health={health} venster={venster} />;
+  return <HealthBadgeView health={health} venster={venster} />;
 }
 
 /**
@@ -37,8 +44,11 @@ export function HealthBadgeView({
   titel = "Account Health",
   Icoon = Activity,
   venster,
+  alsOnderbouwing = false,
 }: {
   health: HealthScore;
+  /** Binnen HealthSamenvatting: zonder de boog, de kop en de kaartrand, die staan daar al open. */
+  alsOnderbouwing?: boolean;
   /** Het Vensterlabel naast de titel. De aanroeper weet over welk venster de score gaat (het
    *  kalenderjaar op het Overzicht); de scorecards op Campagnes geven er geen mee. */
   venster?: ReactNode;
@@ -55,7 +65,7 @@ export function HealthBadgeView({
     : "#ef4444";
 
   return (
-    <div className="@container bg-card rounded-xl border border-border p-5 shadow-sm">
+    <div className={alsOnderbouwing ? "@container" : "@container bg-card rounded-xl border border-border p-5 shadow-sm"}>
       {/* CONTAINER QUERY, GEEN VIEWPORT-BREEKPUNT -- en dat is de kern van de fix.
           Hier stond `xl:flex-row`. Dat is een VENSTER-breekpunt, terwijl deze kaart in de hero in
           een halfbrede kolom staat. Bij een venster van 1500px is `xl` (1280px) waar, dus zette de
@@ -79,6 +89,7 @@ export function HealthBadgeView({
           Zie ook pacing-monitor.tsx, dat @container al gebruikt -- Tailwind v4 heeft het ingebouwd. */}
       <div className="flex flex-col gap-5 @2xl:flex-row @2xl:flex-wrap @2xl:items-start">
         {/* Score circle */}
+        {!alsOnderbouwing && (
         <div className="relative w-20 h-20 shrink-0">
           <svg viewBox="0 0 80 80" className="w-20 h-20 -rotate-90">
             <circle cx="40" cy="40" r="34" fill="none" className="stroke-border" strokeWidth="6" />
@@ -107,6 +118,7 @@ export function HealthBadgeView({
             )}
           </div>
         </div>
+        )}
 
         {/* Factors.
 
@@ -118,11 +130,13 @@ export function HealthBadgeView({
             Onder de drie beoordeelde assen valt de radar terug op de staafjes: twee punten en drie
             gaten is geen vorm maar ruis die eruitziet als een meting. */}
         <div className="shrink-0">
+          {!alsOnderbouwing && (
           <div className="flex flex-wrap items-center gap-2 mb-3">
             <Icoon className="w-4 h-4 text-brand-blue-ink" />
             <h3 className="text-sm font-semibold text-brand-blue-ink uppercase tracking-wide">{titel}</h3>
             {venster}
           </div>
+          )}
           {magRadarTonen(health.factors) ? (
             <HealthRadar factoren={health.factors} kleur={radarKleur} />
           ) : (
@@ -243,5 +257,87 @@ export function HealthBadgeView({
         </div>
       </div>
     </div>
+  );
+}
+
+/** Het oordeel bij een score in één woord of twee, met dezelfde drempels als de kleur. */
+export function healthOordeel(health: HealthScore): { tekst: string; kleur: string; rood: boolean } {
+  if (health.grade === "?") return { tekst: `te weinig beoordeeld (${health.assessedCount}/5)`, kleur: "#6b7280", rood: false };
+  if (health.total >= 70) return { tekst: "gezond", kleur: "#15803d", rood: false };
+  if (health.total >= 50) return { tekst: "vraagt aandacht", kleur: "#b45309", rood: false };
+  return { tekst: "zwak", kleur: "#b91c1c", rood: true };
+}
+
+/**
+ * Account Health in de nieuwe weergave: de score, het oordeel, de zwakste factor en de kritieke
+ * signalen open; de radar, de vijf factoren met hun uitleg en de volledige lijst signalen achter
+ * "Toon onderbouwing". Dezelfde score en dezelfde onderbouwing als HealthBadgeView (die rendert
+ * het deel achter de knop), dus niets is weg; op een telefoon was de kaart ruim duizend pixels.
+ *
+ * Een rode score (onder 50) is een afwijking: dan staat de onderbouwing open. Een kritiek signaal
+ * bij een score die verder in orde is, staat in de samenvatting zelf, met zijn titel.
+ */
+export function HealthSamenvatting({ id, health, venster, titel = "Account Health" }: {
+  /** De sleutel waaronder open of dicht onthouden wordt; per tabblad een eigen. */
+  id: string;
+  health: HealthScore;
+  venster?: ReactNode;
+  titel?: string;
+}) {
+  const oordeel = healthOordeel(health);
+  const beoordeeld = health.factors.filter((f) => f.assessed);
+  const zwakste = beoordeeld.length > 0 ? beoordeeld.reduce((l, f) => (f.score < l.score ? f : l)) : null;
+  const kritiek = health.anomalies.filter((a) => a.severity === "critical");
+  const boogKleur = health.grade === "?" ? "#9ca3af" : health.total >= 70 ? "#22c55e" : health.total >= 50 ? "#f59e0b" : "#ef4444";
+  return (
+    <section aria-label={titel} data-samenvatting="health" data-oordeel={oordeel.rood ? "rood" : undefined}
+      className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
+      <div className="flex items-center gap-4 px-5 pb-3 pt-4">
+        <div className="relative h-14 w-14 shrink-0">
+          <svg viewBox="0 0 80 80" className="h-14 w-14 -rotate-90" aria-hidden>
+            <circle cx="40" cy="40" r="34" fill="none" className="stroke-border" strokeWidth="7" />
+            <circle cx="40" cy="40" r="34" fill="none" stroke={boogKleur} strokeWidth="7" strokeLinecap="round"
+              strokeDasharray={health.grade === "?" ? "0 213.6" : `${health.total * 2.136} 213.6`} />
+          </svg>
+          <span className={`absolute inset-0 flex items-center justify-center text-xl font-bold tabular-nums ${health.color}`} data-health-score>
+            {health.grade === "?" ? "—" : health.total}
+          </span>
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <Activity className="h-4 w-4 text-brand-blue-ink" aria-hidden />
+            <h3 className="text-sm font-semibold uppercase tracking-wide text-brand-blue-ink">{titel}</h3>
+            {venster}
+          </div>
+          <p className="mt-1 text-body text-muted-foreground">
+            <span className="font-semibold" style={{ color: oordeel.kleur }} data-health-oordeel>{oordeel.tekst}</span>
+            {health.grade !== "?" && <span className="sr-only">, score {health.total} van 100</span>}
+            {zwakste && <> · zwakste: <span className="font-medium text-brand-gray">{zwakste.name}</span> {zwakste.score}/{zwakste.maxScore}</>}
+            {health.anomalies.length > 0 && <> · {health.anomalies.length} {health.anomalies.length === 1 ? "signaal" : "signalen"}</>}
+          </p>
+        </div>
+      </div>
+      {/* De kritieke signalen staan open: dat is de afwijking die je niet achter een knop zoekt. */}
+      {kritiek.length > 0 && (
+        <ul className="space-y-1 px-5 pb-3" data-health-kritiek={kritiek.length}>
+          {kritiek.map((a, i) => (
+            <li key={i} className="flex items-start gap-1.5 text-meta leading-tight">
+              <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0 text-red-500" aria-hidden />
+              <span className="font-medium text-brand-gray">{a.title}<span className="sr-only"> (kritiek)</span></span>
+            </li>
+          ))}
+        </ul>
+      )}
+      <Uitklap
+        id={id}
+        label={health.anomalies.length > 0 ? "Toon onderbouwing: radar, factoren en alle signalen" : "Toon onderbouwing: radar en factoren"}
+        labelOpen="Verberg onderbouwing"
+        afwijkend={oordeel.rood}
+      >
+        <div className="border-t border-border px-5 py-4">
+          <HealthBadgeView health={health} titel={titel} venster={venster} alsOnderbouwing />
+        </div>
+      </Uitklap>
+    </section>
   );
 }

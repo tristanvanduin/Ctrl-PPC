@@ -11,6 +11,7 @@ import { toFairWeeks, currentWeekIndex, editieNaam, fairCountdown, type FairWeek
 import { today } from "@/lib/reporting-date";
 import { PeriodPopover } from "@/components/ui/period-popover";
 import { Vensterlabel } from "@/components/ui/vensterlabel";
+import { Uitklap } from "@/components/ui/disclosure";
 import { WEEK_SOORT_LABEL, WEEK_SOORT_UITLEG, weekSoort } from "@/lib/overzicht/beursweek";
 
 const ALLE_METRICS: ForecastMetric[] = ["conversions", "revenue", "roas", "cpa"];
@@ -185,15 +186,33 @@ export function FairWeeksOverview({
   clientId,
   countryFilter,
   edition,
+  compact = false,
 }: {
   clientId: string;
   countryFilter?: string | null;
   edition: UpcomingEdition;
+  /** De nieuwe weergave: zie `compact` bij FairWeeksView. */
+  compact?: boolean;
 }) {
   const fullData = useClientHistoricalData(clientId);
   const data = useCountryFilteredData(clientId, countryFilter ?? null) ?? fullData;
   const gedeeld = useForecast();
-  return <FairWeeksView data={data} forecast={gedeeld ?? computeForecast(data)} edition={edition} />;
+  return <FairWeeksView data={data} forecast={gedeeld ?? computeForecast(data)} edition={edition} compact={compact} />;
+}
+
+/**
+ * Ligt deze week onder verwachting (of kost hij zonder iets op te leveren)? Hetzelfde oordeel als
+ * de regel "deze week": de gerealiseerde waarde, of de prognose voor een week die nog loopt, tegen
+ * de verwachting. Zonder verwachting (geen jaardoel voor deze metric) of zonder data is er geen
+ * oordeel, en dus geen afwijking. Bij een metric waar lager beter is (CPA) is boven de verwachting
+ * ongunstig, en een week met kosten maar zonder conversies (geenNoemer) ook.
+ */
+export function weekOnderVerwachting(week: FairWeek | undefined, lagerIsBeter: boolean): boolean {
+  if (!week) return false;
+  if (week.geenNoemer) return lagerIsBeter;
+  if (zonderData(week) || !(week.expected > 0)) return false;
+  const r = (week.realized ?? week.forecast ?? 0) / week.expected;
+  return lagerIsBeter ? r > 1 : r < 1;
 }
 
 export function FairWeeksView({
@@ -211,6 +230,10 @@ export function FairWeeksView({
    * ratio per week) en wat een klik op een kolom opent (alle vier de metrics met de verwachting).
    * De regel is een knop naar datzelfde venster; de vorige en de volgende week zijn de kolommen
    * links en rechts van de gemarkeerde. Scheelt 170 px, op een telefoon ruim 450.
+   *
+   * De strook zelf staat compact achter "Toon de weken rond de beurs": de regel "deze week" draagt
+   * het oordeel en het getal. Ligt deze week onder verwachting, dan staat de strook open: dan wil
+   * je zien of het een week is of een reeks.
    */
   compact?: boolean;
 }) {
@@ -256,6 +279,8 @@ export function FairWeeksView({
   // Google heeft doelen in client_targets, Meta en LinkedIn vaak niet --
   // en dan stond hier een raster vol "0%" naast een gerealiseerde 42. Zie WeekCard.
   const heeftVerwachting = weken.some((w) => w.expected > 0);
+  // Ligt deze week onder verwachting? In de compacte vorm opent het de strook.
+  const dezeWeekOngunstig = weekOnderVerwachting(huidige, inverted);
 
   return (
     <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
@@ -360,6 +385,8 @@ export function FairWeeksView({
       </div>
       )}
 
+      {(() => {
+      const strook = (
       <div className="mt-2 border-t border-border">
         <div className="px-5 py-3">
           <div className="flex gap-0.5 overflow-x-auto">
@@ -420,6 +447,16 @@ export function FairWeeksView({
           </p>
         </div>
       </div>
+      );
+      if (!compact) return strook;
+      return (
+        <div className="mt-2">
+          <Uitklap id="beurs-weken" label={`Toon de weken rond de beurs (${strip.length})`} labelOpen="Verberg de weken" afwijkend={dezeWeekOngunstig}>
+            {strook}
+          </Uitklap>
+        </div>
+      );
+      })()}
 
       {openWeekStart !== null && (() => {
         const refWeek = wekenPerMetric[metric].find((w) => w.weekStart === openWeekStart);

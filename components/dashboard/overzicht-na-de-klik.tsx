@@ -18,6 +18,7 @@ import { procentTekst } from "@/lib/overzicht/trechter";
 import { NIET_OPTELLEN, type Keten, type KetenRij, type NaDeKlikUitkomst } from "@/lib/overzicht/conversiestappen";
 import { KANAAL_GLYPH } from "./kanaalkaarten";
 import type { TrechterVenster } from "./overzicht-trechter";
+import { Uitklap } from "@/components/ui/disclosure";
 
 const AANTAL = new Intl.NumberFormat("nl-NL", { maximumFractionDigits: 0 });
 const PROCENT = new Intl.NumberFormat("nl-NL", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
@@ -148,6 +149,8 @@ export function NaDeKlikPerKanaal({ uitkomst, venster, onNaarInstellingen }: {
         <p className="text-meta text-muted-foreground">
           over <span className="font-medium text-brand-gray">{venster.over}</span>
           {venster.tegen ? <> · vergeleken met {venster.tegen}</> : <> · zonder vergelijking</>}
+          {/* Het voorbehoud in drie woorden in de kop; de zin erachter onder "waarom". */}
+          {" · "}<span className="font-medium text-brand-gray">per kanaal, niet opgeteld</span>
         </p>
       </div>
       {uitkomst === null ? (
@@ -175,8 +178,10 @@ export function NaDeKlikPerKanaal({ uitkomst, venster, onNaarInstellingen }: {
                         {k.fijnheid === "maand" && <span className="ml-1 text-micro">({PER_MAAND})</span>}
                       </span>
                       <span className="ml-auto font-semibold tabular-nums text-brand-gray">{aantal(k.waarde)}</span>
+                      {/* Op een telefoon past de verandering naast het getal (de kaart is daar de volle
+                          breedte); in de smalle kolommen vanaf sm eronder, zoals altijd. */}
                       {veranderingTekst(k.verandering) && (
-                        <span className="w-full text-right text-micro tabular-nums text-muted-foreground">{veranderingTekst(k.verandering)}</span>
+                        <span className="text-right text-micro tabular-nums text-muted-foreground sm:w-full">{veranderingTekst(k.verandering)}</span>
                       )}
                     </li>
                   ))}
@@ -200,12 +205,20 @@ export function NaDeKlikPerKanaal({ uitkomst, venster, onNaarInstellingen }: {
               </tbody>
             </table>
           </div>
-          <p className="mt-2 text-micro text-muted-foreground">{NIET_OPTELLEN}</p>
+          {/* De noten per kanaal staan OPEN: ze zijn het voorbehoud bij een getal dat erboven staat
+              ("de dagcijfers zijn niet geladen", "pas vanaf ...", waarom er geen vergelijking is).
+              Zonder noot leest dat getal als volledig. Alleen de vaste zin waarom de kanalen niet
+              opgeteld worden, die voor elke klant dezelfde is, staat achter een "waarom". */}
           {uitkomst.noten.length > 0 && (
-            <ul className="mt-1 space-y-0.5 text-micro text-muted-foreground" data-nadeklik-noten>
+            <ul className="mt-2 space-y-0.5 text-micro text-muted-foreground" data-nadeklik-noten>
               {uitkomst.noten.map((n) => <li key={`${n.kanaal}|${n.tekst}`}>{n.tekst}</li>)}
             </ul>
           )}
+          <div className="mt-1">
+            <Uitklap id="na-de-klik-waarom" vorm="regel" label="Waarom niet opgeteld?" labelOpen="Verberg de uitleg">
+              <p className="pb-1 text-micro text-muted-foreground">{NIET_OPTELLEN}</p>
+            </Uitklap>
+          </div>
         </>
       )}
     </section>

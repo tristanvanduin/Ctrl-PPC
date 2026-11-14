@@ -1,7 +1,7 @@
 "use client";
 
 import { ListOrdered } from "lucide-react";
-import { useRememberedOpen, RegioToggle, Lade, MeerKnop, useTruncatedList } from "@/components/ui/disclosure";
+import { useRememberedOpen, RegioToggle, Lade, MeerKnopPerBreedte, useTruncatedList } from "@/components/ui/disclosure";
 import { Tabel, Kop, KolomKop, Body, Rij, NaamCel, GetalCel, TotaalRij, TotaalCel } from "./data-table";
 import { GeoRanglijst } from "./geo-ranglijst";
 import { int, eur, pct, nf, type GeoBreakdownState } from "@/lib/geo/use-geo-breakdown";
@@ -37,6 +37,13 @@ function veranderingVan(state: GeoBreakdownState, code: string): { verandering?:
  */
 /** Hoeveel regio's de ranglijst naast de kaart toont voor "toon meer" (de nieuwe weergave). */
 export const GEO_NAAST_ZICHTBAAR = 6;
+/**
+ * Op een telefoon (onder lg) staan er drie. Daar staat de ranglijst ONDER de projectie, over de
+ * volle breedte, en elke regel is een naam met een balk: zes regels waren een half scherm onder een
+ * kaart die zelf al een half scherm is. De vierde tot en met de zesde staan in de boom (verborgen
+ * onder lg), de rest achter dezelfde knop, en alle landen met alle cijfers in "Toon als tabel".
+ */
+export const GEO_NAAST_ZICHTBAAR_SMAL = 3;
 
 export function GeoRanglijstInKaart({ state, naast = false }: {
   state: GeoBreakdownState;
@@ -60,9 +67,17 @@ export function GeoRanglijstInKaart({ state, naast = false }: {
           metriekLabel={metric.label}
           klikbaar={(code) => canDrillUs && code === "US" && focus == null}
           onKlik={() => setFocus("US")}
+          smalTot={naast && !lijst.uitgeklapt ? GEO_NAAST_ZICHTBAAR_SMAL : undefined}
         />
       </div>
-      <MeerKnop verborgen={lijst.verborgen} uitgeklapt={lijst.uitgeklapt} onToggle={lijst.toggle} eenheid={focus === "US" ? "staten" : "landen"} ruim />
+      <MeerKnopPerBreedte
+        totaal={ranked.length}
+        smal={naast ? GEO_NAAST_ZICHTBAAR_SMAL : Number.MAX_SAFE_INTEGER}
+        breed={naast ? GEO_NAAST_ZICHTBAAR : Number.MAX_SAFE_INTEGER}
+        uitgeklapt={lijst.uitgeklapt}
+        onToggle={lijst.toggle}
+        eenheid={focus === "US" ? "staten" : "landen"}
+      />
     </>
   );
 }

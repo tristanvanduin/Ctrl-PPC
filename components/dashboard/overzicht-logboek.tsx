@@ -34,11 +34,18 @@ import { useLogboek } from "@/lib/overzicht/use-logboek";
 import { useVorigBezoek } from "@/lib/overzicht/use-vorig-bezoek";
 import { useMinuutklok } from "@/lib/overzicht/use-minuutklok";
 import { Vensterlabel } from "@/components/ui/vensterlabel";
-import { MeerKnop, useTruncatedList } from "@/components/ui/disclosure";
+import { MeerKnopPerBreedte, useTruncatedList } from "@/components/ui/disclosure";
 import { KANAAL_GLYPH } from "./kanaalkaarten";
 
 /** Hoeveel regels er staan voor "toon meer": wat naast de grafiek past. */
 export const LOGBOEK_ZICHTBAAR = 4;
+/**
+ * Op een telefoon (onder lg) staan er drie. Daar staat het logboek over de volle breedte BOVEN de
+ * grafiek, zonder eigen schuifvak, en elke regel is er twee regels tekst plus een chip hoog: de
+ * vierde duwde de grafiek een scherm omlaag. De vierde regel staat er wel (in de boom, verborgen
+ * onder lg), zodat het aantal achter "toon meer" per breedte klopt zonder te meten.
+ */
+export const LOGBOEK_ZICHTBAAR_SMAL = 3;
 
 const SOORT_ICOON: Record<LogboekSoort, ReactNode> = {
   "code-rood": <AlertOctagon className="h-3.5 w-3.5" aria-hidden />,
@@ -68,8 +75,10 @@ const TOON_CHIP: Record<LogboekToon, string> = {
 // kaart is juist op een breed scherm smal (vier van de twaalf kolommen naast de grafiek).
 const kaart = "@container relative flex flex-col rounded-xl border border-border bg-card px-1.5 pb-2 pt-3 shadow-sm lg:min-h-[19rem]";
 
-function Rij({ item, nieuw, open, onWissel, nu, bekijkKanaal, onBeoordeel }: {
+function Rij({ item, nieuw, open, onWissel, nu, bekijkKanaal, onBeoordeel, smalVerborgen = false }: {
   item: LogboekItem;
+  /** Deze regel valt op een telefoon achter "toon meer" (LOGBOEK_ZICHTBAAR_SMAL). */
+  smalVerborgen?: boolean;
   nieuw: boolean;
   open: boolean;
   onWissel: () => void;
@@ -81,7 +90,7 @@ function Rij({ item, nieuw, open, onWissel, nu, bekijkKanaal, onBeoordeel }: {
   const paneel = `logboek-${item.id.replace(/[^a-zA-Z0-9_-]/g, "-")}`;
   const kleur = item.kanaal ? KANAAL_KLEUR[item.kanaal] : null;
   return (
-    <li className="border-t border-border/60" data-logboek-soort={item.soort} data-nieuw={nieuw ? "ja" : undefined}>
+    <li className={`border-t border-border/60${smalVerborgen ? " max-lg:hidden" : ""}`} data-logboek-soort={item.soort} data-nieuw={nieuw ? "ja" : undefined}>
       <button
         type="button"
         aria-expanded={open}
@@ -271,9 +280,10 @@ export function LogboekKaart({ logboek, laadt, fout, channel, kanalen, ijkpunt, 
         // pagina een val voor de duim. Daar groeit de kaart mee met wat je openklapt.
         <div className={`relative min-h-0 lg:overflow-y-auto ${lijst.uitgeklapt ? "lg:max-h-[28rem]" : "lg:max-h-[13.5rem]"}`}>
           <ul className="flex flex-col">
-            {lijst.zichtbaar.map((item) => (
+            {lijst.zichtbaar.map((item, i) => (
               <Rij
                 key={item.id}
+                smalVerborgen={!lijst.uitgeklapt && i >= LOGBOEK_ZICHTBAAR_SMAL}
                 item={item}
                 nieuw={isNieuwSinds(item.tijd, ijkpunt)}
                 open={open === item.id}
@@ -289,7 +299,7 @@ export function LogboekKaart({ logboek, laadt, fout, channel, kanalen, ijkpunt, 
       {/* Buiten het schuifvak: vier regels vullen het vak al, en een knop onder de vouw daarvan
           ziet alleen wie in het vak schuift. Hier staat altijd in beeld dat er meer is. */}
       {items.length > 0 && (
-        <MeerKnop verborgen={lijst.verborgen} uitgeklapt={lijst.uitgeklapt} onToggle={lijst.toggle} eenheid="regels" ruim />
+        <MeerKnopPerBreedte totaal={items.length} smal={LOGBOEK_ZICHTBAAR_SMAL} breed={LOGBOEK_ZICHTBAAR} uitgeklapt={lijst.uitgeklapt} onToggle={lijst.toggle} />
       )}
       <div className="mt-auto flex flex-wrap items-center gap-x-2 gap-y-1 border-t border-border/60 px-2 pt-2 text-meta text-muted-foreground">
         <button type="button" onClick={onBeoordeel} className="inline-flex min-h-11 items-center gap-1 font-medium text-brand-blue-ink hover:underline sm:min-h-6 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-blue-ink">
