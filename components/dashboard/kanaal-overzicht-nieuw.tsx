@@ -153,6 +153,7 @@ export function KanaalOverzichtNieuw({ clientId, kanaal, geoClone, edition, kop,
       >
         <CollapsiblePanel
           id="kanaal-nieuw-maandverloop"
+          compact
           title="Maandverloop als eigen grafiek"
           subtitle="dezelfde maanden als de grafiek bovenaan"
           icon={<TrendingUp className="w-4 h-4 text-brand-blue-ink" aria-hidden />}
@@ -163,6 +164,7 @@ export function KanaalOverzichtNieuw({ clientId, kanaal, geoClone, edition, kop,
         </CollapsiblePanel>
         <CollapsiblePanel
           id="kanaal-nieuw-maandprestaties"
+          compact
           title="Maandprestaties"
           subtitle="kerncijfers over 28 dagen, en de maanden van de gekozen periode als tabel"
           icon={<Calendar className="w-4 h-4 text-brand-blue-ink" aria-hidden />}
@@ -182,6 +184,7 @@ export function KanaalOverzichtNieuw({ clientId, kanaal, geoClone, edition, kop,
         {video && kanaal !== "microsoft" && (
           <CollapsiblePanel
             id="kanaal-nieuw-video"
+            compact
             title="Waar het budget landt"
             subtitle="video"
             icon={<LayoutGrid className="w-4 h-4 text-brand-blue-ink" aria-hidden />}
@@ -195,6 +198,7 @@ export function KanaalOverzichtNieuw({ clientId, kanaal, geoClone, edition, kop,
         {!geoClone && (
           <CollapsiblePanel
             id="kanaal-nieuw-over"
+            compact
             title="Over dit tabblad"
             subtitle="de koppeling, wat dit kanaal levert en waar de analyses staan"
             icon={<Info className="w-4 h-4 text-brand-blue-ink" aria-hidden />}

@@ -254,6 +254,7 @@ function GoogleViewRuw({
         >
           <CollapsiblePanel
             id="google-nieuw-verloop"
+            compact
             title={countryFilter ? `CPA en conversies per maand — ${countryLabel(countryFilter)}` : "CPA en conversies per maand"}
             subtitle="als twee eigen grafieken; de grafiek bovenaan toont ze samen"
             icon={<TrendingUp className="w-4 h-4 text-brand-blue-ink" aria-hidden />}
@@ -269,6 +270,7 @@ function GoogleViewRuw({
           </CollapsiblePanel>
           <CollapsiblePanel
             id="google-nieuw-video"
+            compact
             title="Waar het budget landt"
             subtitle="video en placements"
             icon={<LayoutGrid className="w-4 h-4 text-brand-blue-ink" aria-hidden />}
@@ -283,6 +285,7 @@ function GoogleViewRuw({
           </CollapsiblePanel>
           <CollapsiblePanel
             id="kanaal-nieuw-over"
+            compact
             title="Over dit tabblad"
             subtitle="de koppeling, wat dit kanaal levert en waar de analyses staan"
             icon={<Info className="w-4 h-4 text-brand-blue-ink" aria-hidden />}

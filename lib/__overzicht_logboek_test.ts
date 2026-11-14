@@ -249,7 +249,11 @@ async function main() {
       { id: "cr-oud-open", client_id: K, licht: "rood", redenen: ["al maanden open"], gedetecteerd_op: "2026-06-01T08:00:00Z", status: "open" },
       ...Array.from({ length: 12 }, (_, i) => ({ id: `cr-af-${i}`, client_id: K, licht: "amber", redenen: ["afgehandeld"], gedetecteerd_op: dagenTerug(i + 2), status: "opgelost" })),
     ]);
-    sb.seed("generation_jobs", [{ job_id: "j1", client_id: K, job_type: "monthly_sop", status: "completed", channel: "google", completed_at: dagenTerug(2), updated_at: dagenTerug(2) }]);
+    sb.seed("generation_jobs", [
+      { job_id: "j1", client_id: K, job_type: "monthly_sop", status: "completed", channel: "google", completed_at: dagenTerug(2), updated_at: dagenTerug(2) },
+      // Een run van augustus die vandaag achteraf is afgesloten: de trigger zette updated_at op nu.
+      { job_id: "j-oud", client_id: K, job_type: "monthly_sop", status: "failed", channel: "meta", completed_at: "2026-08-19T13:44:00Z", updated_at: dagenTerug(0), error_message: "Vastgelopen" },
+    ]);
     sb.seed("sprint_hypotheses", [
       { id: "v1", client_id: K, hypothesis: "Budget naar brand", status: "pending", ice_total: 7.7, source: "analysis", created_at: dagenTerug(2) },
       { id: "v-oud", client_id: K, hypothesis: "Al maanden open", status: "pending", created_at: "2026-07-01T08:00:00Z" },
@@ -260,6 +264,7 @@ async function main() {
 
     const log = await leesLogboek(sb as unknown as SupabaseClient, K, { nu: NU });
     const ids = log.items.map((i) => i.id);
+    check("een oude run die vandaag gewijzigd is, staat er niet als nieuw (completed_at telt, niet updated_at)", !ids.includes("analyse:j-oud"), ids.join(","));
     check("alle soorten uit één aanroep", ["code-rood:cr1", "sync:google:g0", "datastand:meta:m0", "analyse:j1", "voorstel:v1", "hypothese:h1", "todo:n1"].every((id) => ids.includes(id)), ids.join(","));
     check("de nieuwste eerst", log.items.every((i, n) => n === 0 || Date.parse(log.items[n - 1].tijd) >= Date.parse(i.tijd)));
     check("een oude open Code Rood blijft staan, ook met twaalf nieuwere afgehandelde erna", ids.includes("code-rood:cr-oud-open"), ids.filter((i) => i.startsWith("code-rood")).join(","));

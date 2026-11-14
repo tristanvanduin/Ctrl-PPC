@@ -258,7 +258,16 @@ export interface TrechterStap {
   /** De verandering tegen de vergelijkingsperiode, in procenten; null zonder paar of zonder basis. */
   pct: number | null;
   /** De kosten per eenheid van deze stap: per 1.000 vertoningen, per klik, per conversie. */
-  kosten: { label: string; waarde: number | null; pct: number | null };
+  kosten: {
+    label: string;
+    waarde: number | null;
+    pct: number | null;
+    /**
+     * De kosten per eenheid over het paar in de vergelijkingsperiode; null zonder paar of als ze toen
+     * niet te berekenen waren. Zo is "nu niet te berekenen, toen wel" te herkennen.
+     */
+    vorig?: number | null;
+  };
 }
 
 export interface TrechterOvergang {
@@ -329,6 +338,7 @@ export function trechter(getoond: KanaalStand, paar: KanaalPaar | null): Trechte
       label: kostenLabel,
       waarde: nu.kosten[i],
       pct: pn && pt ? pctTussen(pn.kosten[i], pt.kosten[i]) : null,
+      vorig: pt ? pt.kosten[i] : null,
     },
   })) as Trechter["stappen"];
 

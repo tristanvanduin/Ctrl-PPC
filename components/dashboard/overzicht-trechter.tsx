@@ -25,6 +25,7 @@ import {
 } from "@/lib/overzicht/trechter";
 import { KANAAL_GLYPH } from "./kanaalkaarten";
 import { Uitklap } from "@/components/ui/disclosure";
+import { CPA_MOVE_MATERIAL } from "@/lib/analysis/kpi-relations";
 
 const AANTAL = new Intl.NumberFormat("nl-NL", { maximumFractionDigits: 0 });
 const EURO_HEEL = new Intl.NumberFormat("nl-NL", { style: "currency", currency: "EUR", maximumFractionDigits: 0 });
@@ -69,10 +70,12 @@ export function StatusRegel({ tekst }: { tekst: string | null }) {
 
 // ── 2 WAAR ZIT HET, op Alle kanalen ─────────────────────────────────────────────────────────────
 
-function Aandeelbalk({ label, pct, kleur }: { label: string; pct: number | null; kleur: string }) {
+function Aandeelbalk({ label, kort, pct, kleur }: { label: string; kort: string; pct: number | null; kleur: string }) {
   return (
-    <div className="grid grid-cols-[6.5rem_minmax(0,1fr)_2.75rem] items-center gap-2 text-meta">
-      <span className="text-muted-foreground">{label}</span>
+    // Op een telefoon staan de twee balken NAAST elkaar (halve breedte, kort label: "kosten",
+    // "conversies"); vanaf sm onder elkaar met het label voluit, zoals voorheen.
+    <div className="grid grid-cols-[auto_minmax(0,1fr)_2.25rem] items-center gap-1.5 text-micro sm:grid-cols-[6.5rem_minmax(0,1fr)_2.75rem] sm:gap-2 sm:text-meta">
+      <span className="text-muted-foreground"><span className="sm:hidden">{kort}</span><span className="hidden sm:inline">{label}</span></span>
       <span className="h-2 overflow-hidden rounded-full bg-muted/60" aria-hidden>
         <span className="block h-full rounded-full"
           style={{ width: `${pct ?? 0}%`, background: kleur, transition: "width var(--duur-middel, 200ms) var(--ease-aankomst, ease-out)" }} />
@@ -95,7 +98,10 @@ function BijdrageRegel({ rij }: { rij: BijdrageRij }) {
     : p ? "CPA in een van beide periodes niet te berekenen" : rij.uitleg;
   return (
     <li data-bijdrage={rij.kanaal} data-kenmerk={rij.kenmerk ?? undefined}
-      className={`rounded-lg border px-3 py-2 sm:py-2.5 ${rij.kenmerk === "duur" ? "border-brand-gray/40" : "border-border/70"}`}>
+      // Op een telefoon een rij in een lijst (een lijn eronder) in plaats van een kaartje met rand en
+      // opvulling: vier kaartjes onder elkaar kostten daar meer dan een scherm. Het kenmerk staat er
+      // in woorden, dus de donkerdere rand van "duur" draagt niets alleen.
+      className={`border-b py-2 last:border-b-0 sm:rounded-lg sm:border sm:px-3 sm:py-2.5 sm:last:border-b ${rij.kenmerk === "duur" ? "sm:border-brand-gray/40" : "sm:border-border/70"} border-border/70`}>
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
         <span aria-hidden className="flex h-6 w-6 items-center justify-center rounded-md text-micro font-bold"
           style={{ color: kleur, background: `color-mix(in srgb, ${kleur} 14%, transparent)` }}>{KANAAL_GLYPH[rij.kanaal]}</span>
@@ -110,11 +116,11 @@ function BijdrageRegel({ rij }: { rij: BijdrageRij }) {
         )}
         <span className="ml-auto text-meta tabular-nums text-brand-gray"><TelTekst tekst={cpaTekst} /></span>
       </div>
-      <div className="mt-1.5 space-y-0.5 sm:mt-2 sm:space-y-1">
-        <Aandeelbalk label="van de kosten" pct={rij.aandeelKosten} kleur="var(--color-brand-gray, #4b5563)" />
-        <Aandeelbalk label="van de conversies" pct={rij.aandeelConversies} kleur={kleur} />
+      <div className="mt-1 grid grid-cols-2 gap-x-3 sm:mt-2 sm:grid-cols-1 sm:gap-y-1">
+        <Aandeelbalk label="van de kosten" kort="kosten" pct={rij.aandeelKosten} kleur="var(--color-brand-gray, #4b5563)" />
+        <Aandeelbalk label="van de conversies" kort="conversies" pct={rij.aandeelConversies} kleur={kleur} />
       </div>
-      {vergelijking && <p className="mt-1 text-micro text-muted-foreground sm:mt-1.5">CPA: {vergelijking}</p>}
+      {vergelijking && <p className="mt-0.5 text-micro text-muted-foreground sm:mt-1.5">CPA: {vergelijking}</p>}
     </li>
   );
 }
@@ -136,7 +142,7 @@ export function BijdragePerKanaal({ rijen, venster }: { rijen: readonly Bijdrage
         <div className="h-24 rounded-lg bg-muted/40" aria-hidden />
       ) : (
         <>
-          <ul className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+          <ul className="grid sm:grid-cols-2 sm:gap-2 xl:grid-cols-4">
             {rijen.map((r) => <BijdrageRegel key={r.kanaal} rij={r} />)}
           </ul>
           {/* De uitleg achter een "waarom": hij is voor elke klant en elke periode dezelfde, en op een
@@ -162,30 +168,59 @@ function veranderingTekst(pct: number | null): string | null {
   return pct === null ? null : procentTekst(pct);
 }
 
+/** De kostenregel van een stap: "€ 0,42 per klik, +6%", of dat hij niet te berekenen is. */
+function kostenRegel(stap: TrechterStap, bedrag: string): string {
+  const kostenDelta = veranderingTekst(stap.kosten.pct);
+  return stap.kosten.waarde === null
+    ? `kosten ${stap.kosten.label} niet te berekenen`
+    : `${bedrag} ${stap.kosten.label}${kostenDelta ? `, ${kostenDelta}` : ""}`;
+}
+
+/**
+ * Vanaf hoeveel procent stijging van de kosten per stap dat een afwijking is: dan staan de
+ * kostenregels op een telefoon open in plaats van achter de knop. Hogere kosten per vertoning, klik of
+ * conversie is in elke stap de ongunstige kant; een kleine schommeling is dat niet.
+ *
+ * GEEN EIGEN GETAL. Dit is de grens die de analyses al voor een materiele CPA-beweging gebruiken
+ * (CPA_MOVE_MATERIAL, 0,15 in lib/analysis/kpi-relations.ts), in procenten, omdat `kosten.pct` in
+ * procenten staat (delta in lib/period/apply-period.ts). Wat de analyses een beweging noemen, staat
+ * hier dus open; een tweede, losse drempel zou het dashboard laten zwijgen over wat een analyse wel
+ * aankaart. Dezelfde grens voor de kosten per 1.000 vertoningen en per klik: dat zijn de stappen
+ * waaruit de CPA is opgebouwd.
+ */
+export const KOSTEN_STIJGING_AFWIJKEND_VANAF = CPA_MOVE_MATERIAL * 100;
+
+/**
+ * Of de kosten van een stap afwijken: duurder geworden vanaf de grens, of NU niet te berekenen
+ * terwijl dat in de vergelijkingsperiode wel kon (geen klikken of conversies meer, een meting die
+ * stopte). Dan blijven de kosten op een telefoon open.
+ */
+export function kostenWijkenAf(t: Trechter): boolean {
+  return t.stappen.some((s) =>
+    (s.kosten.pct !== null && s.kosten.pct >= KOSTEN_STIJGING_AFWIJKEND_VANAF)
+    || (s.kosten.waarde === null && s.kosten.vorig != null));
+}
+
 function StapRegel({ stap, breedte, kleur }: { stap: TrechterStap; breedte: number; kleur: string }) {
   const waarde = useTellendeTekst(stap.waarde === null ? "niet bekend" : AANTAL.format(stap.waarde), DUUR.middel);
   const kostenTekst = useTellendeTekst(kosten(stap.kosten.waarde), DUUR.middel);
   const delta = veranderingTekst(stap.pct);
-  const kostenDelta = veranderingTekst(stap.kosten.pct);
   return (
-    // Op een telefoon het label en het getal op één regel en de balk eronder over de volle breedte;
-    // vanaf een tablet label, balk en getal naast elkaar.
-    <div data-trechterstap={stap.sleutel} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1 sm:grid-cols-[7rem_minmax(0,1fr)_minmax(9rem,auto)]">
+    // Op een telefoon label, getal en verandering op één regel en een dunne balk eronder over de
+    // volle breedte; de kosten per stap staan daar onder de trechter achter een knop (KostenPerStap).
+    // Vanaf een tablet label, balk en getal naast elkaar met de kosten erbij, zoals voorheen.
+    <div data-trechterstap={stap.sleutel} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-0.5 sm:grid-cols-[7rem_minmax(0,1fr)_minmax(9rem,auto)] sm:gap-y-1">
       <span className="text-meta font-medium text-brand-gray">{stap.label}</span>
-      <span className="col-span-2 row-start-2 h-6 overflow-hidden rounded-md bg-muted/50 sm:col-span-1 sm:row-start-auto" aria-hidden>
+      <span className="col-span-2 row-start-2 h-2 overflow-hidden rounded-md bg-muted/50 sm:col-span-1 sm:row-start-auto sm:h-6" aria-hidden>
         <span className="block h-full rounded-md"
           style={{ width: `${breedte}%`, background: kleur, transition: "width var(--duur-middel, 200ms) var(--ease-aankomst, ease-out)" }} />
       </span>
       <span className="text-right leading-tight">
         {/* Elke verandering staat bij het getal waar hij over gaat: die van het aantal direct onder het
             aantal, die van de kosten achter de kosten. */}
-        <span className="block text-lg font-semibold tabular-nums text-brand-gray">{waarde}</span>
-        {delta && <span className="block text-micro tabular-nums text-muted-foreground">aantal {delta}</span>}
-        <span className="block text-micro tabular-nums text-muted-foreground">
-          {stap.kosten.waarde === null
-            ? `kosten ${stap.kosten.label} niet te berekenen`
-            : `${kostenTekst} ${stap.kosten.label}${kostenDelta ? `, ${kostenDelta}` : ""}`}
-        </span>
+        <span className="text-lg font-semibold tabular-nums text-brand-gray sm:block">{waarde}</span>
+        {delta && <span className="ml-1.5 text-micro tabular-nums text-muted-foreground sm:ml-0 sm:block">aantal {delta}</span>}
+        <span className="hidden text-micro tabular-nums text-muted-foreground sm:block">{kostenRegel(stap, kostenTekst)}</span>
       </span>
     </div>
   );
@@ -194,11 +229,30 @@ function StapRegel({ stap, breedte, kleur }: { stap: TrechterStap; breedte: numb
 function Overgang({ label, waarde, vorig }: { label: string; waarde: number | null; vorig: number | null }) {
   const tekst = useTellendeTekst(verhouding(waarde), DUUR.middel);
   return (
-    <p className="flex items-center gap-1.5 pl-1 text-micro text-muted-foreground sm:pl-[7.75rem]">
+    <p className="flex items-center gap-1.5 pl-1 text-micro leading-tight text-muted-foreground sm:pl-[7.75rem] sm:leading-normal">
       <ArrowRight className="h-3 w-3 rotate-90" aria-hidden />
       <span>{label} <span className="font-medium tabular-nums text-brand-gray">{tekst}</span>
         {vorig !== null && waarde !== null ? ` (was ${verhouding(vorig)})` : ""}</span>
     </p>
+  );
+}
+
+/**
+ * De kosten per stap op een telefoon: achter een knop onder de trechter, en OPEN als een stap
+ * duurder werd dan KOSTEN_STIJGING_AFWIJKEND_VANAF. Vanaf sm staat dit blok er niet (de kosten staan
+ * dan bij elk getal) en dus ook de knop niet. In de pagina, met `hidden`, zoals elke Uitklap.
+ */
+function KostenPerStap({ kanaal, trechter }: { kanaal: Kanaal; trechter: Trechter }) {
+  return (
+    <div className="-mx-4 mt-1 sm:hidden" data-trechter-kosten>
+      <Uitklap id={`trechter-kosten-${kanaal}`} label="Toon de kosten per stap" labelOpen="Verberg de kosten per stap" afwijkend={kostenWijkenAf(trechter)}>
+        <ul className="space-y-0.5 px-4 pb-1 pt-1 text-micro tabular-nums text-muted-foreground">
+          {trechter.stappen.map((s) => (
+            <li key={s.sleutel}><span className="font-medium text-brand-gray">{s.label}:</span> {kostenRegel(s, kosten(s.kosten.waarde))}</li>
+          ))}
+        </ul>
+      </Uitklap>
+    </div>
   );
 }
 
@@ -235,7 +289,7 @@ export function KanaalTrechter({ kanaal, trechter, uitleg, venster, children }: 
         <p data-trechter-niet-gelopen className="text-body text-muted-foreground">{trechter.nietGelopen}</p>
       ) : (
         <>
-          <div className="space-y-1.5" aria-hidden>
+          <div className="space-y-1 sm:space-y-1.5" aria-hidden>
             <StapRegel stap={trechter.stappen[0]} breedte={breedtes[0]} kleur={kleur} />
             <Overgang {...trechter.overgangen[0]} />
             <StapRegel stap={trechter.stappen[1]} breedte={breedtes[1]} kleur={kleur} />
@@ -270,6 +324,7 @@ export function KanaalTrechter({ kanaal, trechter, uitleg, venster, children }: 
             </tbody>
           </table>
           </div>
+          <KostenPerStap kanaal={kanaal} trechter={trechter} />
           {(trechter.vergelijking === "deel" || uitleg || trechter.opmerkingen.length > 0) && (
             <div className="mt-2 space-y-1 text-micro text-muted-foreground">
               {trechter.vergelijking === "deel" && trechter.over && <p>De veranderingen gaan over {trechter.over}: alleen wat in beide periodes liep.</p>}

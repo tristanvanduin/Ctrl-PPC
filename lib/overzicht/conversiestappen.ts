@@ -542,6 +542,13 @@ export interface Keten {
   rijen: KetenRij[];
   /** De stappen die eruit vallen, met de reden ("Product bekeken: ..."). */
   weg: string[];
+  /**
+   * De stappen uit `weg` die in de vergelijkingsperiode WEL een waarde hadden, met die waarde. Dat
+   * is een afwijking (een meting die stopte, kapotte tracking): de lijst met redenen staat dan open.
+   * Gelezen uit de vergelijkingsperiode zoals die binnenkwam, ook als de verandering zelf niet
+   * eerlijk te tonen is (`geenVergelijking`): dat een stap toen data had en nu niet, blijft waar.
+   */
+  wegAfwijkend: { naam: string; toen: number }[];
   opmerkingen: string[];
   /** True als er geen enkele stap na de klik data heeft. */
   leeg: boolean;
@@ -598,10 +605,16 @@ export function ketenNaDeKlik(nu: KanaalStappen, vergelijk: KanaalStappen | null
   }
   if (nu.noot) opmerkingen.push(nu.noot);
   if (geenVergelijking) opmerkingen.push(geenVergelijking);
+  const zonderData = nu.stappen.filter((s) => s.waarde === null);
+  const wegAfwijkend = zonderData.flatMap((s) => {
+    const t = vergelijk?.stappen.find((v) => v.naam === s.naam)?.waarde ?? null;
+    return t === null ? [] : [{ naam: s.naam, toen: t }];
+  });
   return {
     kanaal: nu.kanaal,
     rijen,
-    weg: nu.stappen.filter((s) => s.waarde === null).map((s) => `${s.naam}: ${s.reden ?? "geen data."}`),
+    weg: zonderData.map((s) => `${s.naam}: ${s.reden ?? "geen data."}`),
+    wegAfwijkend,
     opmerkingen: [...new Set(opmerkingen)],
     leeg: metData.length === 0,
     fijnheid: nu.fijnheid,

@@ -38,7 +38,13 @@ import { Vensterlabel } from "@/components/ui/vensterlabel";
 export const RINGCEL = {
   vertrouwd: "flex flex-wrap items-center justify-center gap-3",
   stapelSmal: "flex min-w-0 flex-col items-center justify-center gap-3 text-center @lg:flex-row @lg:text-left",
+  /** Samengevat (de nieuwe weergave, `samenvatten`): een kleine ring NAAST zijn tekst, ook op een
+   *  telefoon. Ring boven tekst kostte daar per kaart een ring van 88 px plus drie regels eronder. */
+  samengevat: "flex min-w-0 items-center gap-2.5 text-left",
 } as const;
+
+/** De maat van de ring en zijn cijfer in een samengevatte pacingkaart (zie RINGCEL.samengevat). */
+export const RING_SAMENGEVAT = { maat: 60, cijfer: "text-base" } as const;
 
 export function ChannelPacing({ edition, stapelSmal = false, samenvatten = false }: {
   edition?: UpcomingEdition | null;
@@ -52,7 +58,7 @@ export function ChannelPacing({ edition, stapelSmal = false, samenvatten = false
    */
   samenvatten?: boolean;
 }) {
-  const ringcel = stapelSmal ? RINGCEL.stapelSmal : RINGCEL.vertrouwd;
+  const ringcel = samenvatten ? RINGCEL.samengevat : stapelSmal ? RINGCEL.stapelSmal : RINGCEL.vertrouwd;
   const { rijen, convVan, convLabel, fout } = useKanaalData();
 
   // Ook zonder recente dagen rekenen: de ratio's zijn dan null en de kaart zegt "Geen vorige
@@ -97,8 +103,8 @@ export function ChannelPacing({ edition, stapelSmal = false, samenvatten = false
   const convEindeMaand = convPerDag * dagenInMaand;
 
   const pctVan = (ratio: number | null) => (ratio == null ? 0 : Math.round(ratio * 100));
-  const ringMaat = samenvatten ? 88 : undefined;
-  const ringCijfer = samenvatten ? "text-xl" : "text-figure";
+  const ringMaat = samenvatten ? RING_SAMENGEVAT.maat : undefined;
+  const ringCijfer = samenvatten ? RING_SAMENGEVAT.cijfer : "text-figure";
 
   return (
     // Zelfde opbouw als pacing-monitor.tsx: `flex h-full flex-col` met het blokkenraster als
@@ -218,7 +224,7 @@ export function ChannelPacing({ edition, stapelSmal = false, samenvatten = false
       // de knop loopt van rand tot rand, zoals de andere uitklapdelen.
       return (
         <>
-          <div className="grid grid-cols-2 items-start gap-4">{ringen}</div>
+          <div className="grid grid-cols-2 items-start gap-3">{ringen}</div>
           <div className="-mx-5 -mb-5 mt-4">
             <Uitklap id="pacing-kanaal-tempo" label="Toon tempo per dag en eindstand van de maand" labelOpen="Verberg tempo en eindstand">
               <div className="px-5 pb-5 pt-3">

@@ -49,6 +49,7 @@ export function CollapsiblePanel({
   defaultOpen = true,
   naadloos = false,
   standVanNu = false,
+  compact = false,
   children,
 }: {
   /** Stabiele sleutel voor het onthouden van open/dicht. Verander hem niet zonder reden. */
@@ -71,6 +72,14 @@ export function CollapsiblePanel({
    * bovenaan, zodat het als een volgend blok van dezelfde kaart leest.
    */
   naadloos?: boolean;
+  /**
+   * Een kop die op een telefoon niet in de hoogte groeit (het Overzicht in de nieuwe weergave,
+   * "Detail op aanvraag"). De gewone kop zet titel, ondertitel en vensterlabel op één rij die niet
+   * afbreekt; op 390 px kreeg elk een smalle kolom en werd de kop vijf, zes regels hoog. Compact staat
+   * de titel met de ondertitel erachter over de volle breedte en het vensterlabel eronder; dezelfde
+   * tekst, dezelfde knop. Zonder deze prop is de kop zoals hij altijd was.
+   */
+  compact?: boolean;
 }) {
   // Server en eerste client-render moeten hetzelfde opleveren, dus de opgeslagen keuze wordt
   // pas ná het monteren toegepast. Zou dat in de initializer staan, dan hydrateert React op een
@@ -94,6 +103,25 @@ export function CollapsiblePanel({
     // data-paneel: de meting (scripts/meet-overzicht.mjs) ziet zo dat een dicht paneel geen cijfers
     // toont, en telt het dan niet als een blok dat bij een periodewissel had moeten veranderen.
     <div data-paneel={open ? "open" : "dicht"} data-venster={standVanNu ? "stand" : undefined} className={naadloos ? "border-t border-border" : "bg-card rounded-xl border border-border shadow-sm overflow-hidden"}>
+      {compact ? (
+        <button
+          type="button"
+          onClick={toggle}
+          aria-expanded={open}
+          aria-controls={open ? paneelId : undefined}
+          className="flex min-h-11 w-full items-start gap-2 px-4 py-2.5 text-left transition-colors hover:bg-gray-50/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-blue sm:px-5 sm:py-3"
+        >
+          {icon && <span className="mt-0.5 shrink-0">{icon}</span>}
+          <span className="min-w-0 flex-1">
+            <span className="flex flex-wrap items-baseline gap-x-2">
+              <h3 className="text-title font-semibold text-brand-gray">{title}</h3>
+              {subtitle && <span className="text-micro text-muted-foreground sm:text-meta">{subtitle}</span>}
+            </span>
+            {meta && <span className="mt-0.5 flex flex-wrap items-center gap-2">{meta}</span>}
+          </span>
+          <ChevronDown className={`mt-1 h-4 w-4 shrink-0 text-muted-foreground transition-transform motion-reduce:transition-none ${open ? "rotate-180" : ""}`} aria-hidden />
+        </button>
+      ) : (
       <button
         type="button"
         onClick={toggle}
@@ -111,6 +139,7 @@ export function CollapsiblePanel({
           <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform ${open ? "rotate-180" : ""}`} />
         </span>
       </button>
+      )}
       {open && <div id={paneelId} className="border-t border-border">{children}</div>}
     </div>
   );

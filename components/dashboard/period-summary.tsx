@@ -402,7 +402,7 @@ export function bandInhoud({ data, compact, bronnen, vorm = "band" }: Pick<Props
             // geen rand van de tegel: een rand loopt door tot in de ronde hoek van de kaart en
             // steekt daar uit, en zo staan de cijfers met en zonder nadruk op dezelfde lijn.
             <div key={t.label} data-nadruk={i === nadruk || undefined}
-              className="relative px-3 pb-3 pt-3 lg:border-l lg:border-l-border/60 lg:px-4 lg:first:border-l-0">
+              className="relative px-3 pb-2 pt-2.5 sm:pb-3 sm:pt-3 lg:border-l lg:border-l-border/60 lg:px-4 lg:first:border-l-0">
               {i === nadruk && <span aria-hidden className="absolute inset-x-3 top-0 h-0.5 rounded-b-full bg-brand-gray lg:inset-x-4" />}
               <Kerncijfer
                 label={t.label}

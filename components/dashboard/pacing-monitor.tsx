@@ -11,7 +11,7 @@ import { today } from "@/lib/reporting-date";
 import { berekenLanding, seizoensduiding } from "@/lib/pacing/landing";
 import { jaardoelTekst, metToelichting } from "@/lib/analysis/standaard-jaardoel";
 import { Vensterlabel } from "@/components/ui/vensterlabel";
-import { RINGCEL } from "./channel-pacing";
+import { RINGCEL, RING_SAMENGEVAT } from "./channel-pacing";
 import { Uitklap } from "@/components/ui/disclosure";
 
 function fmt(v: number): string {
@@ -280,12 +280,13 @@ export function PacingMonitorView({ data, edition, stapelSmal = false, samenvatt
           met een vaste zes-koloms grid en maar vijf blokken bleef de laatste kolom leeg -- geen
           witruimte maar een gat, precies waar de eigen comment hierboven al voor waarschuwt. */}
       {(() => {
-      const ringMaat = samenvatten ? 88 : undefined;
-      const ringCijfer = samenvatten ? "text-xl" : "text-figure";
+      const ringMaat = samenvatten ? RING_SAMENGEVAT.maat : undefined;
+      const ringCijfer = samenvatten ? RING_SAMENGEVAT.cijfer : "text-figure";
+      const ringcel = samenvatten ? RINGCEL.samengevat : stapelSmal ? RINGCEL.stapelSmal : RINGCEL.vertrouwd;
       const ringen = (
         <>
         {/* Conversions pacing */}
-        <div className={stapelSmal ? RINGCEL.stapelSmal : RINGCEL.vertrouwd}>
+        <div className={ringcel}>
           <div className="relative">
             <PacingRing pct={convPacingPct} color={convColor} size={ringMaat} />
             <div className="absolute inset-0 flex items-center justify-center">
@@ -302,7 +303,7 @@ export function PacingMonitorView({ data, edition, stapelSmal = false, samenvatt
         </div>
 
         {/* Spend pacing */}
-        <div className={stapelSmal ? RINGCEL.stapelSmal : RINGCEL.vertrouwd}>
+        <div className={ringcel}>
           <div className="relative">
             <PacingRing pct={spendPacingPct} color={spendColor} size={ringMaat} />
             <div className="absolute inset-0 flex items-center justify-center">
@@ -426,7 +427,7 @@ export function PacingMonitorView({ data, edition, stapelSmal = false, samenvatt
       // definitie iets dat afwijkt.
       return (
         <>
-          <div className="grid grid-cols-2 items-start gap-4">{ringen}</div>
+          <div className="grid grid-cols-2 items-start gap-3">{ringen}</div>
           {duiding && <div data-pacing-duiding>{duiding}</div>}
           <div className="-mx-5 -mb-5 mt-4">
             <Uitklap id="pacing-google-tempo" label="Toon tempo per dag en waar het jaar uitkomt" labelOpen="Verberg tempo en eindstand" afwijkend={rood}>

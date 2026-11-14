@@ -80,7 +80,10 @@ export function afsluitingVoor(
       message: `Afgerond: het afrondingsteken (sectie ${AFRONDINGS_SECTIE}) staat er sinds ${op.slice(0, 16).replace("T", " ")}. De run meldde dat zelf niet; de status is achteraf vastgesteld.`,
     };
   }
-  return { status: "failed", completed_at: nu.toISOString(), error_message: vastgelopenReden(rij, minuten) };
+  // Het moment van de laatste voortgang, niet nu: daar hield de run op. Met nu stond een run van
+  // augustus in het logboek als "zojuist mislukt".
+  const einde = Number.isFinite(laatst) ? new Date(laatst).toISOString() : nu.toISOString();
+  return { status: "failed", completed_at: einde, error_message: vastgelopenReden(rij, minuten) };
 }
 
 /** Het sop_type uit de metadata, of null. */

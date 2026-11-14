@@ -13,7 +13,7 @@
 // instellingen is een tikvlak van 44 px.
 
 import { ArrowDown, MousePointerClick, Settings } from "lucide-react";
-import { KANAAL_KLEUR, KANAAL_NAAM } from "@/lib/kanalen/beschikbaar";
+import { KANAAL_KLEUR, KANAAL_NAAM, type Kanaal } from "@/lib/kanalen/beschikbaar";
 import { procentTekst } from "@/lib/overzicht/trechter";
 import { NIET_OPTELLEN, type Keten, type KetenRij, type NaDeKlikUitkomst } from "@/lib/overzicht/conversiestappen";
 import { KANAAL_GLYPH } from "./kanaalkaarten";
@@ -33,17 +33,43 @@ function veranderingTekst(v: KetenRij["verandering"]): string | null {
   return `${abs} (${v.pct === null ? "toen nul, geen percentage" : procentTekst(v.pct)})`;
 }
 
+/**
+ * De opmerkingen staan OPEN: ze zijn het voorbehoud bij de getallen erboven. De stappen die niet in
+ * de keten staan (met hun reden) staan achter een knop die zegt hoeveel het er zijn: dat is naslag
+ * over de instelling van de trechter, geen voorbehoud bij een getal dat er staat. In de pagina, met
+ * `hidden`. Is de keten leeg, dan IS die lijst het verhaal en staat hij open.
+ *
+ * WAT AFWIJKT, STAAT OPEN. Had een stap die nu ontbreekt in de vergelijkingsperiode wel een waarde
+ * (`wegAfwijkend`: Aankoop telde toen 45 en heeft nu geen data), dan is de keten korter geworden
+ * door een meting die stopte, niet door de instelling. Dan staat de lijst open (`afwijkend`, met
+ * data-afwijkend="ja"), met die waarde bij de stap.
+ */
 function Redenen({ keten }: { keten: Keten }) {
   if (!keten.weg.length && !keten.opmerkingen.length) return null;
+  const toenBij = (w: string) => keten.wegAfwijkend.find((a) => w.startsWith(`${a.naam}: `))?.toen ?? null;
+  const weg = (
+    <>
+      <p>Niet in de keten:</p>
+      <ul className="list-disc pl-4">{keten.weg.map((w) => {
+        const toen = toenBij(w);
+        return (
+          <li key={w} data-weg-afwijkend={toen === null ? undefined : "ja"}>
+            {w}
+            {toen !== null && <span className="font-medium text-brand-gray"> In de vergelijkingsperiode nog {aantal(toen)}: controleer of deze meting nog loopt.</span>}
+          </li>
+        );
+      })}</ul>
+    </>
+  );
   return (
     <div className="mt-2 space-y-1 text-micro text-muted-foreground">
       {keten.opmerkingen.map((o) => <p key={o}>{o}</p>)}
-      {keten.weg.length > 0 && (
-        <>
-          <p>Niet in de keten:</p>
-          <ul className="list-disc pl-4">{keten.weg.map((w) => <li key={w}>{w}</li>)}</ul>
-        </>
-      )}
+      {keten.weg.length > 0 && (keten.leeg ? weg : (
+        <Uitklap id={`na-de-klik-weg-${keten.kanaal}`} vorm="regel" afwijkend={keten.wegAfwijkend.length > 0}
+          label={`Welke stappen niet in de keten staan (${keten.weg.length})`} labelOpen="Verberg de stappen buiten de keten">
+          <div className="space-y-1 pb-1">{weg}</div>
+        </Uitklap>
+      ))}
     </div>
   );
 }
@@ -56,7 +82,7 @@ export function KanaalNaDeKlik({ keten, venster, onNaarInstellingen }: {
   onNaarInstellingen?: () => void;
 }) {
   return (
-    <div data-trechterblok="na-de-klik" className="mt-3 border-t border-border/70 pt-3">
+    <div data-trechterblok="na-de-klik" className="mt-2 border-t border-border/70 pt-2 sm:mt-3 sm:pt-3">
       <h3 className="flex items-center gap-1.5 text-meta font-semibold text-brand-gray">
         <MousePointerClick className="h-4 w-4" aria-hidden /> Na de klik
       </h3>
@@ -72,18 +98,20 @@ export function KanaalNaDeKlik({ keten, venster, onNaarInstellingen }: {
         </>
       ) : (
         <>
-          <ol className="mt-2 space-y-1" aria-hidden>
+          {/* Per stap naam, getal en verandering op één regel (de verandering brak eerst altijd naar
+              een eigen regel), en de doorstroom naar de volgende stap er klein onder. */}
+          <ol className="mt-1.5 space-y-0.5" aria-hidden>
             {keten.rijen.map((r, i) => (
               <li key={r.naam} data-nadeklikstap={r.naam}>
                 <div className="flex flex-wrap items-baseline gap-x-2">
                   <span className="text-meta font-medium text-brand-gray">{r.naam}</span>
                   <span className="ml-auto text-title font-semibold tabular-nums text-brand-gray">{aantal(r.waarde)}</span>
                   {veranderingTekst(r.verandering) && (
-                    <span className="w-full text-right text-micro tabular-nums text-muted-foreground">{veranderingTekst(r.verandering)}</span>
+                    <span className="text-right text-micro tabular-nums text-muted-foreground">{veranderingTekst(r.verandering)}</span>
                   )}
                 </div>
                 {i < keten.rijen.length - 1 && (
-                  <p className="flex flex-wrap items-center gap-x-1.5 py-0.5 pl-1 text-micro text-muted-foreground">
+                  <p className="flex flex-wrap items-center gap-x-1.5 pl-1 text-micro leading-tight text-muted-foreground">
                     <ArrowDown className="h-3 w-3 shrink-0" aria-hidden />
                     <span>naar de volgende stap <span className="font-medium tabular-nums text-brand-gray">{aandeel(r.naarVolgende)}</span></span>
                     {r.uitval !== null && <span>· uitval {aantal(r.uitval)}</span>}
@@ -128,6 +156,72 @@ function InstellingenLink({ onClick }: { onClick: () => void }) {
 /** "per maand" bij een kanaal dat de periode niet per dag kon tellen (Google zonder dagcijfers). */
 const PER_MAAND = "per maand geteld";
 
+/** Het logo van een kanaal als klein vlak, in de kolomkop en in de legenda van de telefoontabel. */
+function KanaalLogo({ kanaal }: { kanaal: Kanaal }) {
+  return (
+    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded text-micro font-bold"
+      style={{ color: KANAAL_KLEUR[kanaal], background: `color-mix(in srgb, ${KANAAL_KLEUR[kanaal]} 14%, transparent)` }}>
+      {KANAAL_GLYPH[kanaal]}
+    </span>
+  );
+}
+
+/** Na de klik op Alle kanalen, op een telefoon: stap tegen kanaal, zonder zijwaartse scroll. */
+function TelefoonTabel({ uitkomst }: { uitkomst: NaDeKlikUitkomst }) {
+  const kanalen = uitkomst.kanalen;
+  // Een kanaal telt per maand als het dat in een van de stappen doet: dan de * bij de kop.
+  const perMaand = new Set(uitkomst.stappen.flatMap((s) => s.perKanaal.filter((k) => k.fijnheid === "maand").map((k) => k.kanaal)));
+  return (
+    <div className="sm:hidden" aria-hidden data-nadeklik-telefoon>
+      <table className="w-full table-fixed border-collapse text-meta">
+        <thead>
+          <tr className="border-b border-border/70">
+            <th className="w-[34%] pb-1 text-left text-micro font-medium text-muted-foreground">Stap</th>
+            {kanalen.map((k) => (
+              <th key={k} className="pb-1 text-right">
+                <span className="inline-flex items-center gap-0.5">
+                  <KanaalLogo kanaal={k} />
+                  {perMaand.has(k) && <span className="text-micro text-muted-foreground">*</span>}
+                </span>
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {uitkomst.stappen.map((s) => (
+            <tr key={s.naam} data-nadeklikstap-telefoon={s.naam} className="border-b border-border/40 last:border-b-0">
+              <th scope="row" className="py-1 pr-1 text-left align-top text-meta font-medium text-brand-gray [overflow-wrap:anywhere]">{s.naam}</th>
+              {kanalen.map((kanaal) => {
+                const k = s.perKanaal.find((x) => x.kanaal === kanaal);
+                const v = k ? veranderingTekst(k.verandering) : null;
+                return (
+                  <td key={kanaal} className="py-1 text-right align-top tabular-nums">
+                    {k ? (
+                      <>
+                        <span className="block font-semibold text-brand-gray">{aantal(k.waarde)}</span>
+                        {v && <span className="block text-micro leading-tight text-muted-foreground">{v}</span>}
+                      </>
+                    ) : <span className="text-micro text-muted-foreground">geen</span>}
+                  </td>
+                );
+              })}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      {/* De legenda koppelt elk logo uit de kolomkop aan de naam van het kanaal. */}
+      <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-micro text-muted-foreground" data-nadeklik-legenda>
+        {kanalen.map((k) => (
+          <span key={k} className="inline-flex items-center gap-1">
+            <KanaalLogo kanaal={k} />{KANAAL_NAAM[k]}
+          </span>
+        ))}
+        {perMaand.size > 0 && <span>* {PER_MAAND}</span>}
+      </p>
+    </div>
+  );
+}
+
 /**
  * Alle kanalen: per stap na de klik de kanalen naast elkaar, niet opgeteld, met de reden erbij.
  * Alleen kanalen met stapdata; zonder een enkel kanaal een regel met een link naar de instellingen.
@@ -162,7 +256,13 @@ export function NaDeKlikPerKanaal({ uitkomst, venster, onNaarInstellingen }: {
         </p>
       ) : (
         <>
-          <ul className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4" aria-hidden>
+          {/* Op een telefoon een tabel: een rij per stap, een kolom per kanaal. De kaartjes per stap
+              hieronder (vanaf sm) stonden daar onder elkaar en herhaalden per stap elk kanaal met
+              naam en logo; hier staat het kanaal één keer, in de kolomkop. Dezelfde getallen, dezelfde
+              veranderingen en hetzelfde label "per maand geteld" (als * bij de kop, met de legenda
+              eronder). Beide zijn versiering bij de tabel voor een schermlezer (aria-hidden). */}
+          <TelefoonTabel uitkomst={uitkomst} />
+          <ul className="hidden gap-2 sm:grid sm:grid-cols-2 xl:grid-cols-4" aria-hidden>
             {uitkomst.stappen.map((s) => (
               <li key={s.naam} data-nadeklikstap={s.naam} className="rounded-lg border border-border/70 px-3 py-2.5">
                 <p className="text-meta font-semibold text-brand-gray">{s.naam}</p>

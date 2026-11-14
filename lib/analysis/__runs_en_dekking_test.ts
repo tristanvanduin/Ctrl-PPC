@@ -46,6 +46,9 @@ console.log("\nEen stille run met afrondingsteken is afgerond, niet mislukt");
   check("een teken van voor de start telt niet", afsluitingVoor(af, ["2026-09-01T14:50:00Z"], null, nu).status === "failed");
   check("een teken na de start van de volgende run hoort bij die run", afsluitingVoor(af, ["2026-09-01T15:20:00Z"], "2026-09-01T15:10:00Z", nu).status === "failed");
   check("zonder teken: failed met de vastgelopen-reden", (() => { const f = afsluitingVoor(af, [], null, nu); return f.status === "failed" && f.error_message.includes("telt niet als gedraaid"); })());
+  // Het eindmoment is de laatste voortgang, niet nu: anders staat een run van september in het
+  // logboek als zojuist mislukt.
+  check("failed: completed_at is de laatste voortgang, niet nu", (() => { const f = afsluitingVoor(af, [], null, nu); return f.completed_at === new Date(af.updated_at!).toISOString(); })(), JSON.stringify(afsluitingVoor(af, [], null, nu)));
   check("zonder starttijd is niet te zeggen welk teken erbij hoort: failed", afsluitingVoor({ ...af, started_at: null }, ["2026-09-01T14:58:28Z"], null, nu).status === "failed");
 }
 

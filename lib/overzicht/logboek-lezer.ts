@@ -131,8 +131,12 @@ export async function leesLogboek(
     // Het jobtype in de query, niet pas erna: de limiet telt dan alleen jobs die een regel worden.
     veilig("generation_jobs", meld, supabase.from("generation_jobs")
       .select("job_id, job_type, status, channel, period_start, period_end, completed_at, updated_at, error_message, triggered_by")
-      .eq("client_id", clientId).in("job_type", [...JOB_TYPEN]).in("status", ["completed", "failed"]).gte("updated_at", vanaf)
-      .order("updated_at", { ascending: false }).limit(40)),
+      // Op completed_at, niet op updated_at: een trigger zet updated_at bij elke wijziging op nu, ook
+      // bij het achteraf afsluiten van een oude vastgelopen run. Op updated_at stond een mislukte
+      // run van augustus dan als "41 min geleden" bovenaan. Elke afgeronde of mislukte run heeft
+      // completed_at (14 nov 2026: 0 van 345 zonder).
+      .eq("client_id", clientId).in("job_type", [...JOB_TYPEN]).in("status", ["completed", "failed"]).gte("completed_at", vanaf)
+      .order("completed_at", { ascending: false }).limit(40)),
     // De voorstellen die wachten, voor de regels: de nieuwste binnen het venster.
     veilig("sprint_hypotheses", meld, supabase.from("sprint_hypotheses")
       .select("id, hypothesis, expected_result, measurement_metric, timeframe, rationale, ice_total, source, created_at")
