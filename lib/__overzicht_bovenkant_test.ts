@@ -259,12 +259,12 @@ console.log("Kanaalkaarten: een klik kiest, nog een klik is terug");
   check("een kaart schrijft zijn kanaalcijfer niet als paginatotaal ('N conversies')", !/\d\s+conversies\b/i.test(tekst(alle)), tekst(alle).slice(0, 300));
   check("een kanaal zonder score zegt waarom, een ladend kanaal dat het berekend wordt", /Health niet beoordeeld: geen dagcijfers\./.test(tekst(alle)) && /Health wordt berekend\./.test(tekst(alle)));
   check("de datastand staat op de kaart, en een stilstaand kanaal in rood", /data t\/m 26 aug 2026/.test(tekst(alle)) && /text-red-700[^"]*"[^>]*>stil sinds 1 mei 2026/.test(alle));
-  check("de aandelen op de kaarten tellen op tot 100", som([...alle.matchAll(/(\d+)% van de kosten/g)].map((m) => Number(m[1]))) === 100, JSON.stringify([...alle.matchAll(/(\d+)% van de kosten/g)].map((m) => m[1])));
+  check("de aandelen op de kaarten tellen op tot 100", som([...alle.matchAll(/(\d+)% (?:<span class="max-sm:hidden">)?van de (?:<\/span>)?kosten/g)].map((m) => Number(m[1]))) === 100, JSON.stringify([...alle.matchAll(/(\d+)% (?:<span class="max-sm:hidden">)?van de (?:<\/span>)?kosten/g)].map((m) => m[1])));
   check("een gekozen kaart zegt hoe je teruggaat", /nog een klik toont alle kanalen/.test(tekst(meta)) && !/nog een klik toont alle kanalen/.test(tekst(alle)));
   check("op een telefoon schuift de rij, de pagina niet", /overflow-x-auto/.test(alle) && /sm:grid/.test(alle));
   check("met één kanaal staat er geen filter (een kiezer met één knop is geen keuze)", html("google", kaarten.slice(0, 1)) === "" && html("blended", []) === "");
   const ladend = html("blended", kaarten.map((k) => ({ ...k, cijfers: null })));
-  check("zonder cijfers staan de kaarten er al, zonder getal", knoppen(ladend).length === 4 && /Cijfers worden geladen\./.test(tekst(ladend)) && !/% van de kosten/.test(ladend));
+  check("zonder cijfers staan de kaarten er al, zonder getal", knoppen(ladend).length === 4 && /Cijfers worden geladen\./.test(tekst(ladend)) && !/% van de kosten/.test(tekst(ladend)));
 }
 
 console.log("Kanaalkaarten: de datastand");
@@ -413,7 +413,7 @@ console.log("De bovenkant als geheel: kaarten, tegels en grafiek op dezelfde cij
   check("op Meta staan nog steeds alle vier de kaarten (het filter blijft het overzicht)", (meta.match(/aria-describedby="kanaalkaart-/g) ?? []).length === 4);
   check("op Meta telt de tabel alleen Meta", /<th scope="col">Meta<\/th>/.test(meta) && !/<th scope="col">Google Ads<\/th>/.test(meta));
   const laden = toon("blended", { bandKlaar: false });
-  check("zolang de band niet klaar is: laadvlakken, geen cijfers", /cijfers worden geladen/.test(tekst(laden)) && /de grafiek wordt geladen/.test(tekst(laden)) && !/% van de kosten/.test(laden));
+  check("zolang de band niet klaar is: laadvlakken, geen cijfers", /cijfers worden geladen/.test(tekst(laden)) && /de grafiek wordt geladen/.test(tekst(laden)) && !/% van de kosten/.test(tekst(laden)));
   const een = toon("google", { kanalen: ["google"], band: band("google") });
   check("een klant met één kanaal: geen kaarten, wel tegels en grafiek", !/Kanalen, klik om/.test(een) && /Kerncijfers over /.test(een) && /Conversies per maand · Google Ads/.test(tekst(een)));
   check("zonder opbouw-klasse op de server (de opbouw is van de browser, na de data)", !/class="opbouw"|\bopbouw\b"/.test(alle));

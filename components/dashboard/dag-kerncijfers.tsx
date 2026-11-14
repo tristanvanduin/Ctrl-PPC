@@ -70,19 +70,25 @@ export function DagKerncijfers({ cijfers, laden }: { cijfers: DagCijfers | null;
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5">
         {tegels.map((t, i) => (
           <div key={t.label} data-nadruk={i === nadruk || undefined}
-            className="relative px-3 pb-3 pt-3 lg:border-l lg:border-l-border/60 lg:px-4 lg:first:border-l-0">
+            className="relative px-3 pb-2 pt-2.5 sm:pb-3 sm:pt-3 lg:border-l lg:border-l-border/60 lg:px-4 lg:first:border-l-0">
             {i === nadruk && <span aria-hidden className="absolute inset-x-3 top-0 h-0.5 rounded-b-full bg-brand-gray lg:inset-x-4" />}
-            <Kerncijfer label={t.label} waarde={t.waarde} delta={t.delta} deltaVorm="pil" />
+            <Kerncijfer label={t.label} waarde={t.waarde} delta={t.delta} deltaVorm="pil" strak />
           </div>
         ))}
+        {/* Zoals bij PeriodSummary: op een telefoon de periode in de zesde cel naast CPA, vanaf sm
+            over de volle breedte onder de tegels. */}
+        <div data-tegelvoet className="flex items-center px-3 pb-2 pt-2.5 sm:col-span-3 sm:border-t sm:border-border sm:px-4 sm:pb-2 sm:pt-2 lg:col-span-5">
+          <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-meta text-muted-foreground">
+            <span className="font-medium text-brand-gray">{formatDagPeriode(staat.periode)}</span>
+            {c ? <span>vergeleken met {formatDagPeriode(c)}</span> : <span>totaal in deze periode</span>}
+          </p>
+        </div>
       </div>
-      <div className="border-t border-border px-4 pb-2.5 pt-2">
-        <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-meta text-muted-foreground">
-          <span className="font-medium text-brand-gray">{formatDagPeriode(staat.periode)}</span>
-          {c ? <span>vergeleken met {formatDagPeriode(c)}</span> : <span>totaal in deze periode</span>}
-        </p>
-        {uitleg.map((u) => <p key={u} className="mt-1 text-micro text-muted-foreground">{u}</p>)}
-      </div>
+      {uitleg.length > 0 && (
+        <div className="border-t border-border px-4 pb-2.5 pt-1 sm:border-t-0">
+          {uitleg.map((u) => <p key={u} className="mt-1 text-micro text-muted-foreground">{u}</p>)}
+        </div>
+      )}
     </section>
   );
 }

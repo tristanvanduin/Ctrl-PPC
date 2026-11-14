@@ -20,6 +20,7 @@ import { somVergelijking, verhoudingVergelijking, type DeelVergelijking } from "
 import { BandLaadvlak } from "@/components/ui/laadvlak";
 import { Vensterlabel } from "@/components/ui/vensterlabel";
 import { nadrukIndex } from "@/lib/overzicht/bovenkant";
+import { Uitklap } from "@/components/ui/disclosure";
 
 // Eén keer gemaakt en niet per aanroep: de band rendert bij elke wissel van kanaal of periode, en
 // maakte dan per getal een nieuwe Intl.NumberFormat. Dezelfde opties, dus dezelfde tekst.
@@ -125,6 +126,27 @@ function ongepaardTekst(perBron: readonly BronPaar[], vergelijking: PeriodRange)
   return zinnen.join(" ");
 }
 
+/** De kern van ongepaardTekst in één korte zin, voor de tegels (ronde 3): wat er aan de hand is,
+ *  zonder het waarom. De volle zin staat achter "Waarom?" (Uitklap), in de boom. Null als alles
+ *  gepaard is, dus precies wanneer ongepaardTekst ook null is. */
+export function ongepaardKern(perBron: readonly BronPaar[]): string | null {
+  const geraakt = perBron.filter((b) => b.ongepaardHuidig + b.ongepaardVorig > 0);
+  if (geraakt.length === 0) return null;
+  // Eén bron zonder kanaalnaam (een kanaaltab, of een klant met alleen Google).
+  if (geraakt.some((b) => !(b.naam in KANAAL_NAAM))) {
+    const b = geraakt[0];
+    if (b.gepaard > 0) return "Het percentage gaat over een deel van de maanden.";
+    // Op de laadgrens is er wel data, alleen niet geladen: "nog geen" zou dan onjuist zijn.
+    return b.start !== null && b.start === b.geladenVanaf
+      ? "De vergelijkingsperiode is niet geladen."
+      : "Er is nog geen vergelijkingsperiode om het percentage tegen af te zetten.";
+  }
+  const n = geraakt.length;
+  const hoe = geraakt.every((b) => b.gepaard === 0) ? "nog niet" : geraakt.every((b) => b.gepaard > 0) ? "maar deels" : "niet of maar deels";
+  // Eén geraakt kanaal: de naam is even kort als "1 kanaal" en zegt welk.
+  return `${n === 1 ? `${KANAAL_NAAM[geraakt[0].naam as Kanaal]} telt` : `${n} kanalen tellen`} ${hoe} mee in het percentage.`;
+}
+
 /** "Data t/m 26 augustus 2026; de periode loopt t/m juli 2026." als de data eerder ophoudt dan de
  *  kalender verwacht, anders null.
  *
@@ -224,6 +246,7 @@ export function bandInhoud({ data, compact, bronnen, vorm = "band" }: Pick<Props
   // niet als groei. De grote getallen blijven de hele periode; alleen de percentages zijn gepaard.
   const { current, deltas, perBron } = comparePeriods(data, periode.range, periode.compareRange, bronnen ?? undefined);
   const nietGepaard = periode.compareRange ? ongepaardTekst(perBron, periode.compareRange) : null;
+  const nietGepaardKern = nietGepaard ? ongepaardKern(perBron) : null;
   const standTekst = [dataStandTekst(periode.dataStand, periode.eindMaand, periode.range), uitgeslotenTekst(periode.dataStand, periode.range)]
     .filter(Boolean).join(" ") || null;
   // Vanaf waar de band ALLES geladen heeft. Bij een optelling de laatste grens van de bronnen:
@@ -323,7 +346,17 @@ export function bandInhoud({ data, compact, bronnen, vorm = "band" }: Pick<Props
     <>
       {/* Uitleg bij de cijfers, geen waarschuwing: dezelfde neutrale stijl, en hooguit één regel
           per onderwerp. Amber blijft voor wat aandacht vraagt (de ontbrekende maanden hieronder). */}
-      {nietGepaard && <p className="mt-3 text-micro text-muted-foreground">{nietGepaard}</p>}
+      {nietGepaard && (vorm === "tegels" && nietGepaardKern ? (
+        // De tegels (ronde 3): de kern in één regel, de volle zin achter "Waarom?". Uitleg en geen
+        // afwijking: dicht. De zin staat in de boom (hidden), zodat Ctrl+F na het openen en een
+        // schermlezer hem vinden, en elke uitlegregel van de band hier letterlijk terugkomt.
+        <div data-percentage-uitleg className="mt-1 flex flex-wrap items-center gap-x-2 text-micro text-muted-foreground">
+          <span>{nietGepaardKern}</span>
+          <Uitklap id="kerncijfers-percentage-waarom" label="Waarom?" labelOpen="Verberg de uitleg" vorm="regel">
+            <p className="text-micro text-muted-foreground">{nietGepaard}</p>
+          </Uitklap>
+        </div>
+      ) : <p className="mt-3 text-micro text-muted-foreground">{nietGepaard}</p>)}
       {standTekst && <p className={`${nietGepaard ? "mt-1" : "mt-3"} text-micro text-muted-foreground`}>{standTekst}</p>}
 
       {/* Een geladen maand vóór de start: er is nog geen data, en er ontbreekt niets. Uitleg, geen
@@ -387,6 +420,7 @@ export function bandInhoud({ data, compact, bronnen, vorm = "band" }: Pick<Props
         delta: cpaDelta },
     ];
     const nadruk = nadrukIndex(tegels.map((t) => t.delta?.pct));
+    const heeftUitleg = !!(nietGepaard || standTekst || voorStart.length > 0 || gemetenNul.length > 0 || nietOpgehaald.length > 0 || nietGeladen.length > 0);
     return (
       // Geen overflow-hidden: een bedrag van zeven cijfers is op een telefoon een paar pixels breder
       // dan zijn kolom, en dan liever over de opvulling heen dan met een afgesneden laatste cijfer.
@@ -412,20 +446,24 @@ export function bandInhoud({ data, compact, bronnen, vorm = "band" }: Pick<Props
                 reeksLabel={`${t.label} per maand binnen ${formatRange(periode.range)}`}
                 delta={t.delta}
                 deltaVorm="pil"
+                strak
               />
             </div>
           ))}
+          {/* De periode en de vergelijking voluit, met hetzelfde label als de andere blokken die de
+              periode volgen. In de band is dit de kop; hier de voetregel, onder de cijfers. Op een
+              telefoon (twee kolommen) staat hij in de zesde cel, naast CPA: anders stond die vijfde
+              tegel alleen op een rij met een lege halve breedte ernaast. Vanaf sm over de volle
+              breedte onder de tegels, zoals voorheen. Eén keer in de boom, alleen de plek wisselt. */}
+          <div data-tegelvoet className="flex items-center px-3 pb-2 pt-2.5 sm:col-span-3 sm:border-t sm:border-border sm:px-4 sm:pb-2 sm:pt-2 lg:col-span-5">
+            <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-meta text-muted-foreground">
+              <span className="font-medium text-brand-gray">{formatRange(periode.range)}</span>
+              <Vensterlabel soort="periode" kaal />
+              {periode.compareRange && <span>vergeleken met {formatRange(periode.compareRange)}</span>}
+            </p>
+          </div>
         </div>
-        {/* De periode en de vergelijking voluit, met hetzelfde label als de andere blokken die de
-            periode volgen. In de band is dit de kop; hier de voetregel, onder de cijfers. */}
-        <div className="border-t border-border px-4 pb-2.5 pt-2">
-          <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-meta text-muted-foreground">
-            <span className="font-medium text-brand-gray">{formatRange(periode.range)}</span>
-            <Vensterlabel soort="periode" kaal />
-            {periode.compareRange && <span>vergeleken met {formatRange(periode.compareRange)}</span>}
-          </p>
-          {uitleg}
-        </div>
+        {heeftUitleg && <div className="border-t border-border px-4 pb-2 pt-0.5 sm:border-t-0">{uitleg}</div>}
       </section>
     );
   }

@@ -1,6 +1,7 @@
 "use client";
 
-import { Globe2, Loader2, ChevronLeft } from "lucide-react";
+import { Globe2, Loader2, ChevronLeft, ChevronDown } from "lucide-react";
+import { useRememberedOpen } from "@/components/ui/disclosure";
 import dynamic from "next/dynamic";
 import { MapErrorBoundary } from "./map-error-boundary";
 import { CHANNEL_LABEL, type GeoBreakdownState } from "@/lib/geo/use-geo-breakdown";
@@ -17,6 +18,17 @@ const UsStatesMap = dynamic(() => import("./us-states-map"), {
   ssr: false,
   loading: () => <div className="flex justify-center py-16"><Loader2 className="w-5 h-5 animate-spin text-brand-blue-ink" /></div>,
 });
+
+/**
+ * Het vak om de projectie, alleen met de ranglijst ernaast (de nieuwe weergave, ronde 3): onder lg
+ * verborgen tot "Toon de kaart" hem opent (display:none, dus ook voor een schermlezer weg; de lijst
+ * erboven en de tabel in de lade dragen dezelfde cijfers), vanaf lg altijd. Zonder `aan` geen
+ * element: de vertrouwde weergave rendert byte voor byte zoals voorheen.
+ */
+function ProjectieOmhulsel({ aan, open, children }: { aan: boolean; open: boolean; children: ReactNode }) {
+  if (!aan) return <>{children}</>;
+  return <div id="geo-kaart-projectie" data-geo-projectie={open ? "open" : "dicht"} className={`px-3 py-3 lg:block ${open ? "" : "max-lg:hidden"}`}>{children}</div>;
+}
 
 // De kaart-helft van GeoBreakdown, apart (17.36): "deze moet eronder, dan kan de geo kaart
 // groter" gevolgd door "kan dit stuk groter binnen het blok" -- de ranglijst deelde nog steeds de
@@ -50,6 +62,11 @@ export function GeoMapCard({ state, channel = "google", verdieping, naast, voet,
   // Microsoft mee als het landdata heeft, en anders staat dat in de regels.
   const toevoeging = dagVenster ? dagVenster.toevoeging ?? undefined : vensterToevoeging;
   const toevoegingUitleg = dagVenster ? (dagVenster.regels.length ? dagVenster.regels.join(" ") : undefined) : vensterUitleg;
+  // De projectie op een telefoon (ronde 3, alleen met `naast`): dicht, achter "Toon de kaart". Daar
+  // is de ranglijst de hoofdvorm (top 3 met getal en verandering); de projectie herhaalt wat de
+  // lijst al zegt, alleen als ligging, en kostte ongeveer 190 px. Vanaf lg staat hij altijd open,
+  // naast de lijst. Hook vóór de vroege returns hieronder; de keuze wordt onthouden.
+  const [kaartOpen, toggleKaart] = useRememberedOpen("geo-kaart-telefoon", false);
 
   if (laden) return <Laadvlak vorm="grafiek" hoogte={220} titel="Waar komt het vandaan" />;
   // Was tot 20 augustus 2026 een stille `return null` -- zie geo-empty-state.tsx voor waarom dat
@@ -71,7 +88,7 @@ export function GeoMapCard({ state, channel = "google", verdieping, naast, voet,
     // laagste is kreeg het verschil als wit onderin. Nu vangt het kaartvlak het op -- de projectie
     // blijft even groot (hij is gecapt), maar staat gecentreerd in de ruimte die overblijft.
     <div className="bg-card flex h-full flex-col rounded-xl border border-border shadow-sm overflow-hidden">
-      <div className="px-5 py-3 border-b border-border flex items-center gap-2 flex-wrap">
+      <div className={`${metNaast ? "px-4 py-2.5 sm:px-5 sm:py-3" : "px-5 py-3"} border-b border-border flex items-center gap-2 flex-wrap`}>
         <Globe2 className="w-4.5 h-4.5 text-brand-blue-ink" />
         <h3 className="text-title font-semibold text-brand-gray">
           Waar komt het vandaan{focus === "US" ? " — Verenigde Staten" : ""}
@@ -117,7 +134,23 @@ export function GeoMapCard({ state, channel = "google", verdieping, naast, voet,
       </div>
 
       <div className={metNaast ? "grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_340px]" : "contents"}>
-      <div className="flex min-w-0 flex-1 flex-col justify-center px-3 py-3">
+      {/* Met de ranglijst ernaast: op een telefoon de lijst EERST (order), de projectie eronder
+          achter een knop. Vanaf lg zoals voorheen: projectie links, lijst rechts. */}
+      <div className={`flex min-w-0 flex-1 flex-col justify-center ${metNaast ? "max-lg:order-2 max-lg:border-t max-lg:border-border" : "px-3 py-3"}`}>
+        {metNaast && (
+          <button
+            type="button"
+            onClick={toggleKaart}
+            aria-expanded={kaartOpen}
+            aria-controls="geo-kaart-projectie"
+            data-geo-kaartknop
+            className="flex min-h-11 w-full items-center justify-center gap-1.5 px-5 py-2.5 text-meta font-medium text-brand-blue-ink transition-colors hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-blue lg:hidden"
+          >
+            <ChevronDown className={`h-3.5 w-3.5 shrink-0 transition-transform motion-reduce:transition-none ${kaartOpen ? "rotate-180" : ""}`} aria-hidden />
+            {kaartOpen ? "Verberg de kaart" : `Toon de kaart (${ranked.length} ${focus === "US" ? "staten" : ranked.length === 1 ? "land" : "landen"})`}
+          </button>
+        )}
+        <ProjectieOmhulsel aan={metNaast} open={kaartOpen}>
         {ranked.length === 0 ? (
           <>
             <p className="text-body text-muted-foreground py-4 text-center">Geen {geoWord}-data voor deze metric.</p>
@@ -138,7 +171,10 @@ export function GeoMapCard({ state, channel = "google", verdieping, naast, voet,
           // opgeschaald: geen enkel land wordt zichtbaarder van een projectie van 1200px breed, de
           // kaart werd alleen groter. Hij centreert nu binnen de kolom en houdt op met groeien.
           <MapErrorBoundary>
-            <div className="mx-auto w-full max-w-[760px]">
+            {/* Met de lijst ernaast tot 640 px breed (ongeveer 320 px hoog) in plaats van 760: op
+                1440 was de kaart 614 px hoog en de projectie het grootste deel daarvan. Kleiner
+                dan dit en de Benelux-landen worden te klein om aan te tikken. */}
+            <div className={`mx-auto w-full ${metNaast ? "max-w-[640px]" : "max-w-[760px]"}`}>
               {focus === "US" ? (
                 <UsStatesMap values={values} format={metric.fmt} metricLabel={metric.label} />
               ) : (
@@ -150,14 +186,15 @@ export function GeoMapCard({ state, channel = "google", verdieping, naast, voet,
         {focus == null && canDrillUs && (
           <p className="text-center text-meta text-muted-foreground pt-1">Klik op de <strong>Verenigde Staten</strong> om de staten te zien.</p>
         )}
+        </ProjectieOmhulsel>
         {focus == null && !canDrillUs && countries.some((c) => c.code === "US") && (
-          <p className="text-center text-meta text-muted-foreground pt-1">
+          <p className={`text-center text-meta text-muted-foreground pt-1${metNaast ? " px-3 pb-3" : ""}`}>
             Voor de <strong>Verenigde Staten</strong> is geen staten-uitsplitsing beschikbaar: die data is
             voor dit account nog niet gesynct.
           </p>
         )}
       </div>
-      {metNaast && <div className="min-w-0 border-t border-border lg:border-l lg:border-t-0">{naast}</div>}
+      {metNaast && <div className="min-w-0 max-lg:order-1 lg:border-l lg:border-border">{naast}</div>}
       </div>
 
       {/* Per dag: wat elk kanaal telde staat hier leesbaar, niet alleen in de uitleg van het label

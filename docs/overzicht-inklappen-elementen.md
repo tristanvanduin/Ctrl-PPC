@@ -143,3 +143,54 @@ build. De eerstvolgende run van `scripts/meet-overzicht.mjs` hoort deze tabel te
 Niet gedaan in deze ronde, en waarom: de kanaalkaarten (al een snap-strook), Kerncijfer zelf
 (gedeeld met andere pagina's), Waar komt het vandaan, Conversies per maand, Wat er gebeurde,
 Gezondheid op Alle kanalen en de 1440-breedte. Daar zit het verschil met het doel.
+
+## Ronde 3 (basis dd6f72a): de bovenkant en de wereldkaart compacter
+
+Op verzoek van de eigenaar ("maak de kaart en de kerncijfers compacter"), vooral op de telefoon.
+Dezelfde regel: niets verdwijnt, het mag verhuizen of achter een klik, wat afwijkt blijft open. Alles
+zit achter een prop die alleen de nieuwe weergave meegeeft: `strak` op Kerncijfer, `vorm="tegels"`
+op PeriodSummary, `naast` op GeoMapCard; DagKerncijfers en de kanaalkaarten bestaan alleen in de
+nieuwe weergave. Getoetst in `lib/__overzicht_hoogte_ronde3_test.ts`; met de schakelaar uit byte
+voor byte gelijk aan dd6f72a voor Kerncijfer (regel, pil met deel, compact zonder percentage), de
+band (gewoon en compact) en GeoMapCard zonder `naast` met de ranglijst eronder (vingerafdrukken met
+dezelfde fixtures in beide bomen gerenderd, klok vast op 14 november 2026).
+
+| Blok | Element | Voor (390 px) | Na (390 px) | Klik of open |
+|---|---|---|---|---|
+| Kerncijfertegels | label, getal | open | open, ongewijzigd (getal blijft text-figure, 30 px; het label is het vorige element, zoals check-cijfers-gelijk leest) | open |
+| Kerncijfertegels | verandering (pil) | eigen regel, met "vergelijkbaar deel X, was Y" erachter (brak meestal naar een tweede regel) | pil op een regel met het verloopje ernaast | open |
+| Kerncijfertegels | verloopje (sparkline) | eigen regel van 18 px onder het getal, 72 px breed | 48 x 14 px rechts in de regel van de verandering (`ml-auto`; breekt alleen af naast een lange "geen vergelijking mogelijk") | open |
+| Kerncijfertegels | vorige waarde | "vergelijkbaar deel € 109, was € 96" in de pil-regel | eigen korte regel (micro) onder de pil: "deel € 109, was € 96" op de telefoon, "vergelijkbaar deel ..." vanaf sm (het woord staat in de DOM, `max-sm:hidden`); de volle zin in de title | open |
+| Kerncijfertegels | vijfde tegel (CPA) | alleen op een rij, halve breedte leeg | de periode en de vergelijking (met het vensterlabel) staan in de zesde cel naast CPA; vanaf sm over de volle breedte onder de tegels, zoals voorheen. Eén element in de DOM, alleen de rasterplek wisselt | open |
+| Kerncijfertegels | uitleg welke kanalen in het percentage meetellen | alinea van vier tot zes regels | één regel met de kern ("Meta telt nog niet mee in het percentage" bij één kanaal, met de naam; "2 kanalen tellen maar deels mee ..."; op een kanaaltab met de vergelijking op de laadgrens "De vergelijkingsperiode is niet geladen.", niet "nog geen"; `ongepaardKern`) en "Waarom?" (Uitklap, `vorm="regel"`, 44 px); de volle zin letterlijk zoals in de band achter de knop, in de DOM met `hidden`. Uitleg en geen afwijking, dus dicht | klik (in DOM) |
+| Kerncijfertegels | datastand, maanden voor de start, gemeten nullen | open | open, ongewijzigd | open |
+| Kerncijfertegels | amberregels (kanaal niet geladen, maanden niet geladen) | open | open, ongewijzigd: dat is wat afwijkt | open |
+| Kerncijfertegels per dag (DagKerncijfers) | tegels, periode | idem | zelfde strakke tegel (zonder verloopje: per dag is er geen reeks), de periode in de zesde cel; de uitlegregels per kanaal ongewijzigd open | open |
+| Kanaalkaarten | strook | veegstrook | idem, nu met `snap-mandatory`, `scroll-px-1` en `overscroll-x-contain` (een veeg sleept de pagina niet mee terug); alle kaarten staan in de DOM met hun beschrijving `#kanaalkaart-*` | open |
+| Kanaalkaarten | kosten met aandeel | "€ 40.000 · 67% van de kosten" (brak op een kaart van 240 px vaak naar een tweede regel) | "€ 40.000 · 67% kosten" op de telefoon; "van de " staat in de DOM (`max-sm:hidden`); de beschrijving voor een schermlezer ongewijzigd voluit | open |
+| Waar komt het vandaan | ranglijst top 3 met getal en verandering | onder de projectie | BOVEN de projectie (order): de hoofdvorm op de telefoon | open |
+| Waar komt het vandaan | ranglijst 4-6, 7+ | achter "Toon N landen meer" | ongewijzigd | klik (in DOM) |
+| Waar komt het vandaan | projectie | open, ongeveer 190 px | onder lg achter "Toon de kaart (N landen)" (knop met aria-expanded en aria-controls, 44 px, focusring, pijl zonder beweging bij "minder beweging"; de keuze onthouden onder `geo-kaart-telefoon`). De projectie staat in de DOM (`max-lg:hidden`); vanaf lg altijd open | klik |
+| Waar komt het vandaan | "Klik op de Verenigde Staten" | onder de projectie | bij de projectie (achter dezelfde knop op de telefoon): het is een aanwijzing voor de projectie; de VS staan ook klikbaar in de lijst | klik / open vanaf lg |
+| Waar komt het vandaan | "geen staten-uitsplitsing" | open | open, buiten de knop | open |
+| Waar komt het vandaan | kop | px-5 py-3 | px-4 py-2.5 onder sm | open |
+| Waar komt het vandaan (1440) | projectie | tot 760 px breed (ongeveer 380 px hoog) | tot 640 px breed (ongeveer 320 px hoog); Benelux blijft aan te wijzen | open |
+| Waar komt het vandaan | tabel per land | achter "Toon als tabel" | ongewijzigd | klik |
+
+### Geschatte hoogte na ronde 3 (NIET gemeten)
+
+Geschat uit de klassen, niet in een browser gemeten: er draaide geen server en geen build. De
+eerstvolgende run van `scripts/meet-overzicht.mjs` hoort dit te vervangen.
+
+| Blok | Gemeten voor ronde 3 | Schatting na ronde 3 |
+|---|---|---|
+| 390, Alle kanalen: bovenkant tot | y ≈ 1.200 | y ≈ 1.030 tot 1.060 (per tegelrij ongeveer 25 px minder: geen eigen regel voor het verloopje, de "was" kort; de voetregel naast CPA in plaats van eronder; de uitlegalinea van ongeveer 90 naar ongeveer 50 px). De kanaalkaarten winnen alleen hoogte als de regel cijfers eerder naar een tweede regel brak |
+| 390, per kanaal: bovenkant | 1.010 tot 1.130 | ongeveer 880 tot 1.000 |
+| 390, Waar komt het vandaan | 677 tot 747 | ongeveer 430 tot 490 (projectie en de VS-aanwijzing achter de knop: ongeveer -210; de knop zelf +44) |
+| 1440, Waar komt het vandaan | 614 | ongeveer 550 (projectie 60 px lager; de lijst ernaast met zes regels is dan ongeveer even hoog) |
+
+Niet gedaan, en waarom: het getal van de tegels kleiner maken (de rookproef en check-cijfers-gelijk
+eisen minstens 18 px, en het kerncijfer is het antwoord op de pagina); de tegels in drie kolommen op
+de telefoon (een bedrag als "€ 153.060" past op 30 px niet in een derde van 358 px); de kaarten van de
+kanaalstrook smaller (dan breekt juist de regel cijfers af en worden ze hoger); de Toon-select in de
+kop van de kaart verplaatsen (het is de keuze van de metriek, en hij staat al op dezelfde regel).

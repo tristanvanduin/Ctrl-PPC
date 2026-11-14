@@ -60,17 +60,30 @@ export function wasTekst(was: string, nu?: string): string {
 }
 
 /**
+ * De "was"-regel van een strakke tegel (Kerncijfer met `strak`): dezelfde waarden als wasTekst, op een
+ * telefoon met "deel" in plaats van "vergelijkbaar deel". Beide woorden staan in de boom; alleen
+ * "vergelijkbaar " valt onder sm weg, en de volle zin staat in de uitleg (title) van de regel.
+ */
+function WasRegel({ was, nu }: { was: string; nu?: string }) {
+  return (
+    <p data-wasregel className="mt-0.5 text-micro leading-snug text-muted-foreground" title={wasTekst(was, nu)}>
+      {nu ? <><span className="max-sm:hidden">vergelijkbaar </span>deel {nu}, was {was}</> : <>was {was}</>}
+    </p>
+  );
+}
+
+/**
  * De verandering onder het getal. Dit is wat er bewoog, en het stond in de kleinste letter van de
  * pagina (10 px) in een groen dat op die maat 3,2:1 haalde. Nu een maat groter (text-body, 12 px),
  * met icoon en teken, in groen-700 en rood-700, en met een woord voor wie geen kleur ziet.
  * Vanaf tien procent zonder decimaal: "+15%" leest, "+15,3%" telt.
  */
-function Delta({ pct, hogerIsBeter = true, waartegen, leegTekst, was, nu, vorm = "regel" }: KerncijferDelta & { vorm?: DeltaVorm }) {
+function Delta({ pct, hogerIsBeter = true, waartegen, leegTekst, was, nu, vorm = "regel", zonderWas = false }: KerncijferDelta & { vorm?: DeltaVorm; zonderWas?: boolean }) {
   if (pct === null) {
     return (
       <span className="text-body text-muted-foreground">
         {leegTekst ?? "geen vergelijking mogelijk"}
-        {was && <span className="ml-1.5">was {was}</span>}
+        {was && !zonderWas && <span className="ml-1.5">was {was}</span>}
       </span>
     );
   }
@@ -94,7 +107,7 @@ function Delta({ pct, hogerIsBeter = true, waartegen, leegTekst, was, nu, vorm =
           <span>{getal}</span>
         </span>
         <span className="sr-only">{vlak ? "vrijwel gelijk" : goed ? "gunstig" : "ongunstig"}</span>
-        {was && <span className="text-muted-foreground">{wasTekst(was, nu)}</span>}
+        {was && !zonderWas && <span className="text-muted-foreground">{wasTekst(was, nu)}</span>}
         {waartegen && <span className="text-muted-foreground">{waartegen}</span>}
       </span>
     );
@@ -122,6 +135,7 @@ export function Kerncijfer({
   reeksLabel,
   toon,
   onderschrift,
+  strak = false,
   children,
 }: {
   label: string;
@@ -144,6 +158,13 @@ export function Kerncijfer({
   toon?: "waarschuwing" | "goed";
   /** Een regel onder het getal die zegt waar het over gaat ("conversies", "vorige editie"). */
   onderschrift?: string;
+  /**
+   * De strakke tegel (de kerncijfertegels van het Overzicht in de nieuwe weergave, ronde 3): het
+   * verloopje klein (48 px) rechts naast de verandering in plaats van op een eigen regel, en de
+   * vorige waarde op een korte regel eronder. Dezelfde label, hetzelfde getal, dezelfde verandering
+   * en dezelfde "was"; alleen de plek verschilt. Zonder deze prop is de tegel zoals hij altijd was.
+   */
+  strak?: boolean;
   children?: ReactNode;
 }) {
   // Proportionele cijfers en geen `tabular-nums`. Dat laatste geeft elke cijfer de breedte van een
@@ -170,6 +191,38 @@ export function Kerncijfer({
   // De juiste plek om te compenseren is bóven het getal: reserveer regels voor het label en alle
   // getallen beginnen op dezelfde hoogte, ongeacht wat eronder hangt. Hoeveel regels weet alleen de
   // aanroeper — hij kent zijn eigen labels — dus dat is een keuze en geen gok.
+  const heeftReeks = !!reeks && reeks.length > 1;
+  if (strak) {
+    // Geen eigen regel voor het verloop: hij staat rechts van de verandering (ml-auto), en past hij
+    // er niet naast (een lange "geen vergelijking mogelijk"), dan breekt hij eronder af. De "was"
+    // komt op een eigen korte regel; zonder percentage staat hij daar ook, zoals in de pil.
+    const was = delta?.was;
+    return (
+      <div className="flex h-full flex-col">
+        <p
+          className="text-micro font-medium uppercase tracking-wider text-muted-foreground leading-[1.35]"
+          style={labelRegels > 1 ? { minHeight: `${labelRegels * 1.35}em` } : undefined}
+        >
+          {label}
+        </p>
+        <p className={`mt-1.5 ${maat} ${kleur}`}>{getoond}</p>
+        {onderschrift && <p className="mt-1 text-micro text-muted-foreground">{onderschrift}</p>}
+        {(delta || heeftReeks) && (
+          <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1">
+            {delta && <Delta {...delta} vorm={deltaVorm} zonderWas />}
+            {heeftReeks && (
+              <span className="ml-auto flex shrink-0">
+                <Sparkline punten={reeks!} basis={reeksBasis} breedte={48} hoogte={14} titel={reeksLabel} />
+              </span>
+            )}
+          </div>
+        )}
+        {delta && was && <WasRegel was={was} nu={delta.pct !== null ? delta.nu : undefined} />}
+        {children && <div className="mt-2">{children}</div>}
+      </div>
+    );
+  }
+
   return (
     <div className="flex h-full flex-col">
       <p

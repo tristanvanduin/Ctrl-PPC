@@ -185,7 +185,10 @@ function Kaart({ kaart, actief, onKlik, vertraging, opbouw, periode }: {
             </span>
             <span className="ml-auto whitespace-nowrap text-meta text-muted-foreground">
               <span className="text-brand-gray">{euro(cijfers.adSpend)}</span>
-              {cijfers.aandeelKosten !== null ? ` · ${cijfers.aandeelKosten}% van de kosten` : " kosten"}
+              {/* Op een telefoon "· 55% kosten": met "van de kosten" brak de regel cijfers op een
+                  kaart van 240 px naar een tweede regel en werd de rij hoger. Beide woorden staan in
+                  de boom; de beschrijving voor een schermlezer zegt het voluit. */}
+              {cijfers.aandeelKosten !== null ? <> · {cijfers.aandeelKosten}% <span className="max-sm:hidden">van de </span>kosten</> : " kosten"}
             </span>
           </>
         ) : (
@@ -236,7 +239,7 @@ export function Kanaalkaarten({ kaarten, gekozen, onKies, opbouw = false, opbouw
       aria-label="Kanalen, klik om de pagina te filteren"
       // De marge en de opvulling heffen elkaar op: de strook mag schuiven (overflow), en zonder die
       // lucht sneed hij de focusring en de schaduw van de kaarten af.
-      className="-m-1 flex snap-x gap-2 overflow-x-auto p-1 sm:grid sm:overflow-visible"
+      className="-m-1 flex snap-x snap-mandatory scroll-px-1 gap-2 overflow-x-auto overscroll-x-contain p-1 sm:grid sm:overflow-visible"
       // Zoveel kolommen als er passen, met een ondergrens: een kolom per kanaal maakte een kaart op
       // een tablet 174 px breed, en dan viel het kostenaandeel achter puntjes weg. Past de regel
       // cijfers ook dan niet, dan breekt hij naar een tweede regel in plaats van af te kappen.
