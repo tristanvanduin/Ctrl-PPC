@@ -8,7 +8,8 @@
 // Exitcode 0 als elke cadans met genoeg pogingen boven de grens zit EN elke vaste cadans binnen zijn
 // termijn afrondde; 1 bij een cadans eronder, een cadans die te lang niet afrondde, of een leeg
 // venster (niets gedraaid is geen groen); 3 (overgeslagen, zie scripts/poort-overslaan.mjs) zonder
-// databasegegevens.
+// databasegegevens, en ook 3 als de analyses niet gepland zijn (geen cron voor
+// /api/cron/trigger-sops in vercel.json) en verder niets onder de grens zit: "niet gepland".
 //
 // Waarom: zie de kop van lib/eval/analyse-slagingen.ts. Kort: de maandanalyse rondde sinds augustus
 // 11 van de 40 keer af en geen scherm of poort zei het. Dit script schrijft niets en zet ook geen
@@ -19,7 +20,7 @@ import { readFileSync } from "node:fs";
 import { sql } from "./supabase-sql.mjs";
 import { slaOver } from "./poort-overslaan.mjs";
 // Rechtstreeks de .ts: node haalt de typen eraf. Beide bestanden zijn zuiver en zonder imports.
-import { vatSlagingenSamen, slagingsRegel, beslisSlagingsPoort } from "../lib/eval/analyse-slagingen.ts";
+import { vatSlagingenSamen, slagingsRegel, beslisSlagingsPoort, analysesGepland } from "../lib/eval/analyse-slagingen.ts";
 import { STALE_RUNNING_MINUTES } from "../lib/scheduler/core.ts";
 
 const arg = (naam, standaard) => {
@@ -76,8 +77,16 @@ for (const u of uitslag) console.log(slagingsRegel(u));
 
 // De beslissing staat in lib/eval/analyse-slagingen.ts (beslisSlagingsPoort), met een test die eist
 // dat een leeg venster niet groen is.
-const beslissing = beslisSlagingsPoort(uitslag, laatsteAfrondingen, { nu });
+// Gepland of niet: uit vercel.json in de repo. Zonder cron voor de analyses is stilte verwacht en
+// zegt de poort "niet gepland" (exit 3) in plaats van "de keten staat stil" (exit 1).
+let vercelJson = null;
+try { vercelJson = readFileSync("vercel.json", "utf8"); } catch { /* geen vercel.json: niet gepland */ }
+const beslissing = beslisSlagingsPoort(uitslag, laatsteAfrondingen, { nu, gepland: analysesGepland(vercelJson) });
 if (beslissing.meldingen.length > 0) console.log("");
 for (const m of beslissing.meldingen) console.log(`  ${m}`);
+if (beslissing.code === 3) {
+  console.log("\nanalyses: NIET GEPLAND. Niet gedraaid is niet geslaagd.");
+  process.exit(3);
+}
 if (beslissing.code !== 0) process.exit(beslissing.code);
 console.log("\n  OK  elke cadans met genoeg pogingen zit boven de grens, en elke cadans rondde binnen zijn termijn af.");

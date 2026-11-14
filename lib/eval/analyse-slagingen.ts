@@ -113,9 +113,34 @@ export interface LaatsteAfronding {
   laatst: string | null;
 }
 
+/** De route die de analyses volgens een vast ritme start (app/api/cron/trigger-sops). */
+export const ANALYSE_CRON_PAD = "/api/cron/trigger-sops";
+
+/**
+ * Of de analyses ingepland zijn: een cron in vercel.json (de inhoud als tekst) op ANALYSE_CRON_PAD.
+ * Puur. Onleesbare of lege configuratie telt als niet gepland. Let op: dit leest de repo, niet het
+ * Vercel-project zelf; een cron die alleen in het dashboard van Vercel staat ziet dit niet.
+ */
+export function analysesGepland(vercelJson: string | null): boolean {
+  if (!vercelJson) return false;
+  try {
+    const crons = (JSON.parse(vercelJson) as { crons?: { path?: unknown }[] }).crons ?? [];
+    return crons.some((c) => typeof c.path === "string" && c.path.split("?")[0] === ANALYSE_CRON_PAD);
+  } catch {
+    return false;
+  }
+}
+
+/** De melding als de analyses niet gepland zijn. */
+export const NIET_GEPLAND =
+  `analyses niet gepland: er staat geen cron voor ${ANALYSE_CRON_PAD} in vercel.json, dus ze draaien alleen als iemand ze start. ` +
+  "Dat er sinds de laatste afronding niets draaide is dan geen stilgevallen keten. De termijnregel geldt weer zodra de cron er staat; " +
+  "het slagingspercentage van wat wel gestart is, telt nu al.";
+
 export interface PoortBeslissing {
-  /** 0 groen, 1 rood. Overgeslagen (3) beslist het script zelf: dat gaat over de verbinding. */
-  code: 0 | 1;
+  /** 0 groen, 1 rood, 3 niet gedraaid: de analyses zijn niet gepland (en verder niets rood). Zonder
+   *  databaseverbinding slaat het script zelf over, ook met 3. */
+  code: 0 | 1 | 3;
   meldingen: string[];
 }
 
@@ -125,11 +150,25 @@ const datum = (iso: string | null): string => (iso ? iso.slice(0, 10) : "nooit")
 export function beslisSlagingsPoort(
   uitslag: readonly CadansUitslag[],
   laatsteAfrondingen: readonly LaatsteAfronding[],
-  opties: { nu: Date; maxDagen?: Readonly<Record<string, number>> }
+  opties: { nu: Date; maxDagen?: Readonly<Record<string, number>>; gepland?: boolean }
 ): PoortBeslissing {
   const maxDagen = opties.maxDagen ?? MAX_DAGEN_ZONDER_AFRONDING;
+  const gepland = opties.gepland ?? true;
   const meldingen: string[] = [];
   let rood = false;
+
+  // Niet gepland: stilte is dan de verwachte toestand, geen fout. Wel niet groen (3): er is niets
+  // ritmisch gedraaid om te beoordelen. Een percentage onder de grens van wat WEL gestart is, blijft
+  // rood (1): dat zijn echte mislukkingen.
+  if (!gepland) {
+    meldingen.push(NIET_GEPLAND);
+    const laag = uitslag.filter((u) => u.waarschuwing);
+    if (laag.length > 0) {
+      meldingen.push(`${laag.length} cadans(en) onder de grens: ${laag.map((u) => u.cadans).join(", ")}. Een vastgelopen run telt als mislukt.`);
+      return { code: 1, meldingen };
+    }
+    return { code: 3, meldingen };
+  }
 
   if (uitslag.length === 0) {
     meldingen.push("geen enkele gestarte analyse in dit venster: er is niets gedraaid om te beoordelen, en dat is geen groen.");

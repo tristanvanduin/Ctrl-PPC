@@ -5,7 +5,7 @@
 // 14 mislukt, 15 op "running" met een updated_at gelijk aan de startdag. Dat is 11 van 40, en het
 // script moet daarop waarschuwen. Telde het de vastgelopen runs niet mee, dan stond er 11 van 25.
 
-import { vatSlagingenSamen, slagingsRegel, beslisSlagingsPoort, type GenerationJobRij } from "./analyse-slagingen";
+import { vatSlagingenSamen, slagingsRegel, beslisSlagingsPoort, analysesGepland, type GenerationJobRij } from "./analyse-slagingen";
 import { STALE_RUNNING_MINUTES } from "../scheduler/core";
 
 let passed = 0, failed = 0;
@@ -94,6 +94,24 @@ const onderGrens = beslisSlagingsPoort(uit, [
   { cadans: "biweekly_sop", laatst: "2026-11-05T03:00:00Z" },
 ], { nu: NU });
 check("onder de grens met recente runs: rood", onderGrens.code === 1 && /onder de grens/.test(onderGrens.meldingen.join(" ")));
+
+// Niet gepland: de termijnregel zegt niet "de keten staat stil" maar "niet gepland", en dat is niet
+// groen (3). Een percentage onder de grens van wat wel gestart is, blijft rood.
+check("vercel.json zonder analysecron: niet gepland", !analysesGepland(JSON.stringify({ crons: [{ path: "/api/sync/cron", schedule: "0 5 * * *" }] })));
+check("vercel.json met de analysecron: gepland", analysesGepland(JSON.stringify({ crons: [{ path: "/api/cron/trigger-sops?limit=1", schedule: "0 3 * * *" }] })));
+check("geen of onleesbare vercel.json: niet gepland", !analysesGepland(null) && !analysesGepland("{kapot"));
+const stilNietGepland = beslisSlagingsPoort(
+  vatSlagingenSamen(herhaal(9, rij("monthly_sop", "completed")), { nu: NU, vastgelopenNaMinuten: 15, grens: 0.8, minimumPogingen: 5 }),
+  [{ cadans: "monthly_sop", laatst: "2026-09-01T15:00:00Z" }],
+  { nu: NU, maxDagen: { monthly_sop: 38 }, gepland: false });
+check("niet gepland en oud: code 3 met 'niet gepland', niet 'staat stil'",
+  stilNietGepland.code === 3 && /niet gepland/.test(stilNietGepland.meldingen.join(" ")) && !/staat stil/.test(stilNietGepland.meldingen.join(" ")), JSON.stringify(stilNietGepland));
+const leegNietGepland = beslisSlagingsPoort([], [], { nu: NU, gepland: false });
+check("niet gepland en leeg venster: code 3, niet 1", leegNietGepland.code === 3);
+const laagNietGepland = beslisSlagingsPoort(uit, [], { nu: NU, gepland: false });
+check("niet gepland maar onder de grens: rood (1), met beide meldingen",
+  laagNietGepland.code === 1 && /niet gepland/.test(laagNietGepland.meldingen.join(" ")) && /onder de grens/.test(laagNietGepland.meldingen.join(" ")));
+check("gepland (standaard): de termijnregel geldt zoals voorheen", goedMaarOud.code === 1);
 
 console.log(`analyse-slagingen: ${passed} geslaagd, ${failed} gefaald`);
 if (failed > 0) process.exit(1);

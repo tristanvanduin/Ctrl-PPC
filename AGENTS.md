@@ -228,6 +228,12 @@ laatste afgeronde run), en als een vaste cadans langer dan zijn termijn niet afr
 (`MAX_DAGEN_ZONDER_AFRONDING` in `lib/eval/analyse-slagingen.ts`). Een keten die stilvalt, levert geen
 mislukkingen op maar stilte; een lege tabel mag niet als in orde lezen.
 
+Staat er in `vercel.json` geen cron voor `/api/cron/trigger-sops`, dan zijn de analyses **niet gepland**
+en zegt de poort dat, in plaats van "de keten staat stil": stilte is dan verwacht. Hij eindigt dan op
+**3** (niet gedraaid, dus niet groen), behalve als het percentage van wat wel met de hand gestart is
+onder de grens zit: dat blijft rood. Zet je de cron aan, dan geldt de termijnregel vanzelf weer. Let
+op: de poort leest de repo, niet het Vercel-dashboard.
+
 ## CI
 
 `.github/workflows/pr-poorten.yml` draait op elke pull request hygiene, datagrond, tsc, de tests en de
