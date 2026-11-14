@@ -1,10 +1,11 @@
-// Een halve run telt niet als gedraaid, een vastgelopen run gaat op failed, de maandpoort keurt
-// geen analyse goed die over ontbrekende stappen zwijgt, en de zoektermtabel heeft een periode.
+// Een halve run telt niet als gedraaid, een vastgelopen run gaat op failed (tenzij hij zijn
+// afrondingsteken wel wegschreef), de maandpoort keurt geen analyse goed die over ontbrekende
+// stappen zwijgt, en de zoektermtabel heeft een periode.
 // Draaien: node_modules/.bin/tsx lib/analysis/__runs_en_dekking_test.ts
 
 import { dekkingsRegel, validateMonthlyAcceptance, GEEN_DATA_MODEL } from "./monthly-acceptance";
 import { laatsteZoektermStand, zoektermKop } from "./zoekterm-stand";
-import { vastgelopenRuns, vastgelopenReden } from "@/lib/scheduler/vastgelopen-runs";
+import { vastgelopenRuns, vastgelopenReden, afsluitingVoor } from "@/lib/scheduler/vastgelopen-runs";
 import { isStaleRunning, VASTGELOPEN_RUN_MINUTEN } from "@/lib/scheduler/core";
 import type { StepResult } from "./helpers";
 
@@ -27,6 +28,25 @@ console.log("Vastgelopen runs");
   check("een run met voortgang een half uur geleden loopt nog", !weg.some((r) => r.job_id === "b"));
   check("de reden noemt de fase en dat hij niet als gedraaid telt", vastgelopenReden(rijen[0]).includes("Stap 6") && vastgelopenReden(rijen[0]).includes("telt niet als gedraaid"));
   check("de pump-drempel van 15 minuten blijft de standaard", isStaleRunning("running", new Date(nu.getTime() - 20 * 60_000), nu) && !isStaleRunning("running", new Date(nu.getTime() - 20 * 60_000), nu, VASTGELOPEN_RUN_MINUTEN));
+}
+
+console.log("\nEen stille run met afrondingsteken is afgerond, niet mislukt");
+{
+  // Naar de echte rijen van demo-greentech: meta_monthly 1 september (teken 19 s na de laatste
+  // melding) en 19 augustus 13:42 (teken pas om 19:56, van een latere run).
+  const nu = new Date("2026-11-14T12:00:00Z");
+  const af = { job_id: "m", client_id: "demo-greentech", status: "running", started_at: "2026-09-01T14:57:10Z", updated_at: "2026-09-01T14:58:09Z", current_phase: "run_step_6", metadata: { sop_type: "meta_monthly" } };
+  const a = afsluitingVoor(af, ["2026-09-01T14:58:28Z"], null, nu);
+  check("een running-rij met een full-rij wordt completed en niet failed", a.status === "completed", JSON.stringify(a));
+  check("afgerond op het moment van het teken, niet nu", a.completed_at === "2026-09-01T14:58:28.000Z", a.completed_at);
+  check("de melding zegt dat het achteraf is vastgesteld", a.status === "completed" && a.message.includes("achteraf"));
+
+  const gestopt = { ...af, started_at: "2026-08-19T13:42:31Z", updated_at: "2026-08-19T13:43:32Z" };
+  check("een teken uren later hoort bij een andere run: failed", afsluitingVoor(gestopt, ["2026-08-19T19:56:25Z"], null, nu).status === "failed");
+  check("een teken van voor de start telt niet", afsluitingVoor(af, ["2026-09-01T14:50:00Z"], null, nu).status === "failed");
+  check("een teken na de start van de volgende run hoort bij die run", afsluitingVoor(af, ["2026-09-01T15:20:00Z"], "2026-09-01T15:10:00Z", nu).status === "failed");
+  check("zonder teken: failed met de vastgelopen-reden", (() => { const f = afsluitingVoor(af, [], null, nu); return f.status === "failed" && f.error_message.includes("telt niet als gedraaid"); })());
+  check("zonder starttijd is niet te zeggen welk teken erbij hoort: failed", afsluitingVoor({ ...af, started_at: null }, ["2026-09-01T14:58:28Z"], null, nu).status === "failed");
 }
 
 console.log("\nDe maandpoort en stappen zonder data");

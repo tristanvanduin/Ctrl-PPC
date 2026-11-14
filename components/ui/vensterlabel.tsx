@@ -48,7 +48,10 @@ type Props = (
   | { soort: "periode"; kaal?: boolean;
       /** Het blok telt de periode van de kiezer per dag (de kaart in de nieuwe weergave): dan staan de
        *  dagen in het label, niet de maanden die de periode raken. */
-      perDag?: boolean }
+      perDag?: boolean;
+      /** Het blok volgt de dagen van de periode, in vakken per dag, week of maand (de hoofdgrafiek in
+       *  de nieuwe weergave, lib/overzicht/grafiek-vakken.ts). Alleen bij een periode per dag. */
+      korrel?: "dag" | "week" | "maand" }
   /** Zonder `jaar`: het lopende rapportagejaar (Amsterdam), het jaar waar pacing, jaardoel en
    *  prognose over gaan. Een blok dat zijn jaar uit de data kent, geeft dat mee. */
   | { soort: "jaar"; jaar?: number }
@@ -69,13 +72,16 @@ export function Vensterlabel(props: Props) {
   // Een periode per dag die geen hele maanden is: dit blok telt de maanden die hij raakt.
   const perMaand = periode.dag && !periode.dag.maandPad && periode.dag.keuze.periode.soort === "dagen" ? periode.dag.periode : null;
   // Een blok dat per dag telt, volgt de dagen zelf.
-  const dagen = soort === "periode" && props.perDag && periode.dag ? periode.dag.periode : null;
-  const tekst = dagen ? `volgt periode · per dag: ${formatDagPeriode(dagen)}`
+  const korrel = soort === "periode" ? props.korrel ?? (props.perDag ? "dag" : null) : null;
+  const dagen = korrel && periode.dag ? periode.dag.periode : null;
+  const tekst = dagen ? `volgt periode · per ${korrel}: ${formatDagPeriode(dagen)}`
     : soort === "periode" && perMaand ? `volgt periode · per maand: ${formatRangeKort(periode.range)}`
     : soort === "periode" ? (props.kaal ? "volgt periode" : `volgt periode · ${formatRangeKort(periode.range)}`)
     : soort === "jaar" ? `jaarblok · ${jaar}`
     : `vast venster · ${props.venster}`;
-  const uitleg = dagen ? `Dit blok volgt de gekozen periode per dag: ${formatDagPeriode(dagen)}.`
+  const uitleg = dagen ? `Dit blok volgt de gekozen periode per ${korrel}: ${formatDagPeriode(dagen)}.`
+      + (korrel === "week" ? " Een week loopt van maandag t/m zondag; de eerste en de laatste zijn afgekapt op de periode." : "")
+      + (korrel === "maand" ? " De eerste en de laatste maand zijn afgekapt op de periode." : "")
     : soort === "periode" && perMaand
     ? `Dit blok telt per maand: de maanden die de gekozen periode (${formatDagPeriode(perMaand)}) raken, ${formatRange(periode.range)}.`
       // Het venster loopt bewust door tot na de datastand: dan staat er een halve maand naast hele.

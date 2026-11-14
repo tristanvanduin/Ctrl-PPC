@@ -325,9 +325,11 @@ function CrossChannelViewRuw({ clientId, kanalen = [], edition, nieuw = false, a
                         <span className="block text-micro font-normal text-muted-foreground">{periodeTekst}</span>
                       )}
                     </TotaalCel>
-                    <TotaalCel getal>{eur(tot.spend)}</TotaalCel>
+                    {/* data-cijfer: de cijfercontrole legt deze totalen op Campagnes naast de tegels van het
+                        Overzicht (scripts/check-cijfers-gelijk.mjs), op het attribuut en niet op de opmaak. */}
+                    <TotaalCel getal><span data-cijfer="kanaaltotaal-kosten">{eur(tot.spend)}</span></TotaalCel>
                     <TotaalCel getal>{fmt(tot.clicks)}</TotaalCel>
-                    <TotaalCel getal>{fmt(tot.conversions)}</TotaalCel>
+                    <TotaalCel getal><span data-cijfer="kanaaltotaal-conversies">{fmt(tot.conversions)}</span></TotaalCel>
                     {heeftWaarde && <TotaalCel getal>{eur(tot.waarde)}</TotaalCel>}
                     {/* De CPA uit de totalen, niet als gemiddelde van de kanaal-CPA's: dat zou
                         LinkedIn even zwaar laten wegen als Google. */}

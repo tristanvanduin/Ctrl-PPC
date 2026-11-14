@@ -20,7 +20,7 @@ import { Tabel, Kop, KolomKop, Body, Rij, NaamCel, GetalCel, AandeelCel, TotaalR
 import { Kerncijfer } from "@/components/ui/kerncijfer";
 import { metriekLabel } from "@/lib/util/tekst";
 import { useBlendedClientData } from "@/lib/use-blended-client-data";
-import { budgetAdvies, doelOordeel, gebruikteDoelReeks, jaardoelBereik, oordeelOverTekst, reeksVanDoel, scenarioVak, type DoelRichting } from "@/lib/doel/jaardoel";
+import { budgetAdvies, doelOordeel, gebruikteDoelReeks, jaardoelBereik, oordeelOverTekst, reeksVanDoel, scenarioVak, type DoelReeks, type DoelRichting } from "@/lib/doel/jaardoel";
 import { KANAAL_NAAM, type Kanaal } from "@/lib/kanalen/beschikbaar";
 import { Laadvlak } from "@/components/ui/laadvlak";
 import { geenBeursfilterTekst } from "@/lib/overzicht/beursfilter";
@@ -781,6 +781,8 @@ const impactColors = {
 
 function KpiCard({
   label,
+  kpi,
+  reeks,
   realized,
   target,
   forecast: forecastVal,
@@ -790,6 +792,12 @@ function KpiCard({
   richting,
 }: {
   label: string;
+  /** Welk doel dit is, in de namen van de Prognose (ForecastMetric, plus adSpend): de cijfercontrole
+   *  zoekt hierop het doel dat bij dat van de Prognose hoort (scripts/check-cijfers-gelijk.mjs). */
+  kpi: "conversions" | "revenue" | "cpa" | "adSpend" | "roas";
+  /** Over welke kanalen de kaart rekent (gebruikteDoelReeks): de cijfercontrole vergelijkt het doel
+   *  alleen met dat van de Prognose als beide over dezelfde reeks gaan. */
+  reeks: DoelReeks;
   /** Null voor een verhouding zonder noemer (ytdGerealiseerd): een CPA zonder één conversie is
    *  geen € 0. Overzicht zei daar "—" en dit tabblad een gemeten CPA van € 0. */
   realized: number | null;
@@ -848,7 +856,7 @@ function KpiCard({
       </div>
       <p className="text-micro text-muted-foreground/70 mt-1">Voortgang tot nu toe — nog niet tijd-gecorrigeerd</p>
       <div className="flex items-center justify-between mt-1">
-        <span className="text-micro text-muted-foreground">Doel: {fmtVal(target)}</span>
+        <span className="text-micro text-muted-foreground">Doel: <span data-cijfer="jaardoel" data-kpi={kpi} data-reeks={reeks}>{fmtVal(target)}</span></span>
         <span className={`text-micro font-semibold ${statusColor}`}>
           Prognose: {forecastVal === null ? "—" : `${fmtVal(forecastVal)} (${pct(diffPct)})`}
         </span>
@@ -1079,6 +1087,8 @@ export function DgmView({ clientId, kanalen = null, geoClone = null }: {
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
           {conv.annualTarget > 0 && (
             <KpiCard
+              kpi="conversions"
+              reeks={gebruikteReeks}
               label={vocab.conversions.charAt(0).toUpperCase() + vocab.conversions.slice(1)}
               realized={conv.ytdRealized}
               target={conv.annualTarget}
@@ -1089,6 +1099,8 @@ export function DgmView({ clientId, kanalen = null, geoClone = null }: {
           )}
           {rev.annualTarget > 0 && (
             <KpiCard
+              kpi="revenue"
+              reeks={gebruikteReeks}
               label="Omzet"
               realized={rev.ytdRealized}
               target={rev.annualTarget}
@@ -1104,6 +1116,8 @@ export function DgmView({ clientId, kanalen = null, geoClone = null }: {
             const cpaForecast = jaarprognoseVerhouding(forecast, "cpa");
             return (
               <KpiCard
+                kpi="cpa"
+                reeks={gebruikteReeks}
                 label={vocab.cpa.charAt(0).toUpperCase() + vocab.cpa.slice(1)}
                 realized={ytdGerealiseerd(forecast, "cpa")}
                 target={cpaTarget}
@@ -1116,6 +1130,8 @@ export function DgmView({ clientId, kanalen = null, geoClone = null }: {
           })()}
           {spend.annualTarget > 0 && (
             <KpiCard
+              kpi="adSpend"
+              reeks={gebruikteReeks}
               label="Advertentiebudget gebruikt"
               realized={spend.ytdRealized}
               target={spend.annualTarget}
@@ -1130,6 +1146,8 @@ export function DgmView({ clientId, kanalen = null, geoClone = null }: {
             const roasForecast = jaarprognoseVerhouding(forecast, "roas");
             return (
               <KpiCard
+                kpi="roas"
+                reeks={gebruikteReeks}
                 label="Rendement op advertentiebudget"
                 realized={ytdGerealiseerd(forecast, "roas")}
                 target={roasTarget}

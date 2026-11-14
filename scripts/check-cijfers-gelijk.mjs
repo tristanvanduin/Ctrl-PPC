@@ -17,9 +17,20 @@
 // vensterverschil is:
 //   1. Overzicht oud tegen Overzicht nieuw: dezelfde tegels (Conversies, Kosten, CPA, ROAS, Omzet).
 //   2. Overzicht nieuw: de kanaalkaarten opgeteld tegen de totaaltegel (conversies en kosten).
-//   3. Overzicht tegen Campagnes: conversies en kosten, als som van de totaalrijen per kanaal.
+//   3. Overzicht nieuw tegen Campagnes nieuw: conversies en kosten uit de totaalrij van de
+//      kanaaltotalen (data-cijfer="kanaaltotaal-*"). Alleen in de nieuwe weergave: daar staat die
+//      tabel op Campagnes en volgt hij de gekozen periode. De campagnetabellen eronder (en heel
+//      Campagnes in de vertrouwde weergave) hebben een vast venster, 90 dagen of hele maanden sinds
+//      90 dagen terug, en hun totaal is dus geen 12 maanden: dat naast het Overzicht leggen geeft een
+//      verschil dat niets zegt. Een eerdere versie telde die tfoot's op en las er nooit iets.
 //   4. Prognose tegen Doelen & voortgang: het jaardoel (een doel is een invoer, geen berekening:
-//      het hoort overal hetzelfde getal te zijn).
+//      het hoort overal hetzelfde getal te zijn), op data-cijfer="jaardoel", per KPI (data-kpi):
+//      de Prognose toont het doel van een KPI, Doelen een kaart per KPI. Het stond op beide
+//      schermen in kleine tekst ("vs. doel 1.650 (-24%)", "Doel: 1.650"), en de tegellezer zag
+//      alleen getallen vanaf 18 px: het jaardoel was zo altijd NIET GEMETEN. Alleen over dezelfde
+//      reeks (data-reeks, google of blended): zonder ingevoerd doel schat elke reeks een eigen doel,
+//      en Doelen rekent op Google zolang Alle kanalen niet geladen is. Een andere reeks is NIET
+//      GEMETEN, geen verschil.
 //   5. Portfolio (de rij met de link naar de demo-klant) tegen het Overzicht: conversies en kosten.
 // "Gelijk" is: het verschil past binnen de afronding van de minst precieze van de twee weergaven
 // ("1.246" tegen "1.245,6" is gelijk; "€ 12k" tegen "€ 12.480" ook, "1.246" tegen "1.250" niet).
@@ -36,9 +47,11 @@
 //
 // ── DE ZELFTEST ─────────────────────────────────────────────────────────────
 //
-// Aan het eind laadt het script twee nep-pagina's (zonder server, via page.route) met een bewust
+// Aan het eind laadt het script nep-pagina's (zonder server, via page.route) met een bewust
 // verschil en een verschil dat binnen de afronding valt, en eist dat de controle het eerste meldt en
-// het tweede niet. Ook de kanaalkaartsom wordt zo nagespeeld. Faalt de zelftest, dan faalt het script.
+// het tweede niet. Ook de kanaalkaartsom, de kanaaltotalen op Campagnes en het jaardoel worden zo
+// nagespeeld, elk met een pagina die goedgekeurd, een die afgekeurd en een die niet gemeten moet
+// worden. Faalt de zelftest, dan faalt het script.
 
 import { laadPlaywright } from "./playwright-laden.mjs";
 
@@ -98,8 +111,9 @@ function som(getallen) {
  * /client/<id>, niet op de tekst: het scorebord toont de naam ("GreenTech (demo)"), en het id staat
  * alleen in de href, die niet in textContent zit. Een eerdere versie zocht het id in de tekst, vond
  * daardoor nooit een rij, en de Portfolio-vergelijking was zo altijd NIET GEMETEN.
- * Totaalrijen: per tabel de rij in tfoot (TotaalRij in data-table.tsx). Campagnes heeft een tabel
- * per kanaal, elk met een eigen totaal; "alle kanalen" is de som daarvan.
+ * Gemerkte cijfers: elk zichtbaar element met data-cijfer (en eventueel data-kpi). Dat zet de pagina
+ * er zelf op waar een cijfer niet als tegel staat (het jaardoel, de kanaaltotalen op Campagnes): een
+ * attribuut verschuift niet mee met de opmaak of de tekst eromheen.
  */
 const LEES = (klant) => {
   const schoon = (s) => (s ?? "").replace(/\s+/g, " ").trim();
@@ -124,7 +138,6 @@ const LEES = (klant) => {
     };
   });
   const rijen = [];
-  const totalen = [];
   const vanKlant = (tr) => {
     const id = klant.toLowerCase();
     for (const a of tr.querySelectorAll("a[href]")) {
@@ -140,10 +153,11 @@ const LEES = (klant) => {
       return Object.fromEntries(koppen.map((k, i) => [k, cellen[i] ?? null]));
     };
     for (const tr of tabel.querySelectorAll("tbody tr")) if (vanKlant(tr)) rijen.push(alsRij(tr));
-    const voet = tabel.querySelector("tfoot tr");
-    if (voet) totalen.push(alsRij(voet));
   }
-  return { tegels, kaarten, rijen, totalen };
+  const cijfers = [...document.querySelectorAll("[data-cijfer]")]
+    .filter((el) => el.getClientRects().length > 0)
+    .map((el) => ({ naam: el.getAttribute("data-cijfer"), kpi: el.getAttribute("data-kpi"), reeks: el.getAttribute("data-reeks"), tekst: schoon(el.textContent) }));
+  return { tegels, kaarten, rijen, cijfers };
 };
 
 /** De eerste tegel waarvan het label op het patroon past. */
@@ -157,22 +171,9 @@ const cel = (gelezen, patroon) => {
   return null;
 };
 
-/**
- * De som van de totaalrijen, onder de eerste kop die op het patroon past. null als er geen
- * totaalrij is, of als een totaalrij die kolom wel heeft maar er geen getal in staat: een som die
- * stil een tabel overslaat, is een kleiner getal en geen meting.
- */
-const totaalSom = (gelezen, patroon) => {
-  const getallen = [];
-  for (const rij of gelezen?.totalen ?? []) {
-    const kop = Object.keys(rij).find((k) => patroon.test(k));
-    if (!kop) continue;
-    const g = leesGetal(rij[kop]);
-    if (!g) return null;
-    getallen.push(g);
-  }
-  return getallen.length > 0 ? { getal: som(getallen), n: getallen.length } : null;
-};
+/** Het eerste gemerkte cijfer met deze naam (en, als gegeven, deze KPI). */
+const cijfer = (gelezen, naam, kpi = undefined) =>
+  gelezen?.cijfers?.find((c) => c.naam === naam && (kpi === undefined || c.kpi === kpi)) ?? null;
 
 // ── De vergelijkingen ───────────────────────────────────────────────────────
 
@@ -187,7 +188,10 @@ const TEGELS = [
 /** Elke vergelijking: welke twee plekken, en de twee gelezen teksten (of null). */
 function vergelijkingen(p) {
   const uit = [];
-  const paar = (wat, plekA, a, plekB, b) => uit.push({ wat, plekA, plekB, a: a?.tekst ?? null, b: b?.tekst ?? null });
+  // `reden`: waarom niet gemeten, als er een kant ontbreekt. `nietVergelijkbaar`: beide kanten staan er,
+  // maar gaan niet over hetzelfde (dan is een verschil geen fout, en gelijk ook geen bewijs).
+  const paar = (wat, plekA, a, plekB, b, reden = null, nietVergelijkbaar = null) =>
+    uit.push({ wat, plekA, plekB, a: a?.tekst ?? null, b: b?.tekst ?? null, reden, nietVergelijkbaar });
 
   for (const [naam, patroon] of TEGELS) {
     paar(`${naam}`, "Overzicht oud (tegel)", tegel(p.oud, patroon), "Overzicht nieuw (tegel)", tegel(p.nieuw, patroon));
@@ -203,16 +207,34 @@ function vergelijkingen(p) {
   uit.push({ wat: "Kosten", plekA: `kanaalkaarten opgeteld (${kaarten.map((k) => k.kanaal).join("+") || "geen"})`, plekB: "Overzicht nieuw (totaaltegel)",
     aGetal: somVan("kosten"), b: tegel(p.nieuw, TEGELS[1][1])?.tekst ?? null });
 
-  // Campagnes: de totaalrijen van de tabellen per kanaal opgeteld. Een tegel met het label
-  // Conversies staat op dat tabblad niet, dus een vergelijking op tegels was daar nooit gemeten.
-  const campConv = totaalSom(p.campagnes, /^(conversies|conv\.?|leads|aanvragen)\b/i);
-  const campKosten = totaalSom(p.campagnes, /^(kosten|spend|uitgaven)\b/i);
-  uit.push({ wat: "Conversies", plekA: "Overzicht oud (tegel)", a: tegel(p.oud, /^conversies$/i)?.tekst ?? null,
-    plekB: `Campagnes, totaalrijen opgeteld (${campConv?.n ?? 0} tabel(len))`, bGetal: campConv?.getal ?? null });
-  uit.push({ wat: "Kosten", plekA: "Overzicht oud (tegel)", a: tegel(p.oud, TEGELS[1][1])?.tekst ?? null,
-    plekB: `Campagnes, totaalrijen opgeteld (${campKosten?.n ?? 0} tabel(len))`, bGetal: campKosten?.getal ?? null });
+  // Campagnes: de totaalrij van de kanaaltotalen (cross-channel-view.tsx, alleenTabel), in de nieuwe
+  // weergave en dus tegen het Overzicht in de nieuwe weergave. Zie de kop voor waarom de
+  // campagnetabellen eronder niet meetellen.
+  // De reden noemt de kant die ontbreekt: een regel over de kanaaltotalen terwijl juist het tabblad
+  // niet openging of de tegel ontbrak, stuurt de zoektocht de verkeerde kant op.
+  for (const [naam, patroon, merk] of [["Conversies", /^conversies$/i, "kanaaltotaal-conversies"], ["Kosten", TEGELS[1][1], "kanaaltotaal-kosten"]]) {
+    const a = tegel(p.nieuw, patroon), b = cijfer(p.campagnes, merk);
+    const reden = !p.campagnes ? "het tabblad Campagnes kon niet geopend worden (knop Prestaties of Campagnes niet gevonden)"
+      : !b ? "geen kanaaltotalen op Campagnes: die staan er alleen in de nieuwe weergave, bij Alle kanalen en met meer dan een kanaal"
+        : !a ? `geen tegel ${naam} op Overzicht nieuw` : null;
+    paar(naam, "Overzicht nieuw (tegel)", a, "Campagnes nieuw (kanaaltotalen, totaalrij)", b, reden);
+  }
 
-  paar("Jaardoel", "Prognose", tegel(p.prognose, /doel/i), "Doelen & voortgang", tegel(p.doelen, /doel/i));
+  // Het jaardoel: de KPI die de Prognose toont, en op Doelen & voortgang de kaart van diezelfde KPI.
+  // Alleen over dezelfde reeks (data-reeks): zonder ingevoerd doel schat elke reeks zijn eigen doel
+  // (vorig jaar +10%), en Doelen rekent op Google zolang Alle kanalen niet geladen is.
+  const doelPrognose = cijfer(p.prognose, "jaardoel");
+  const kpi = doelPrognose?.kpi ?? null;
+  const doelDoelen = kpi ? cijfer(p.doelen, "jaardoel", kpi) : null;
+  const reeksA = doelPrognose?.reeks ?? "?", reeksB = doelDoelen?.reeks ?? "?";
+  paar("Jaardoel", `Prognose (${kpi ?? "geen KPI"}, ${reeksA})`, doelPrognose, `Doelen & voortgang (${kpi ?? "geen KPI"}, ${reeksB})`, doelDoelen,
+    !p.prognose ? "het tabblad Prognose kon niet geopend worden (knop Prestaties of Prognose niet gevonden)"
+      : !doelPrognose ? "de Prognose toont geen jaardoel (geen doel ingesteld, of de prognose laadde niet)"
+        : !p.doelen ? "het tabblad Doelen & voortgang kon niet geopend worden (knop niet gevonden)"
+          : `Doelen & voortgang heeft geen kaart met een jaardoel voor ${kpi}`,
+    reeksA === "?" || reeksA !== reeksB
+      ? `de twee doelen gaan over een andere reeks (Prognose: ${reeksA}, Doelen: ${reeksB}); dan kan het doel terecht verschillen`
+      : null);
 
   // Portfolio toont alleen Google Ads en zegt dat in zijn kop (lib/portfolio-kop.ts). Hij hoort dus
   // gelijk te zijn aan de Google-kaart, niet aan het totaal over alle kanalen: tegen dat totaal
@@ -228,14 +250,21 @@ function beoordeel(v) {
   const a = v.aGetal ?? leesGetal(v.a);
   const b = v.bGetal ?? leesGetal(v.b);
   const toon = (g, t) => t ?? (g ? String(Math.round(g.waarde * 100) / 100) : "niet af te lezen");
-  if (!a || !b) return { uitslag: "niet gemeten", tekst: `${v.plekA}: ${toon(a, v.a)}; ${v.plekB}: ${toon(b, v.b)}` };
+  if (!a || !b) return { uitslag: "niet gemeten", tekst: `${v.plekA}: ${toon(a, v.a)}; ${v.plekB}: ${toon(b, v.b)}${v.reden ? ` (${v.reden})` : ""}` };
+  if (v.nietVergelijkbaar) return { uitslag: "niet gemeten", tekst: `${v.plekA}: ${toon(a, v.a)}; ${v.plekB}: ${toon(b, v.b)} (${v.nietVergelijkbaar})` };
   const gelijk = gelijkBinnenAfronding(a, b);
   return { uitslag: gelijk ? "gelijk" : "verschil", tekst: `${v.plekA}: ${toon(a, v.a)}  tegen  ${v.plekB}: ${toon(b, v.b)}` };
 }
 
 // ── Pagina's ophalen ────────────────────────────────────────────────────────
 
-async function lees(p, url, knoppen = []) {
+/**
+ * Opent de pagina, klikt de tabbladen (die hebben geen eigen adres: client-dashboard.tsx houdt het
+ * tabblad in state) en leest af. Met `wachtOp` wacht hij daarna tot er een gemerkt cijfer staat, tot
+ * WACHT ms: de Prognose en de kanaaltotalen laden hun data pas na de klik, en een vaste pauze die
+ * net te kort is, leest als "staat er niet".
+ */
+async function lees(p, url, knoppen = [], wachtOp = null) {
   await p.goto(url, { waitUntil: "domcontentloaded", timeout: 60000 });
   await p.waitForTimeout(WACHT);
   for (const k of knoppen) {
@@ -244,6 +273,7 @@ async function lees(p, url, knoppen = []) {
     await knop.click();
     await p.waitForTimeout(4500);
   }
+  if (wachtOp) await p.waitForSelector(wachtOp, { timeout: WACHT }).catch(() => {});
   return p.evaluate(LEES, KLANT);
 }
 
@@ -254,11 +284,15 @@ async function draai(browser) {
   const gelezen = {
     oud: await lees(p, klant("oud")),
     nieuw: await lees(p, klant("nieuw")),
-    campagnes: await lees(p, klant("oud"), [/^Prestaties$/, /^Campagnes$/]),
-    prognose: await lees(p, klant("oud"), [/^Prestaties$/, /^Prognose$/]),
-    doelen: await lees(p, klant("oud"), [/Planning & rapportage/, /Doelen & voortgang/]),
-    portfolio: await lees(p, `${BASIS}/portfolio?demo=1&periode=${VENSTER}`),
+    campagnes: await lees(p, klant("nieuw"), [/^Prestaties$/, /^Campagnes$/], "[data-cijfer^='kanaaltotaal-']"),
+    prognose: await lees(p, klant("oud"), [/^Prestaties$/, /^Prognose$/], "[data-cijfer='jaardoel']"),
   };
+  // Doelen rekent eerst op Google en schakelt over op Alle kanalen zodra die geladen is: wacht op een
+  // doel over de reeks van de Prognose, anders leest hij het kortstondige Google-doel.
+  const reeks = cijfer(gelezen.prognose, "jaardoel")?.reeks;
+  gelezen.doelen = await lees(p, klant("oud"), [/Planning & rapportage/, /Doelen & voortgang/],
+    reeks ? `[data-cijfer='jaardoel'][data-reeks='${reeks}']` : "[data-cijfer='jaardoel']");
+  gelezen.portfolio = await lees(p, `${BASIS}/portfolio?demo=1&periode=${VENSTER}`);
   await ctx.close();
   return vergelijkingen(gelezen);
 }
@@ -272,6 +306,14 @@ const campagneTabel = (kanaal, convLabel, spend, conv) =>
   `<h3>${kanaal}</h3><table><thead><tr><th>Campagne</th><th>Spend <span>aandeel</span></th><th>${convLabel} <span>aandeel</span></th><th>CPA</th></tr></thead>` +
   `<tbody><tr><td>${kanaal} | Brand</td><td>${spend}</td><td>${conv}</td><td>€ 40</td></tr></tbody>` +
   `<tfoot><tr><td>Totaal</td><td>${spend}</td><td>${conv}</td><td>€ 40</td></tr></tfoot></table>`;
+// Zoals de kanaaltotalen in cross-channel-view.tsx: de totaalrij met de gemerkte cijfers.
+const kanaaltotalen = (kosten, conv, stijl = "") =>
+  `<div style="${stijl}"><h3>Kanaaltotalen</h3><table><thead><tr><th>Kanaal</th><th>Spend</th><th>Klikken</th><th>Conversies</th></tr></thead>` +
+  `<tfoot><tr><td>Totaal</td><td><span data-cijfer="kanaaltotaal-kosten">${kosten}</span></td><td>9.000</td>` +
+  `<td><span data-cijfer="kanaaltotaal-conversies">${conv}</span></td></tr></tfoot></table></div>`;
+// Zoals KpiCard in dgm-view.tsx en ForecastSummaryTiles: het doel in kleine tekst, gemerkt per KPI.
+const doelKaart = (kpi, label, doel, reeks = "blended") =>
+  `<div><p>${label}</p><p style="font-size:32px">812</p><span style="font-size:11px">Doel: <span data-cijfer="jaardoel" data-kpi="${kpi}" data-reeks="${reeks}">${doel}</span></span></div>`;
 const portfolioTabel = (rijen) =>
   `<table><thead><tr><th>Klant</th><th>Conversies</th><th>Kosten</th></tr></thead><tbody>` +
   rijen.map(([naam, href, conv, kosten]) => `<tr><td><a href="${href}">${naam}</a></td><td>${conv}</td><td>${kosten}</td></tr>`).join("") +
@@ -288,8 +330,26 @@ async function zelftest(browser) {
     oud: pagina(tegelHtml([["Conversies", "1.246"], ["Kosten", "+6%"], ["Advertentiekosten", "€ 49.870"], ["CPA", "€ 40,02"]])),
     // Conversies wijken echt af; CPA verschilt alleen in afronding; kosten in "k"-notatie, binnen de stap.
     nieuw: pagina(tegelHtml([["Conversies", "1.312"], ["Kosten", "€ 50k"], ["CPA", "€ 40"]]) + kaartHtml([["google", "1.000", "€ 40.000"], ["meta", "246", "€ 9.870"]])),
-    // Zoals campaigns-per-channel.tsx: een tabel per kanaal, het totaal in tfoot, de kop met bijschrift.
-    campagnes: pagina(campagneTabel("Google Ads", "Conversies", "€ 40.000", "1.000") + campagneTabel("LinkedIn", "Leads", "€ 9.870", "246")),
+    // Campagnes in de nieuwe weergave: de kanaaltotalen, en daaronder de campagnetabellen van
+    // campaigns-per-channel.tsx met hun eigen (vaste) venster en eigen tfoot. Die tellen niet mee:
+    // opgeteld zijn ze 1.246 en € 49.870, en dan zou "gelijk" hieronder niets bewijzen.
+    campagnes: pagina(kanaaltotalen("€ 50.120", "1.312") + campagneTabel("Google Ads", "Conversies", "€ 40.000", "1.000") + campagneTabel("LinkedIn", "Leads", "€ 9.870", "246")),
+    "campagnes-anders": pagina(kanaaltotalen("€ 61.200", "1.246")),
+    // De vertrouwde weergave: alleen campagnetabellen, en een verborgen tabel (zoals achter "Toon als
+    // tabel") telt niet als afgelezen.
+    "campagnes-oud": pagina(kanaaltotalen("€ 50.120", "1.312", "display:none") + campagneTabel("Google Ads", "Conversies", "€ 40.000", "1.000")),
+    prognose: pagina(`<p>Jaarprognose — Conversies</p><p>Gerealiseerd + prognose <span>1.246</span></p><p>vs. doel <span data-cijfer="jaardoel" data-kpi="conversions" data-reeks="blended">1.650</span> (-24%)</p>`),
+    "prognose-leeg": pagina(`<p>Blended jaarprognose laadt…</p>`),
+    // Een andere KPI eerst, met een ander doel: de lezer moet de kaart van dezelfde KPI kiezen.
+    doelen: pagina(doelKaart("cpa", "Kosten per conversie", "€ 45") + doelKaart("conversions", "Conversies", "1.650")),
+    "doelen-anders": pagina(doelKaart("conversions", "Conversies", "1.600")),
+    "doelen-zonder": pagina(doelKaart("cpa", "Kosten per conversie", "€ 45")),
+    // Doelen nog op Google (Alle kanalen niet geladen), met een eigen schatting: geen fout van het doel.
+    "doelen-google": pagina(doelKaart("conversions", "Conversies", "1.430", "google")),
+    // Hetzelfde getal over een andere reeks is ook geen bewijs van gelijk.
+    "doelen-google-gelijk": pagina(doelKaart("conversions", "Conversies", "1.650", "google")),
+    // Een Overzicht zonder de tegel Conversies: dan ontbreekt de tegel, niet de kanaaltotalen.
+    "nieuw-zonder-conversies": pagina(tegelHtml([["Kosten", "€ 50k"]])),
     // Zoals portfolio-scoreboard.tsx: de NAAM in de rij, het id alleen in de href. Een andere klant
     // erboven, zodat een lezer die de eerste rij pakt het verkeerde getal krijgt.
     portfolio: pagina(portfolioTabel([["Andere klant", "/client/iemand-anders", "88", "€ 3.100"], ["GreenTech (demo)", `/client/${KLANT}`, "1.000", "€ 40.000"]])),
@@ -299,16 +359,25 @@ async function zelftest(browser) {
     route.fulfill({ status: 200, contentType: "text/html; charset=utf-8", body: paginas[naam] ?? pagina("") });
   });
   const lezen = async (naam) => { await p.goto(`${NEP}/${naam}`); return p.evaluate(LEES, KLANT); };
-  const v = vergelijkingen({
-    oud: await lezen("oud"), nieuw: await lezen("nieuw"),
-    campagnes: await lezen("campagnes"), portfolio: await lezen("portfolio"),
-  });
+  const g = {};
+  for (const naam of Object.keys(paginas)) g[naam] = await lezen(naam);
   await ctx.close();
 
-  const uitslag = (wat, plekA, plekB = "") => {
-    const gevonden = v.find((x) => x.wat === wat && x.plekA.startsWith(plekA) && x.plekB.startsWith(plekB));
+  const basis = { oud: g.oud, nieuw: g.nieuw, campagnes: g.campagnes, prognose: g.prognose, doelen: g.doelen, portfolio: g.portfolio };
+  const v = vergelijkingen(basis);
+  // Dezelfde vergelijkingen met een of meer pagina's vervangen door een variant.
+  const uitslagIn = (lijst, wat, plekA, plekB = "") => {
+    const gevonden = lijst.find((x) => x.wat === wat && x.plekA.startsWith(plekA) && x.plekB.startsWith(plekB));
     return gevonden ? beoordeel(gevonden).uitslag : "ontbreekt";
   };
+  const uitslag = (wat, plekA, plekB = "") => uitslagIn(v, wat, plekA, plekB);
+  const met = (vervang, wat, plekA, plekB = "") => uitslagIn(vergelijkingen({ ...basis, ...vervang }), wat, plekA, plekB);
+  // De uitleg bij een vergelijking: een NIET GEMETEN moet de kant noemen die ontbreekt.
+  const tekstMet = (vervang, wat, plekA, plekB = "") => {
+    const gevonden = vergelijkingen({ ...basis, ...vervang }).find((x) => x.wat === wat && x.plekA.startsWith(plekA) && x.plekB.startsWith(plekB));
+    return gevonden ? beoordeel(gevonden).tekst : "";
+  };
+  const campagnesZonderTegel = tekstMet({ nieuw: g["nieuw-zonder-conversies"] }, "Conversies", "Overzicht nieuw", "Campagnes");
   const eisen = [
     ["een echt verschil (1.246 tegen 1.312) wordt gemeld", uitslag("Conversies", "Overzicht oud", "Overzicht nieuw") === "verschil"],
     ["een afrondingsverschil (€ 40,02 tegen € 40) niet", uitslag("CPA", "Overzicht oud", "Overzicht nieuw") === "gelijk"],
@@ -316,11 +385,27 @@ async function zelftest(browser) {
     ["kaarten 1.000 + 246 tegen tegel 1.312 wordt gemeld", uitslag("Conversies", "kanaalkaarten") === "verschil"],
     ["kaartkosten € 49.870 tegen tegel € 50k niet", uitslag("Kosten", "kanaalkaarten") === "gelijk"],
     ["een tegel die er niet is, is niet gemeten (en niet gelijk)", uitslag("ROAS", "Overzicht oud", "Overzicht nieuw") === "niet gemeten"],
-    ["Campagnes: totaalrijen opgeteld (1.000 + 246) gelijk aan de tegel 1.246", uitslag("Conversies", "Overzicht oud", "Campagnes") === "gelijk"],
-    ["Campagnes: kosten uit de totaalrijen opgeteld gelijk aan € 49.870", uitslag("Kosten", "Overzicht oud", "Campagnes") === "gelijk"],
+    ["Campagnes: kanaaltotaal 1.312 gelijk aan de tegel 1.312 (de campagnetabellen tellen niet mee)", uitslag("Conversies", "Overzicht nieuw", "Campagnes") === "gelijk"],
+    ["Campagnes: kanaaltotaal € 50.120 tegen € 50k valt binnen de stap", uitslag("Kosten", "Overzicht nieuw", "Campagnes") === "gelijk"],
+    ["Campagnes: kanaaltotaal 1.246 tegen de tegel 1.312 wordt gemeld", met({ campagnes: g["campagnes-anders"] }, "Conversies", "Overzicht nieuw", "Campagnes") === "verschil"],
+    ["Campagnes: kanaaltotaal € 61.200 tegen € 50k wordt gemeld", met({ campagnes: g["campagnes-anders"] }, "Kosten", "Overzicht nieuw", "Campagnes") === "verschil"],
+    ["Campagnes zonder (zichtbare) kanaaltotalen: niet gemeten, ook niet via de tfoot's", met({ campagnes: g["campagnes-oud"] }, "Conversies", "Overzicht nieuw", "Campagnes") === "niet gemeten"
+      && met({ campagnes: g["campagnes-oud"] }, "Kosten", "Overzicht nieuw", "Campagnes") === "niet gemeten"],
+    ["Campagnes niet geopend: niet gemeten, en de reden noemt het tabblad", met({ campagnes: null }, "Conversies", "Overzicht nieuw", "Campagnes") === "niet gemeten"
+      && /tabblad Campagnes kon niet geopend/.test(tekstMet({ campagnes: null }, "Conversies", "Overzicht nieuw", "Campagnes"))],
+    ["Campagnes zonder kanaaltotalen: de reden noemt de kanaaltotalen", /geen kanaaltotalen op Campagnes/.test(tekstMet({ campagnes: g["campagnes-oud"] }, "Kosten", "Overzicht nieuw", "Campagnes"))],
+    ["Campagnes, tegel ontbreekt: de reden noemt de tegel, niet de kanaaltotalen", /geen tegel Conversies op Overzicht nieuw/.test(campagnesZonderTegel) && !/kanaaltotalen op Campagnes/.test(campagnesZonderTegel)],
+    ["Jaardoel: 1.650 tegen de conversiekaart 1.650 is gelijk (niet de CPA-kaart ervoor)", uitslag("Jaardoel", "Prognose (conversions", "Doelen") === "gelijk"],
+    ["Jaardoel: Doelen over Google (1.430) tegen Prognose over alle kanalen is niet gemeten, geen verschil", met({ doelen: g["doelen-google"] }, "Jaardoel", "Prognose", "Doelen") === "niet gemeten"
+      && /andere reeks/.test(tekstMet({ doelen: g["doelen-google"] }, "Jaardoel", "Prognose", "Doelen"))],
+    ["Jaardoel: hetzelfde getal over een andere reeks is ook niet gemeten, geen gelijk", met({ doelen: g["doelen-google-gelijk"] }, "Jaardoel", "Prognose", "Doelen") === "niet gemeten"],
+    ["Jaardoel: Prognose niet geopend noemt het tabblad", /tabblad Prognose kon niet geopend/.test(tekstMet({ prognose: null }, "Jaardoel", "Prognose", "Doelen"))],
+    ["Jaardoel: 1.650 tegen 1.600 wordt gemeld", met({ doelen: g["doelen-anders"] }, "Jaardoel", "Prognose", "Doelen") === "verschil"],
+    ["Jaardoel: geen kaart voor dezelfde KPI is niet gemeten", met({ doelen: g["doelen-zonder"] }, "Jaardoel", "Prognose", "Doelen") === "niet gemeten"],
+    ["Jaardoel: geen doel op de Prognose is niet gemeten", met({ prognose: g["prognose-leeg"] }, "Jaardoel", "Prognose", "Doelen") === "niet gemeten"],
     ["Portfolio: de rij wordt via de link gevonden, niet via de tekst", uitslag("Conversies", "Portfolio") === "gelijk"],
     ["Portfolio: kosten van de juiste rij (niet de eerste)", uitslag("Kosten", "Portfolio") === "gelijk"],
-    ["een verandering (+6%) is geen kostenbedrag, Advertentiekosten wel", uitslag("Kosten", "Overzicht oud", "Campagnes") === "gelijk"],
+    ["een verandering (+6%) is geen kostenbedrag, Advertentiekosten wel", tegel(g.oud, TEGELS[1][1])?.tekst === "€ 49.870"],
     ["leesGetal: '1.246' is 1246", leesGetal("1.246")?.waarde === 1246],
     ["leesGetal: '€ 45,20' is 45,2 met stap 0,01", leesGetal("€ 45,20")?.waarde === 45.2 && leesGetal("€ 45,20")?.stap === 0.01],
     ["leesGetal: '—' is geen getal", leesGetal("—") === null],
@@ -341,7 +426,8 @@ async function main() {
   let verschil = 0, nietGemeten = 0;
 
   if (!alleenZelftest) {
-    console.log(`Cijfercontrole op ${BASIS}, klant ${KLANT}, venster ${VENSTER}.\n`);
+    console.log(`Cijfercontrole op ${BASIS}, klant ${KLANT}, venster ${VENSTER}.`);
+    console.log("Niet vergeleken: de campagnetabellen op Campagnes (vast venster, ze volgen de gekozen periode niet; zie de kop).\n");
     for (const v of await draai(browser)) {
       const b = beoordeel(v);
       if (b.uitslag === "verschil") verschil += 1;

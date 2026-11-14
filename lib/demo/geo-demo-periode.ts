@@ -21,9 +21,9 @@
 // dezelfde vraag als lib/demo/server-supabase.ts). Buiten de demo leest de kaart de echte landtabellen.
 
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { demoGeoCountries, demoGeoStates, type GeoAgg } from "./geo-demo";
+import { demoGeoCountries, demoGeoStates } from "./geo-demo";
+import { verdeelOverProfiel, type GeoTotaal } from "./geo-dag-demo";
 import { seededDemoClientData } from "./geoclone-demo-data";
-import { splitInt } from "./split";
 import { googleDataUitAntwoord } from "@/lib/api/adapter";
 import { fetchBlendedHistoricalData } from "@/lib/api/blended-historical";
 import { alleRijen } from "@/lib/analysis/db-veilig";
@@ -40,37 +40,6 @@ import { monthsAgo } from "@/lib/reporting-date";
 import type { GeoDagKanaal, GeoKanaalTelling } from "@/lib/geo/geo-dag";
 import type { GeoLevel } from "@/lib/geo/geo-source";
 import type { GeoPeriodeResultaat } from "@/lib/geo/geo-periode";
-
-type Metriek = "impressions" | "clicks" | "cost" | "conversions" | "conversionsValue";
-const METRIEKEN: readonly Metriek[] = ["impressions", "clicks", "cost", "conversions", "conversionsValue"];
-type Totaal = Omit<GeoAgg, "code">;
-
-/**
- * Verdeelt een totaal over gewichten; de som van de delen is exact het totaal. Een geheel getal
- * met de grootste rest (splitInt, zoals de rest van de demo); een bedrag naar verhouding, met het
- * afrondingsverschil bij het grootste deel. Zonder gewichten (alles nul) de reservegewichten.
- */
-function verdeel(totaal: number, gewichten: readonly number[], reserve: readonly number[]): number[] {
-  const g = gewichten.some((w) => w > 0) ? gewichten : reserve;
-  if (!g.length || !g.some((w) => w > 0)) return g.map(() => 0);
-  if (Number.isInteger(totaal)) return splitInt(totaal, [...g]);
-  const som = g.reduce((s, w) => s + w, 0);
-  const delen = g.map((w) => (totaal * w) / som);
-  const grootste = g.indexOf(Math.max(...g));
-  delen[grootste] += totaal - delen.reduce((s, x) => s + x, 0);
-  return delen;
-}
-
-/** Een totaal over de codes van een profiel, per metriek met de aandelen van dat profiel. */
-export function verdeelOverProfiel(totaal: Totaal, profiel: readonly GeoAgg[]): GeoAgg[] {
-  const reserve = profiel.map((p) => p.cost);
-  const perMetriek = Object.fromEntries(METRIEKEN.map((m) => [m, verdeel(totaal[m], profiel.map((p) => p[m]), reserve)])) as Record<Metriek, number[]>;
-  return profiel.map((p, i) => ({
-    code: p.code,
-    impressions: perMetriek.impressions[i], clicks: perMetriek.clicks[i], cost: perMetriek.cost[i],
-    conversions: perMetriek.conversions[i], conversionsValue: perMetriek.conversionsValue[i],
-  }));
-}
 
 /**
  * Wat één kanaal in de demo op de kaart telt: zijn telling uit de kerncijfers, verdeeld over de
@@ -90,7 +59,7 @@ export function demoGeoUitTelling(kanaal: GeoDagKanaal, t: KanaalTelling | null,
     return leeg(`De vertoningen en klikken van ${naam} zijn voor deze periode niet bekend; ${naam} staat daarom niet op de kaart.`);
   }
 
-  const totaal: Totaal = {
+  const totaal: GeoTotaal = {
     impressions: t.tellers.impressions, clicks: t.tellers.clicks,
     cost: t.totalen.adSpend, conversions: t.totalen.conversions, conversionsValue: t.totalen.revenue,
   };
@@ -132,7 +101,7 @@ export function demoGeoPeriode(
 // ── De lezer: dezelfde rijen als de pagina ───────────────────────────────────
 
 /** De klant-id zoals de rijen hem hebben: zonder het voorvoegsel "gads-". */
-const demoId = (clientId: string): string => clientId.replace(/^gads-/, "");
+export const demoId = (clientId: string): string => clientId.replace(/^gads-/, "");
 
 /** Een lezing die mislukt (een tabel die ontbreekt), is een bron zonder rijen: null, geen throw. */
 async function ofNull<T>(lezing: () => Promise<T>): Promise<T | null> {

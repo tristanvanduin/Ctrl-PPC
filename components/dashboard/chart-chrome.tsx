@@ -358,9 +358,10 @@ interface TipProps {
   formatter?: (v: number, naam?: string) => string;
   verberg?: readonly string[];
   voet?: (label: string) => TipVoetRegel[];
+  kop?: (label: string) => string;
 }
 
-function TipInhoud({ active, payload, label, formatter, verberg, voet }: TipProps) {
+function TipInhoud({ active, payload, label, formatter, verberg, voet, kop }: TipProps) {
   if (!active || !payload?.length) return null;
   const fmt = formatter ?? volledigGetal;
   const regels = verberg?.length ? payload.filter((p) => !verberg.includes(String(p.name))) : payload;
@@ -377,7 +378,7 @@ function TipInhoud({ active, payload, label, formatter, verberg, voet }: TipProp
     <div className="rounded-lg border border-border bg-[var(--tip-vlak)] backdrop-blur-md shadow-lg px-3 py-2 text-meta">
       {/* Door dezelfde opmaker als de as. De as zei "mei '26" en de tooltip eronder "2026-05":
           twee schrijfwijzen voor dezelfde maand, tien pixels uit elkaar. */}
-      {label != null && <div className="font-semibold text-brand-gray mb-1">{maandLabel(String(label))}</div>}
+      {label != null && <div className="font-semibold text-brand-gray mb-1">{(kop ?? maandLabel)(String(label))}</div>}
       <div className="space-y-0.5">
         {regels.map((p: TipDeel, i: number) => (
           <div key={`${p.name}-${i}`} className="flex items-center gap-2">
@@ -405,13 +406,15 @@ function TipInhoud({ active, payload, label, formatter, verberg, voet }: TipProp
   );
 }
 
-export function Tip({ formatter, verberg, voet }: {
+export function Tip({ formatter, verberg, voet, kop }: {
   /** De opmaak van een waarde; de naam van de reeks gaat mee voor een plot met twee grootheden. */
   formatter?: (v: number, naam?: string) => string;
   /** Reeksen die wel getekend worden maar niet als regel in de lijst horen (ze staan in de voet). */
   verberg?: readonly string[];
   /** Regels onder de reeksen, per categorie op de x-as: een totaal, een afgeleide waarde. */
   voet?: (label: string) => TipVoetRegel[];
+  /** De kop van de tooltip; zonder deze de maand ("mei '26"). Voor een as met dagen of weken. */
+  kop?: (label: string) => string;
 }) {
   return (
     <Tooltip
@@ -421,7 +424,7 @@ export function Tip({ formatter, verberg, voet }: {
       // Direct bij de cursor. Recharts laat de tip standaard 400 ms van zijn vorige plek glijden,
       // en onderweg dekt hij de balken af waar je net naar kijkt (bouwplan fase 0).
       isAnimationActive={false}
-      content={(props: unknown) => <TipInhoud {...(props as TipProps)} formatter={formatter} verberg={verberg} voet={voet} />}
+      content={(props: unknown) => <TipInhoud {...(props as TipProps)} formatter={formatter} verberg={verberg} voet={voet} kop={kop} />}
     />
   );
 }

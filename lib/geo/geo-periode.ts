@@ -21,13 +21,17 @@
 // NOOIT EEN THROW: een tabel die ontbreekt of een lezing die faalt, is een kanaal zonder dagbron
 // (Google valt dan helemaal terug op de maanden, met dat in het label).
 //
-// In demo: de kanaaltotalen van de kerncijfers (dezelfde rijen uit de geseede database, dezelfde
-// telling), verdeeld over de landen met de vaste aandelen van de mock (lib/demo/geo-demo-periode.ts).
+// In demo: Google per land en staat uit de dagrijen van de geseede database (ads_country_daily en
+// ads_region_daily, lib/demo/geo-dag-demo.ts), via leesGoogle zoals bij een echte klant, als die
+// rijen de periode en de vergelijking dekken; zie demoMetGoogleDagen. Voor de andere kanalen, en voor
+// Google zonder (dekkende) dagrijen, de kanaaltotalen van de
+// kerncijfers (dezelfde rijen, dezelfde telling), verdeeld over de landen met de vaste aandelen van
+// de mock (lib/demo/geo-demo-periode.ts).
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { isDemoClientValue } from "@/lib/demo/mock-supabase";
-import { demoGeoInvoer, demoGeoPeriode } from "@/lib/demo/geo-demo-periode";
+import { demoGeoInvoer, demoGeoPeriode, demoId } from "@/lib/demo/geo-demo-periode";
 import type { DagPeriode } from "@/lib/period/dag-periode";
 import { landcodeUitLinkedInUrn, landcodeUitNaam } from "./land-namen";
 import { regionNameToUsps } from "./us-fips";
@@ -84,15 +88,19 @@ export interface ResolveGeoPeriodeArgs {
   vergelijking: DagPeriode | null;
 }
 
-export async function resolveGeoPeriode({ clientId, channel, periode, vergelijking }: ResolveGeoPeriodeArgs): Promise<GeoPeriodeResultaat> {
+/** `sb` alleen voor de test (een nep-database); de route laat hem weg. */
+export async function resolveGeoPeriode(
+  { clientId, channel, periode, vergelijking }: ResolveGeoPeriodeArgs,
+  sb: SupabaseClient | null = getSupabaseAdmin(),
+): Promise<GeoPeriodeResultaat> {
   const gevraagd: GeoDagKanaal[] = channel === "blended" ? [...GEO_DAG_KANALEN] : [channel];
-  const sb = getSupabaseAdmin();
   if (isDemoClientValue(clientId)) {
     // De demo: dezelfde rijen en dezelfde telling als de kerncijfers op de pagina, verdeeld over de
-    // landen met de aandelen van de mock (lib/demo/geo-demo-periode.ts). Zonder database is er niets
+    // landen met de aandelen van de mock (lib/demo/geo-demo-periode.ts); Google uit zijn dagrijen
+    // als die beide periodes dekken (demoMetGoogleDagen). Zonder database is er niets
     // te tellen: dan zegt de kaart per kanaal dat er geen landdata is, net als de pagina zonder cijfers.
     if (!sb) return telGeoPeriode(gevraagd, periode, vergelijking, async (kanaal) => ({ kanaal, dagen: null }));
-    return demoGeoPeriode(gevraagd, periode, vergelijking, await demoGeoInvoer(sb, clientId));
+    return demoMetGoogleDagen(sb, clientId, demoGeoPeriode(gevraagd, periode, vergelijking, await demoGeoInvoer(sb, clientId)));
   }
   if (!sb) return telGeoPeriode(gevraagd, periode, vergelijking, async (kanaal) => ({ kanaal, dagen: null }));
   const kanalen = channel === "blended"
@@ -100,6 +108,48 @@ export async function resolveGeoPeriode({ clientId, channel, periode, vergelijki
     : gevraagd;
   return telGeoPeriode(kanalen, periode, vergelijking, (kanaal, niveau, venster) =>
     leesBron(sb, clientId, kanaal, niveau, venster).catch(() => ({ kanaal, dagen: null })));
+}
+
+/**
+ * De demo met Google uit zijn dagrijen: per niveau de telling van leesGoogle (dezelfde weg als bij
+ * een echte klant) in plaats van de verdeling van de mock, ALLEEN als de dagrijen de periode én de
+ * vergelijking dekken. Anders blijft voor dat niveau de mock staan, voor beide periodes: een periode
+ * uit de dagrijen tegen een vergelijking uit de mock zette twee telwijzen naast elkaar (Californië
+ * +386%, Pennsylvania -100%). Geen rijen, een lezing die faalt of een venster dat vóór de eerste dagrij
+ * begint: de mock. De demo heeft geen landmaanden in de database om het deel ervóór aan te vullen.
+ *
+ * Eerst alleen de eerste dagrij per niveau (één rij); het venster wordt pas gelezen als het gedekt is.
+ */
+export async function demoMetGoogleDagen(sb: SupabaseClient, clientId: string, demo: GeoPeriodeResultaat): Promise<GeoPeriodeResultaat> {
+  const google = demo.kanalen.find((k) => k.kanaal === "google");
+  if (!google) return demo;
+  const { periode, vergelijking } = demo;
+  const venster: DagPeriode = vergelijking
+    ? { start: vergelijking.start < periode.start ? vergelijking.start : periode.start, eind: vergelijking.eind > periode.eind ? vergelijking.eind : periode.eind }
+    : periode;
+  const id = demoId(clientId);
+  const bronnen = await Promise.all(NIVEAUS.map(async (n) => {
+    try {
+      const eerste = await sb.from(n === "country" ? "ads_country_daily" : "ads_region_daily")
+        .select("date").eq("client_id", id).order("date", { ascending: true }).limit(1);
+      const eersteDag = eerste.error ? null : eersteDagVan((eerste.data ?? []) as { date: string }[]);
+      if (!eersteDag || eersteDag > venster.start) return null;
+      const bron = await leesGoogle(sb, id, n, venster);
+      return bron.dagen === null ? null : bron;
+    } catch {
+      return null;
+    }
+  }));
+  const tel = (p: DagPeriode, oud: Record<GeoLevel, GeoKanaalTelling>) => Object.fromEntries(NIVEAUS.map((n, i) => {
+    const bron = bronnen[i];
+    return [n, bron ? telGeoKanaal(p, bron) : oud[n]];
+  })) as Record<GeoLevel, GeoKanaalTelling>;
+  const nieuw: GeoPeriodeKanaal = {
+    kanaal: "google",
+    nu: tel(periode, google.nu),
+    toen: vergelijking && google.toen ? tel(vergelijking, google.toen) : google.toen,
+  };
+  return { ...demo, kanalen: demo.kanalen.map((k) => (k.kanaal === "google" ? nieuw : k)) };
 }
 
 // ── De lezers ────────────────────────────────────────────────────────────────

@@ -57,6 +57,7 @@ import { today } from "../../lib/reporting-date";
 import { microsoftDemoRows, MS_CAMPAIGNS, MS_ADGROUPS } from "../../lib/demo/microsoft-demo";
 import { checkoutPerDagUitCampagnes } from "../../lib/demo/checkout-demo";
 import { googleDagRijen } from "../../lib/demo/google-dag-demo";
+import { googleGeoDagRijen } from "../../lib/demo/geo-dag-demo";
 
 export const DEMO_CLIENT = "demo-greentech";
 const DEMO_NAME = "DEMO — GreenTech (fictief)";
@@ -515,6 +516,12 @@ export function buildAllRows(): Record<string, Row[]> {
     const dagen = googleDagRijen(DEMO_CLIENT, tables["ads_campaign_monthly"]);
     tables["ads_account_daily"] = dagen.account;
     tables["ads_campaign_daily"] = dagen.campagnes;
+    // Per land en per VS-staat per dag: elke accountdag verdeeld met de vaste landaandelen van de
+    // demo, exact optellend tot het account (lib/demo/geo-dag-demo.ts). De kaart leest ze zoals bij
+    // een echte klant (lib/geo/geo-periode.ts).
+    const geo = googleGeoDagRijen(DEMO_CLIENT, dagen.account);
+    tables["ads_country_daily"] = geo.landen;
+    tables["ads_region_daily"] = geo.staten;
   }
 
   tables["ads_account_monthly"] = [...byMonth.entries()].map(([mIdx, a]) => ({
@@ -826,6 +833,8 @@ const OPTIONELE_TABELLEN: Record<string, string> = {
   ads_account_daily: "migratie 111 (Google per dag); zonder deze tabel telt Google per week of maand, met dat in het label",
   ads_campaign_daily: "migratie 111 (Google per dag); zonder deze tabel telt Google per week of maand, met dat in het label",
   google_ads_checkout_funnel_daily: "migratie 111 (Google per dag); zonder deze tabel toont het Overzicht bij Google geen stappen na de klik, met de reden",
+  ads_country_daily: "migratie 111 (Google per dag); zonder deze tabel verdeelt de kaart de kanaaltotalen met de aandelen van de mock",
+  ads_region_daily: "migratie 111 (Google per dag); zonder deze tabel verdeelt de kaart de kanaaltotalen met de aandelen van de mock",
 };
 
 function printSql(tables: Record<string, Row[]>) {

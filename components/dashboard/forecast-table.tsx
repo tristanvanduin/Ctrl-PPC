@@ -118,7 +118,10 @@ export function ForecastSummaryTiles({ clientId, channel = "google" }: { clientI
                   de maandverwachtingen: bij een ratio is dat een getal zonder betekenis, en bij een
                   volume een afrondingsvariant van het doel (2.595 naast een doel van 2.600). */}
               <span className={`font-semibold ${kpiAdjusted === null ? "text-muted-foreground" : isPositive ? "text-green-600" : "text-red-500"}`}>
-                {fmt(result.kpi.annualTarget)} ({kpiAdjusted === null ? "—" : formatDeltaPercent(totalDiffPct, 0)})
+                {/* data-cijfer: de cijfercontrole leest het doel hier af en legt het naast Doelen &
+                    voortgang (scripts/check-cijfers-gelijk.mjs); data-kpi zegt van welke KPI, data-reeks
+                    over welke kanalen (zonder ingevoerd doel schat elke reeks zijn eigen doel). */}
+                <span data-cijfer="jaardoel" data-kpi={primaryId} data-reeks={channel}>{fmt(result.kpi.annualTarget)}</span> ({kpiAdjusted === null ? "—" : formatDeltaPercent(totalDiffPct, 0)})
               </span>
             </div>
           </div>

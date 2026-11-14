@@ -20,7 +20,8 @@
 // telDagVergelijking (lib/period/use-dag-telling.ts). Die haalt één keer per klant de dagrijen en de
 // Google-weekrijen op, bij de eerste zo'n keuze; daarna is elke wissel weer rekenwerk. Hele maanden
 // met een maandvergelijking lopen over het bestaande pad, en tonen dus exact dezelfde cijfers. De
-// grafiek telt altijd per maand, en zijn vensterlabel zegt dan welke maanden.
+// grafiek volgt dan de dagen zelf, per dag, week of maand naar de lengte (grafiekVakken), uit
+// dezelfde rijen en dezelfde telling als de tegels: geen tweede verzoek.
 
 import { memo, useEffect, useMemo, useState, type AnimationEvent } from "react";
 import type { ClientHistoricalData } from "@/lib/types";
@@ -55,6 +56,7 @@ import { PeriodSummary } from "./period-summary";
 import { DagKerncijfers } from "./dag-kerncijfers";
 import { BandUitZaad, type BandZaad } from "./band-uit-zaad";
 import { OverzichtHoofdgrafiek } from "./overzicht-hoofdgrafiek";
+import { dagGrafiek, googleVoorbehoud } from "@/lib/overzicht/grafiek-vakken";
 import { OverzichtLogboek } from "./overzicht-logboek";
 import { BijdragePerKanaal, KanaalTrechter, StatusRegel, type TrechterVenster } from "./overzicht-trechter";
 import { KanaalNaDeKlik, NaDeKlikPerKanaal } from "./overzicht-na-de-klik";
@@ -337,10 +339,35 @@ function OverzichtBovenkantRuw({ clientId, channel, kanalen, onKies, onBeoordeel
     return grafiekMaanden(band.perKanaal, getoond, periode.range);
   }, [bandKlaar, gekozen, lijst, band.perKanaal, periode.range]);
 
+  // Een periode per dag: de grafiek in vakken van die periode (lib/overzicht/grafiek-vakken.ts), uit
+  // de invoer van de tegels. De tabel rechts krijgt de totalen van de tegels; de vergelijking een
+  // tweede lijn als de vakken aan beide kanten even veel dagen tellen.
+  const dagVakken = useMemo(() => {
+    const staat = periode.dag;
+    const invoer = dagTelling.invoer;
+    const g = dagTelling.getoond;
+    const t = g ? (g.vergelijking?.huidig ?? g.alleen) : null;
+    if (!dagPad || !staat || !invoer || !t) return null;
+    const c = staat.keuze.vergelijk !== "none" ? staat.vergelijking.periode : null;
+    // Null: Google telt deze periode alleen per hele maand, dan de maandweg hieronder.
+    const d = dagGrafiek(staat.periode, c, invoer, grafiekKanalen);
+    if (!d) return null;
+    const totalen = Object.fromEntries(t.perKanaal.map((x) => [x.kanaal, x.totalen]));
+    const vergelijking = c && d.vergelijking ? { periode: formatDagPeriode(c), vakken: d.vergelijking.vorig, reden: d.vergelijking.reden } : null;
+    // Telt Google niet alles per dag (per week, of een deel per maand), dan zegt het label dat.
+    const venster = googleVoorbehoud(t.perKanaal.find((x) => x.kanaal === "google"));
+    return { korrel: d.korrel, vakken: d.vakken, totalen, vergelijking, venster };
+  }, [dagPad, periode.dag, dagTelling.invoer, dagTelling.getoond, grafiekKanalen]);
+
   // Geen reeksen en nog iets onderweg: het laadvlak op de hoogte van de grafiek. Een klant zonder
-  // kanalen heeft niets om te tekenen en krijgt geen leeg vlak.
-  const grafiekLaadt = maanden === null && (gekozen !== null || lijst.length > 0 || kanalen === null)
-    && (!bandKlaar || (gekozen ? [gekozen] : lijst).some((k) => !band.perKanaal[k]));
+  // kanalen heeft niets om te tekenen en krijgt geen leeg vlak. Bij een periode per dag wacht de
+  // grafiek op de dagrijen, zodat er niet eerst de maanden staan. Telt Google de periode alleen per
+  // hele maand (dagGrafiek null na het laden), dan de maandweg.
+  const vakkenPad = dagPad && (dagVakken !== null || dagTelling.laden);
+  const grafiekLaadt = vakkenPad
+    ? dagVakken === null && grafiekKanalen.length > 0
+    : maanden === null && (gekozen !== null || lijst.length > 0 || kanalen === null)
+      && (!bandKlaar || (gekozen ? [gekozen] : lijst).some((k) => !band.perKanaal[k]));
 
   // De volgorde van de opbouw: de kaarten van links naar rechts, dan de tegels, dan de grafiek.
   const voor = toonKaarten ? kaarten.length : 0;
@@ -387,7 +414,12 @@ function OverzichtBovenkantRuw({ clientId, channel, kanalen, onKies, onBeoordeel
           ronde van de blended route (na een sync). */}
       <div className={`grid items-start gap-2 lg:grid-cols-12 ${speel ? "opbouw" : ""}`} style={stap(voor + 1)} onAnimationEnd={opEinde}>
         <div className="order-2 min-w-0 lg:order-1 lg:col-span-8">
-          <OverzichtHoofdgrafiek maanden={maanden} kanalen={grafiekKanalen} gekozen={gekozen} laden={grafiekLaadt} />
+          {vakkenPad ? (
+            <OverzichtHoofdgrafiek maanden={dagVakken?.vakken ?? null} kanalen={grafiekKanalen} gekozen={gekozen} laden={grafiekLaadt}
+              korrel={dagVakken?.korrel} totalen={dagVakken?.totalen} vergelijking={dagVakken?.vergelijking} venster={dagVakken?.venster} />
+          ) : (
+            <OverzichtHoofdgrafiek maanden={maanden} kanalen={grafiekKanalen} gekozen={gekozen} laden={grafiekLaadt} />
+          )}
         </div>
         <div className="order-1 min-w-0 lg:order-2 lg:col-span-4">
           <OverzichtLogboek clientId={clientId} channel={channel} kanalen={lijst} onKies={onKies} onBeoordeel={onBeoordeel} herlees={route.perKanaalTab} />

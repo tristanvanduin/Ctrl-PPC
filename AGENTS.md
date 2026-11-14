@@ -183,8 +183,13 @@ Draai hem na elke wijziging aan een totaal, een venster of een conversieselectie
 `--zelftest`.
 
 De rij van de klant op Portfolio wordt gekozen op de link naar `/client/<id>`, niet op de tekst: het
-scorebord toont de naam, het id staat alleen in de href. Campagnes wordt gelezen als de som van de
-totaalrijen (`tfoot`) van de tabellen per kanaal. Beide staan in de zelftest met een nep-tabel.
+scorebord toont de naam, het id staat alleen in de href. Wat niet als tegel staat, leest hij op een
+merkteken dat de pagina zelf zet: `data-cijfer="jaardoel"` met `data-kpi` en `data-reeks` (Prognose en
+Doelen; alleen dezelfde reeks wordt vergeleken), en
+`data-cijfer="kanaaltotaal-conversies"`/`"kanaaltotaal-kosten"` op de totaalrij van de kanaaltotalen
+(Campagnes, alleen in de nieuwe weergave: de campagnetabellen eronder hebben een vast venster en
+tellen niet mee). Haal zo'n merkteken niet weg; `lib/__cijfer_merktekens_test.ts` bewaakt ze. Alles
+staat in de zelftest met een nep-pagina die goed-, af- of niet-gemeten wordt.
 
 ## De evaluatieset van de analyses
 

@@ -16,16 +16,26 @@
 // de lijn heeft punten en de staven niet, en de precieze waarden staan per maand in de tooltip en
 // in de tabel voor schermlezers. De CPA-as begint niet op nul (asSchaalVenster): het is een
 // verhouding, en vanaf nul werd elke beweging een rechte streep.
+//
+// EEN PERIODE PER DAG. Dan tekent de grafiek de periode zelf, in vakken per dag, week of maand
+// (lib/overzicht/grafiek-vakken.ts: tot zes weken per dag, tot ongeveer zes maanden per week), uit
+// dezelfde telling als de kerncijfers. De tabel rechts is dan het totaal van de kerncijfers per
+// kanaal (`totalen`). Een vergelijkingsperiode staat er als gestippelde lijn bij, alleen als hij
+// vak voor vak dezelfde dagen telt; anders zegt de voetregel waarom niet. Zonder `korrel` is alles
+// per maand, precies zoals het was.
 
 import { ResponsiveContainer, ComposedChart, Bar, Line } from "recharts";
 import { useEffect, useRef, useState } from "react";
 import { LineChart } from "lucide-react";
 import { useGrafiekBeweging } from "@/lib/beweging";
 import { KANAAL_NAAM, KANAAL_KLEUR, ALLE_KANALEN, type Kanaal } from "@/lib/kanalen/beschikbaar";
-import { CHART_LINE_SECONDARY } from "@/lib/branding/chart-colors";
+import { CHART_AXIS, CHART_LINE_SECONDARY } from "@/lib/branding/chart-colors";
 import { formatRange, formatRangeKort } from "@/lib/period/period-range";
+import { formatDagPeriode } from "@/lib/period/dag-periode";
 import { usePeriod } from "@/lib/period/period-context";
 import type { GrafiekMaand } from "@/lib/overzicht/bovenkant";
+import type { Totalen } from "@/lib/period/apply-period";
+import { gatenIn, grofRegel, vakAsLabel, vakLabel, vergelijkWaarde, type GrafiekVak, type Korrel } from "@/lib/overzicht/grafiek-vakken";
 import { Vensterlabel } from "@/components/ui/vensterlabel";
 import {
   Raster, AsX, AsY, Tip, Legenda, GROEP_GAP, BALK_RADIUS,
@@ -35,6 +45,10 @@ import {
 
 /** De naam van de lijn; ook de sleutel waarmee de tooltip hem uit de lijst met kanalen houdt. */
 const CPA = "CPA";
+/** De naam van de vergelijkingslijn, en zijn sleutel in de rijen. */
+const VERG = "Vergelijking";
+const KORREL_KOP: Record<Korrel, string> = { dag: "per dag", week: "per week", maand: "per maand" };
+const VAK_KOLOM: Record<Korrel, string> = { dag: "Dag", week: "Week", maand: "Maand" };
 /** De hoogte van de plot. Vast, ook tijdens het laden: de blokken eronder verspringen dan niet. */
 const HOOGTE = "h-[180px] sm:h-[220px]";
 
@@ -55,9 +69,10 @@ const MATEN: { id: Maat; label: string }[] = [
   { id: "adSpend", label: "Kosten" },
 ];
 
-export function OverzichtHoofdgrafiek({ maanden, kanalen, gekozen, laden = false, beginMaat = "conversions" }: {
-  /** De maanden van de gekozen periode (grafiekMaanden); null zolang de reeksen laden. */
-  maanden: GrafiekMaand[] | null;
+export function OverzichtHoofdgrafiek({ maanden, kanalen, gekozen, laden = false, beginMaat = "conversions", korrel, totalen = null, vergelijking = null, venster = null }: {
+  /** De maanden van de gekozen periode (grafiekMaanden), of met `korrel` de vakken (grafiekVakken);
+   *  null zolang de reeksen laden. */
+  maanden: GrafiekMaand[] | GrafiekVak[] | null;
   /** De kanalen die getoond worden: alle kanalen van de klant, of het ene gekozen kanaal. */
   kanalen: readonly Kanaal[];
   /** Het gekozen kanaal, voor de kop; null op "Alle kanalen". */
@@ -66,11 +81,26 @@ export function OverzichtHoofdgrafiek({ maanden, kanalen, gekozen, laden = false
   /** Waar de schakelaar Conversies of Kosten op begint. De pagina laat hem op Conversies; de test
    *  rendert er beide standen mee, zonder te hoeven klikken. */
   beginMaat?: HoofdgrafiekMaat;
+  /** Een periode per dag: de vakken zijn dagen, weken of maanden van die periode. Weglaten: per maand. */
+  korrel?: Korrel;
+  /** Per kanaal het totaal van de periode zoals de kerncijfers het tellen, voor de tabel rechts.
+   *  Null: de som van de staven. */
+  totalen?: Partial<Record<Kanaal, Totalen>> | null;
+  /** De vergelijkingsperiode (alleen met `korrel`): de gepaarde vakken, of null met de reden. */
+  vergelijking?: { periode: string; vakken: GrafiekVak[] | null; reden: string | null } | null;
+  /** Een voorbehoud bij het venster (Google deels per maand): kort in het label, voluit in de uitleg. */
+  venster?: { kort: string; uitleg: string } | null;
 }) {
   const periode = usePeriod();
   const [maat, setMaat] = useState<Maat>(beginMaat);
   const kosten = maat === "adSpend";
-  const titel = kosten ? "Kosten per maand" : "Conversies per maand";
+  const titel = `${kosten ? "Kosten" : "Conversies"} ${korrel ? KORREL_KOP[korrel] : "per maand"}`;
+  // De vakken bij een periode per dag; hun sleutel op de as is hun eerste dag.
+  const vakken = korrel && maanden ? (maanden as GrafiekVak[]) : null;
+  const vakPer = new Map((vakken ?? []).map((v) => [v.maand, v]));
+  const asLabel = (k: string) => { const v = vakPer.get(k); return korrel && v ? vakAsLabel(v, korrel) : maandLabel(k); };
+  const volLabel = (k: string) => { const v = vakPer.get(k); return korrel && v ? vakLabel(v, korrel) : maandLabel(k); };
+  const vorigeVakken = vakken && vergelijking?.vakken ? vergelijking.vakken : null;
   const basisBeweging = useGrafiekBeweging();
   // Pas bewegen als de grafiek er al een keer stond. Dit component rendert eerst zijn laadvlak,
   // dus zonder deze rem groeiden de staven in zodra de reeksen binnenkwamen: beweging bij een
@@ -86,7 +116,7 @@ export function OverzichtHoofdgrafiek({ maanden, kanalen, gekozen, laden = false
       <h3 className="text-title font-semibold text-brand-gray">
         {titel}{gekozen ? ` · ${KANAAL_NAAM[gekozen]}` : ""}
       </h3>
-      <Vensterlabel soort="periode" />
+      <Vensterlabel soort="periode" korrel={korrel} toevoeging={venster?.kort} toevoegingUitleg={venster?.uitleg} />
       {/* Een keuze uit twee, als radiogroep: Tab brengt je bij de gekozen knop, de pijltjes wisselen
           (en kiezen meteen), zoals bij elke groep keuzerondjes. Geen aria-pressed: dat is voor een
           knop die aan of uit staat, en de kanaalkaarten hierboven gebruiken het al voor het filter. */}
@@ -116,7 +146,11 @@ export function OverzichtHoofdgrafiek({ maanden, kanalen, gekozen, laden = false
       </div>
       <Legenda
         className="ml-auto"
-        items={[...lijst.map((k) => ({ label: KANAAL_NAAM[k], kleur: KANAAL_KLEUR[k] })), { label: "CPA (rechteras)", kleur: CHART_LINE_SECONDARY }]}
+        items={[
+          ...lijst.map((k) => ({ label: KANAAL_NAAM[k], kleur: KANAAL_KLEUR[k] })),
+          { label: "CPA (rechteras)", kleur: CHART_LINE_SECONDARY },
+          ...(vorigeVakken ? [{ label: `Vergelijking (${vergelijking!.periode})`, kleur: CHART_AXIS }] : []),
+        ]}
       />
     </div>
   );
@@ -127,7 +161,7 @@ export function OverzichtHoofdgrafiek({ maanden, kanalen, gekozen, laden = false
     // binnenkomen. Zonder laden (een fout elders op de pagina) staat er niets.
     if (!laden) return null;
     return (
-      <section aria-label="Conversies per maand" aria-busy="true" className={kaart}>
+      <section aria-label="Hoofdgrafiek" aria-busy="true" className={kaart}>
         <div className="h-5 w-56 max-w-full rounded bg-muted/70" aria-hidden />
         <div className={`mt-2 ${HOOGTE} rounded-lg bg-muted/40`} aria-hidden />
         <span className="sr-only">de grafiek wordt geladen</span>
@@ -135,19 +169,24 @@ export function OverzichtHoofdgrafiek({ maanden, kanalen, gekozen, laden = false
     );
   }
 
-  const rijen = maanden.map((m) => ({
+  // De vergelijkingslijn per vak: het gepaarde vak, of null (een gat) als het niet te paren is.
+  const vergWaarden = vakken ? vakken.map((v, i) => vergelijkWaarde(v, vorigeVakken?.[i], maat)) : [];
+  const reeks: GrafiekMaand[] = maanden;
+  const rijen = reeks.map((m, i) => ({
     maand: m.maand,
     // Een kanaal dat deze maand nog niet liep, krijgt geen sleutel: zonder sleutel tekent recharts
     // niets en zwijgt de tooltip. Een nul zou lezen als "niets uitgegeven", en dat is een meting.
-    ...Object.fromEntries(lijst.filter((k) => !m.voorStart.includes(k)).map((k) => [k, m.perKanaal[k]?.[maat] ?? 0])),
+    // Bij vakken net zo voor een kanaal zonder rijen of dat niet op deze korrel telde (gatenIn).
+    ...Object.fromEntries(lijst.filter((k) => !gatenIn(m).includes(k)).map((k) => [k, m.perKanaal[k]?.[maat] ?? 0])),
     [CPA]: m.cpa,
+    ...(vorigeVakken ? { [VERG]: vergWaarden[i] } : {}),
   }));
-  const perMaand = new Map(maanden.map((m) => [m.maand, m]));
-  const hoogste = Math.max(0, ...maanden.map((m) => m[maat]));
-  const cpas = maanden.map((m) => m.cpa).filter((v): v is number => v !== null);
+  const perMaand = new Map(reeks.map((m) => [m.maand, m]));
+  const hoogste = Math.max(0, ...reeks.map((m) => m[maat]), ...vergWaarden.filter((v): v is number => v !== null));
+  const cpas = reeks.map((m) => m.cpa).filter((v): v is number => v !== null);
   const schaal = asSchaal(hoogste);
   const schaalCpa = cpas.length > 0 ? asSchaalVenster(Math.min(...cpas), Math.max(...cpas)) : null;
-  const leeg = maanden.every((m) => m.leeg);
+  const leeg = reeks.every((m) => m.leeg);
   // Het bovenste kanaal dat in de stapel staat krijgt de ronde kop; de rest sluit recht aan.
   const bovenste = lijst[lijst.length - 1];
 
@@ -166,11 +205,15 @@ export function OverzichtHoofdgrafiek({ maanden, kanalen, gekozen, laden = false
 
   // De som over de periode per kanaal, naast de plot: wat de staven samen zijn, en wat een
   // conversie per kanaal kostte. Uit dezelfde rijen als de plot, dus het telt op tot de eerste tegel.
-  const totaal = maanden.reduce((t, m) => ({ conversions: t.conversions + m.conversions, adSpend: t.adSpend + m.adSpend }), { conversions: 0, adSpend: 0 });
+  // Bij een periode per dag de totalen van de kerncijfers: een kanaal dat een vak niet op deze korrel
+  // kon tellen (een gat in de staven) telt hier wel mee, net als in de tegels erboven.
   const perKanaal = lijst.map((k) => {
-    const t = maanden.reduce((s, m) => ({ conversions: s.conversions + (m.perKanaal[k]?.conversions ?? 0), adSpend: s.adSpend + (m.perKanaal[k]?.adSpend ?? 0) }), { conversions: 0, adSpend: 0 });
+    const t = totalen
+      ? { conversions: totalen[k]?.conversions ?? 0, adSpend: totalen[k]?.adSpend ?? 0 }
+      : reeks.reduce((s, m) => ({ conversions: s.conversions + (m.perKanaal[k]?.conversions ?? 0), adSpend: s.adSpend + (m.perKanaal[k]?.adSpend ?? 0) }), { conversions: 0, adSpend: 0 });
     return { kanaal: k, ...t, cpa: t.conversions > 0 ? t.adSpend / t.conversions : null };
   });
+  const totaal = perKanaal.reduce((t, r) => ({ conversions: t.conversions + r.conversions, adSpend: t.adSpend + r.adSpend }), { conversions: 0, adSpend: 0 });
   const totaalCpa = totaal.conversions > 0 ? totaal.adSpend / totaal.conversions : null;
   // De kolom met het getal: een aantal conversies past in 4rem, een bedrag van zes of zeven cijfers
   // ("€ 1.250.000") niet. In de stand Kosten is de kolom daarom breder; de kanaalnaam kort in.
@@ -181,15 +224,35 @@ export function OverzichtHoofdgrafiek({ maanden, kanalen, gekozen, laden = false
   // maand waarin Meta nog niet liep als "Meta gaf niets uit". Dezelfde regel als de stavenkaart
   // "Spend per kanaal per maand" die deze schakelaar vervangt.
   const laatstarters = lijst
-    .filter((k) => maanden.some((m) => m.voorStart.includes(k)))
-    .map((k) => ({ kanaal: k, start: maanden.find((m) => !m.voorStart.includes(k))?.maand ?? null }));
+    .filter((k) => reeks.some((m) => m.voorStart.includes(k)))
+    .map((k) => ({ kanaal: k, start: reeks.find((m) => !m.voorStart.includes(k))?.maand ?? null }));
+  // Bij vakken: een kanaal zonder rijen in een deel van de vakken (na zijn laatste rij), en een
+  // kanaal dat niet op deze korrel kon tellen.
+  const zonderData = vakken ? lijst.filter((k) => vakken.some((v) => v.geenData.includes(k))) : [];
+  const grof = vakken && korrel ? grofRegel(vakken, korrel) : null;
+  const vergReden = vakken && vergelijking ? vergelijking.reden : null;
+  // Het voorbehoud van het label nog eens zichtbaar: in het label valt het op een telefoon achter de
+  // datumtekst weg (truncate), en `title` bereikt daar niemand.
+  const voorbehoud = vakken ? venster?.uitleg ?? null : null;
+  const voetNodig = laatstarters.length > 0 || lijst.length > 1 || zonderData.length > 0 || !!grof || !!vergReden || !!voorbehoud;
+  const gatTekst = (m: GrafiekMaand, k: Kanaal): string | null => {
+    if (m.voorStart.includes(k)) return "liep nog niet";
+    const v = vakPer.get(m.maand);
+    if (!v || !korrel) return null;
+    return v.geenData.includes(k) ? "geen data" : v.grof.includes(k) ? `niet ${KORREL_KOP[korrel]} geteld` : null;
+  };
+
+  // De periode in woorden: bij vakken de dagen zelf, anders de maanden.
+  const periodeTekst = korrel && periode.dag ? formatDagPeriode(periode.dag.periode) : formatRange(periode.range);
 
   return (
-    <section aria-label={`${titel}, ${formatRange(periode.range)}`} className={kaart}>
+    <section aria-label={`${titel}, ${periodeTekst}`} className={kaart}>
       {kop}
       {leeg ? (
-        <p className={`mt-2 flex ${HOOGTE} items-center justify-center rounded-lg bg-muted/30 text-meta text-muted-foreground`}>
-          Geen data in {formatRange(periode.range)}.
+        // Alle vakken leeg omdat een kanaal ze niet op deze korrel kon tellen, is geen "Geen data":
+        // de tegels erboven tellen hem wel. Dan de regel die zegt waarom er geen staaf staat.
+        <p className={`mt-2 flex ${HOOGTE} items-center justify-center rounded-lg bg-muted/30 px-4 text-center text-meta text-muted-foreground`}>
+          {grof ?? `Geen data in ${periodeTekst}.`}
         </p>
       ) : (
         <div className="mt-2 flex items-stretch gap-4">
@@ -201,7 +264,7 @@ export function OverzichtHoofdgrafiek({ maanden, kanalen, gekozen, laden = false
             <ResponsiveContainer width="100%" height="100%">
               <ComposedChart data={rijen} margin={{ top: 10, right: 0, left: 0, bottom: 4 }} barCategoryGap={GROEP_GAP}>
                 <Raster />
-                <AsX dataKey="maand" formatter={maandLabel} />
+                <AsX dataKey="maand" formatter={asLabel} />
                 {/* De linkeras zonder eigen naam: het raster hangt aan de standaard-as van recharts. */}
                 <AsY formatter={kosten ? kortEuro : kortGetal} width={kosten ? 52 : 44} {...schaal} />
                 {schaalCpa && <AsY id="cpa" rechts kleur={CHART_LINE_SECONDARY} formatter={kortEuro} width={52} domain={schaalCpa.domain} ticks={schaalCpa.ticks} />}
@@ -209,6 +272,7 @@ export function OverzichtHoofdgrafiek({ maanden, kanalen, gekozen, laden = false
                   formatter={(v) => (kosten ? volledigEuro(v) : volledigGetal(v))}
                   verberg={[CPA]}
                   voet={voet}
+                  kop={volLabel}
                 />
                 {lijst.map((k) => (
                   <Bar
@@ -219,9 +283,25 @@ export function OverzichtHoofdgrafiek({ maanden, kanalen, gekozen, laden = false
                     name={KANAAL_NAAM[k]}
                     fill={KANAAL_KLEUR[k]}
                     radius={k === bovenste ? BALK_RADIUS : undefined}
-                    barSize={balkBreedte(rijen.length)}
+                    // Veel vakken (dagen, weken): recharts verdeelt de breedte zelf, anders schuiven
+                    // vaste staven van twaalf pixels over elkaar op een telefoon.
+                    barSize={rijen.length > 12 ? undefined : balkBreedte(rijen.length)}
                   />
                 ))}
+                {vorigeVakken && (
+                  // De vergelijkingsperiode als schaduw: gestippeld en in de askleur, op de linkeras.
+                  <Line
+                    {...beweging}
+                    dataKey={VERG}
+                    name={`${VERG} (${vergelijking!.periode})`}
+                    stroke={CHART_AXIS}
+                    strokeWidth={1.5}
+                    strokeDasharray="4 3"
+                    dot={false}
+                    activeDot={{ r: 3 }}
+                    connectNulls={false}
+                  />
+                )}
                 {schaalCpa && (
                   <Line
                     {...beweging}
@@ -245,7 +325,7 @@ export function OverzichtHoofdgrafiek({ maanden, kanalen, gekozen, laden = false
           <div className={`hidden shrink-0 self-center text-meta lg:block ${kosten ? "w-72" : "w-64"}`}>
           {/* De kolomkoppen boven de cijfers, niet een zin eronder: zo staat bij elk getal wat het is. */}
           <div className={`mb-1 grid ${kolommen} gap-x-2 text-micro uppercase tracking-wider text-muted-foreground`} aria-hidden>
-            <span>{formatRangeKort(periode.range)}</span>
+            <span>{korrel && periode.dag ? formatDagPeriode(periode.dag.periode) : formatRangeKort(periode.range)}</span>
             <span className="text-right">{kosten ? "kosten" : "conv."}</span>
             <span className="text-right">CPA</span>
           </div>
@@ -275,13 +355,22 @@ export function OverzichtHoofdgrafiek({ maanden, kanalen, gekozen, laden = false
       {/* De voetregel: wat je bij deze staven moet weten en niet kunt zien. Het voorbehoud van de
           optelling stond naast de kanaaltabel onderaan ("waarom blended indicatief is"); die tabel
           zit in de nieuwe weergave achter een knop, en het voorbehoud hoort bij het getal. */}
-      {!leeg && (laatstarters.length > 0 || lijst.length > 1) && (
+      {/* Leeg door een kanaal dat grof telde: de regel staat al in het vlak, de rest van de voet blijft. */}
+      {(!leeg || !!grof) && voetNodig && (
         <p className="mt-2 text-micro leading-snug text-muted-foreground">
           {laatstarters.map((l) => (
             <span key={l.kanaal}>
-              {KANAAL_NAAM[l.kanaal]} {l.start ? `begint in ${maandLabel(l.start)}` : "liep in deze periode nog niet"}: de maanden daarvoor zijn niet gemeten, geen nul.{" "}
+              {korrel
+                ? <>{KANAAL_NAAM[l.kanaal]} {l.start ? `telt vanaf ${volLabel(l.start)}` : "liep in deze periode nog niet"}: de vakken daarvoor zijn niet gemeten, geen nul.{" "}</>
+                : <>{KANAAL_NAAM[l.kanaal]} {l.start ? `begint in ${maandLabel(l.start)}` : "liep in deze periode nog niet"}: de maanden daarvoor zijn niet gemeten, geen nul.{" "}</>}
             </span>
           ))}
+          {zonderData.map((k) => (
+            <span key={`geen-${k}`}>{KANAAL_NAAM[k]} heeft in een deel van de vakken geen rijen (nog niet gesynchroniseerd, of na de laatste dag): daar staat geen staaf, geen nul.{" "}</span>
+          ))}
+          {grof && !leeg && <>{grof}{" "}</>}
+          {voorbehoud && <>{voorbehoud}{" "}</>}
+          {vergReden && <>{vergReden}{" "}</>}
           {lijst.length > 1 && <>De conversies zijn de som over de kanalen, elk met zijn eigen attributievenster: een bovengrens, geen exacte telling.</>}
         </p>
       )}
@@ -290,22 +379,24 @@ export function OverzichtHoofdgrafiek({ maanden, kanalen, gekozen, laden = false
       {/* In een div: sr-only op de tabel zelf houdt hem niet op 1 px (een tabel negeert width),
           en dan maakte hij de pagina op een telefoon 320 px te breed. */}
       <div className="sr-only"><table>
-        <caption>{titel} per kanaal, met het totaal en de CPA, over {formatRange(periode.range)}</caption>
+        <caption>{titel} per kanaal, met het totaal en de CPA, over {periodeTekst}</caption>
         <thead>
           <tr>
-            <th scope="col">Maand</th>
+            <th scope="col">{korrel ? VAK_KOLOM[korrel] : "Maand"}</th>
             {lijst.map((k) => <th key={k} scope="col">{KANAAL_NAAM[k]}</th>)}
             <th scope="col">Totaal</th>
             <th scope="col">CPA</th>
+            {vorigeVakken && <th scope="col">Vergelijking ({vergelijking!.periode})</th>}
           </tr>
         </thead>
         <tbody>
-          {maanden.map((m) => (
+          {reeks.map((m, i) => (
             <tr key={m.maand}>
-              <th scope="row">{maandLabel(m.maand)}</th>
-              {lijst.map((k) => <td key={k}>{m.voorStart.includes(k) ? "liep nog niet" : kosten ? volledigEuro(m.perKanaal[k]?.adSpend ?? 0) : volledigGetal(m.perKanaal[k]?.conversions ?? 0)}</td>)}
+              <th scope="row">{volLabel(m.maand)}</th>
+              {lijst.map((k) => <td key={k}>{gatTekst(m, k) ?? (kosten ? volledigEuro(m.perKanaal[k]?.adSpend ?? 0) : volledigGetal(m.perKanaal[k]?.conversions ?? 0))}</td>)}
               <td>{kosten ? volledigEuro(m.adSpend) : volledigGetal(m.conversions)}</td>
               <td>{m.cpa === null ? "geen conversies" : volledigEuro(m.cpa)}</td>
+              {vorigeVakken && <td>{vergWaarden[i] == null ? "niet te vergelijken" : kosten ? volledigEuro(vergWaarden[i]!) : volledigGetal(vergWaarden[i]!)}</td>}
             </tr>
           ))}
         </tbody>

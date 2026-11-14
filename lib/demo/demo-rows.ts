@@ -27,6 +27,7 @@ import { analyseOutputRows } from "./analyses-demo";
 import { splitInt, splitAlong } from "./split";
 import { microsoftDemoRows } from "./microsoft-demo";
 import { googleDagRijen } from "./google-dag-demo";
+import { googleGeoDagRijen } from "./geo-dag-demo";
 import { checkoutPerDagUitCampagnes } from "./checkout-demo";
 import { DEFAULT_CHANNEL_CONVERSION_CONFIG, sumSelectedConversions } from "@/lib/analysis/channel-conversion-config";
 
@@ -945,6 +946,12 @@ const adsAccountWeekly: Row[] = accountWeeklyRows(CID, adsAccountMonthly, 26);
 // Google per dag (migratie 111): de campagnemaanden over hun dagen verdeeld, exact optellend tot de
 // maanden (lib/demo/google-dag-demo.ts). Voorbeelden, zoals alles hier.
 const googleDagen = googleDagRijen(CID, adsCampaignMonthly);
+// Per land en per VS-staat per dag, uit de accountdagen hierboven (lib/demo/geo-dag-demo.ts). PAS
+// BEREKEND ALS ZE GEVRAAGD WORDEN (de getters in demoRows): het zijn tienduizenden rijen, en
+// lib/supabase.ts laadt deze module in de browser bij elke pagina, terwijl de kaart ze server-side
+// leest. Eén keer berekend, daarna bewaard.
+let googleGeoBewaard: { landen: Row[]; staten: Row[] } | null = null;
+const googleGeoDagen = () => (googleGeoBewaard ??= googleGeoDagRijen(CID, googleDagen.account));
 
 // ── google_ads_checkout_funnel_daily ───────────────────────────────────────
 // De Google-checkoutstappen per dag (migratie 111), voor de conversietrechter op het Overzicht.
@@ -1114,6 +1121,8 @@ export function demoRows(): Record<string, Row[]> {
     ads_account_weekly: adsAccountWeekly,
     ads_account_daily: googleDagen.account,
     ads_campaign_daily: googleDagen.campagnes,
+    get ads_country_daily() { return googleGeoDagen().landen; },
+    get ads_region_daily() { return googleGeoDagen().staten; },
     google_ads_checkout_funnel_daily: googleCheckoutPerDag,
     ads_adgroup_monthly: adsAdgroupMonthly,
     ads_campaign_impression_share: adsCampaignImpressionShare,

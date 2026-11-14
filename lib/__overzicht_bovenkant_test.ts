@@ -318,7 +318,7 @@ console.log("Hoofdgrafiek: de som per maand is de band over dezelfde periode");
   check("hij gebruikt de gedeelde chrome en de vaste kanaalkleuren", /Raster, AsX, AsY, Tip, Legenda/.test(grafiek) && /fill=\{KANAAL_KLEUR\[k\]\}/.test(grafiek) && /CHART_LINE_SECONDARY/.test(grafiek));
   check("de tooltip toont per maand de kanalen, het totaal en de CPA", /naam: "Totaal"/.test(grafiek) && /naam: CPA/.test(grafiek) && /verberg=\{\[CPA\]\}/.test(grafiek));
   check("de beweging komt uit het token (300 ms bij een wissel, niets bij de eerste render)", /useGrafiekBeweging\(\)/.test(grafiek) && !/animationDuration=/.test(grafiek));
-  check("de grafiek draagt een vensterlabel en een tabel voor schermlezers", /<Vensterlabel soort="periode" \/>/.test(grafiek) && /<div className="sr-only"><table>/.test(grafiek));
+  check("de grafiek draagt een vensterlabel en een tabel voor schermlezers", /<Vensterlabel soort="periode"[ />]/.test(grafiek) && /<div className="sr-only"><table>/.test(grafiek));
 }
 
 // ── 4. De tegels ───────────────────────────────────────────────────────────────────────────────

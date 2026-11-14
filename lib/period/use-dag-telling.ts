@@ -205,7 +205,12 @@ export function useDagTelling({ clientId, staat, kanalen, gekozen, googleData, g
   googleData: ClientHistoricalData | null;
   /** De vertoningen en klikken van Google per maand (de blended route), voor de trechter. */
   googleTellers?: ReadonlyMap<Month, Tellers> | null;
-}): { alle: DagCijfers | null; getoond: DagCijfers | null; laden: boolean } {
+}): {
+  alle: DagCijfers | null; getoond: DagCijfers | null; laden: boolean;
+  /** De invoer van `getoond`, voor wie dezelfde rijen anders indeelt (de hoofdgrafiek per dag of
+   *  week, lib/overzicht/grafiek-vakken.ts): dezelfde rijen, geen tweede verzoek. */
+  invoer: DagTelInvoer | null;
+} {
   const nodig = !!staat && !staat.maandPad && kanalen.length > 0;
   const kanaalSleutel = kanalen.join(",");
   const [geladen, setGeladen] = useState<{ sleutel: string; bronnen: DagBronnen } | null>(null);
@@ -224,22 +229,26 @@ export function useDagTelling({ clientId, staat, kanalen, gekozen, googleData, g
   const b = geladen?.sleutel === sleutel ? geladen.bronnen : null;
   const googleNodig = kanalen.includes("google");
   const uit = useMemo(() => {
-    if (!nodig || !staat || !b || (googleNodig && !googleData)) return { alle: null, getoond: null };
-    const tel = (welke: readonly Kanaal[]): DagCijfers => {
+    if (!nodig || !staat || !b || (googleNodig && !googleData)) return { alle: null, getoond: null, invoer: null };
+    const invoerVoor = (welke: readonly Kanaal[]): DagTelInvoer => {
       const dagkanalen: DagTelInvoer["dagkanalen"] = {};
       for (const k of NIET_GOOGLE) if (welke.includes(k) && b.dagkanalen[k]) dagkanalen[k] = b.dagkanalen[k];
-      const invoer: DagTelInvoer = {
+      return {
         google: welke.includes("google") ? { maanden: googleData, weken: b.weken, dagen: b.dagen, maandTellers: googleTellers } : null,
         dagkanalen,
         convConfig: b.convConfig,
       };
+    };
+    const tel = (welke: readonly Kanaal[]): DagCijfers => {
+      const invoer = invoerVoor(welke);
       const c = staat.keuze.vergelijk === "none" ? null : staat.vergelijking.periode;
       return c
         ? { vergelijking: telDagVergelijking(staat.periode, c, invoer), alleen: null, fouten: b.fouten }
         : { vergelijking: null, alleen: telDagPeriode(staat.periode, invoer), fouten: b.fouten };
     };
     const alle = tel(kanalen);
-    return { alle, getoond: gekozen && kanalen.includes(gekozen) ? tel([gekozen]) : alle };
+    const enkel = gekozen && kanalen.includes(gekozen) ? [gekozen] : null;
+    return { alle, getoond: enkel ? tel(enkel) : alle, invoer: invoerVoor(enkel ?? kanalen) };
   }, [nodig, staat, b, googleNodig, googleData, googleTellers, kanalen, gekozen]);
   return { ...uit, laden: nodig && uit.alle === null };
 }
