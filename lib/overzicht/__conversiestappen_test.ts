@@ -408,6 +408,14 @@ const vorig = { start: "2025-11-01", eind: "2025-11-02" };
   // Dezelfde generator voor de seed: geen dag na vandaag, geen dag die niet bestaat.
   const proef = checkoutPerDagUitCampagnes("x", [{ campaign_id: "c", campaign_name: "C", month: "2026-02-01", conversions: 10 }], "2026-02-10", "2026-01");
   check("demo-generator: alleen echte dagen tot en met vandaag", proef.length === 10 && proef.every((r) => String(r.date) <= "2026-02-10"));
+  // Een kleine campagne (gemiddeld minder dan een winkelwagen per dag): per dag naar beneden afronden
+  // gaf 0 aankopen. Per maand verdeeld: de stappen tellen op tot de maand en dalen op elke dag.
+  const klein = checkoutPerDagUitCampagnes("x", [{ campaign_id: "c", campaign_name: "C", month: "2026-01-01", conversions: 20 }], "2026-01-31", "2026-01");
+  const som = (k: string) => klein.reduce((s, r) => s + Number(r[k]), 0);
+  check("demo-generator: aankopen ook bij een kleine campagne, en per maand exact", som("add_to_cart_count") === 24 && som("begin_checkout_count") === 13 && som("purchase_count") === 8,
+    `${som("add_to_cart_count")}/${som("begin_checkout_count")}/${som("purchase_count")}`);
+  check("demo-generator: winkelwagen >= afrekenen >= aankoop op elke dag",
+    klein.every((r) => Number(r.add_to_cart_count) >= Number(r.begin_checkout_count) && Number(r.begin_checkout_count) >= Number(r.purchase_count)));
   const seed = lees("scripts/demo/seed-demo-client.ts");
   check("de seed schrijft dezelfde Google-dagrijen (de browser leest de database, niet de mock)",
     /tables\["google_ads_checkout_funnel_daily"\] = checkoutPerDagUitCampagnes\(/.test(seed) && /google_ads_checkout_funnel_daily: "migratie 111/.test(seed));

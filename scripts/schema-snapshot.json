@@ -10,6 +10,16 @@
 "is_primary",
 "sops_enabled"
 ],
+"ads_account_daily": [
+"client_id",
+"date",
+"impressions",
+"clicks",
+"cost",
+"conversions",
+"conversions_value",
+"synced_at"
+],
 "ads_account_monthly": [
 "id",
 "client_id",
@@ -161,6 +171,19 @@
 "campaign_spend_share",
 "synced_at"
 ],
+"ads_campaign_daily": [
+"client_id",
+"date",
+"campaign_id",
+"campaign_name",
+"campaign_type",
+"impressions",
+"clicks",
+"cost",
+"conversions",
+"conversions_value",
+"synced_at"
+],
 "ads_campaign_impression_share": [
 "id",
 "client_id",
@@ -272,6 +295,17 @@
 "new_value",
 "user_email",
 "created_at"
+],
+"ads_country_daily": [
+"client_id",
+"date",
+"country_code",
+"impressions",
+"clicks",
+"cost",
+"conversions",
+"conversions_value",
+"synced_at"
 ],
 "ads_country_impression_share": [
 "id",
@@ -583,6 +617,19 @@
 "ctr",
 "roas",
 "cost_per_conversion",
+"synced_at"
+],
+"ads_region_daily": [
+"client_id",
+"date",
+"country_code",
+"region_code",
+"region_name",
+"impressions",
+"clicks",
+"cost",
+"conversions",
+"conversions_value",
 "synced_at"
 ],
 "ads_region_monthly": [
@@ -1151,6 +1198,26 @@
 "overall_conversion_rate",
 "created_at"
 ],
+"google_ads_checkout_funnel_daily": [
+"id",
+"client_id",
+"date",
+"campaign_id",
+"campaign_name",
+"device",
+"sessions",
+"add_to_cart_count",
+"add_to_cart_value",
+"begin_checkout_count",
+"begin_checkout_value",
+"purchase_count",
+"purchase_value",
+"atc_to_checkout_rate",
+"checkout_to_purchase_rate",
+"overall_conversion_rate",
+"created_at",
+"synced_at"
+],
 "google_ads_image_assets": [
 "client_id",
 "ad_id",
@@ -1214,6 +1281,14 @@
 "conversions",
 "cost",
 "synced_at"
+],
+"google_dag_stand": [
+"client_id",
+"tabel",
+"vanaf",
+"tot",
+"conversie_selectie",
+"bijgewerkt_at"
 ],
 "google_metrics": [
 "account_id",

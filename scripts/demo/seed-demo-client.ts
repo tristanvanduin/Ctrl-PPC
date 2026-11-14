@@ -56,6 +56,7 @@ import { splitInt } from "../../lib/demo/split";
 import { today } from "../../lib/reporting-date";
 import { microsoftDemoRows, MS_CAMPAIGNS, MS_ADGROUPS } from "../../lib/demo/microsoft-demo";
 import { checkoutPerDagUitCampagnes } from "../../lib/demo/checkout-demo";
+import { googleDagRijen } from "../../lib/demo/google-dag-demo";
 
 export const DEMO_CLIENT = "demo-greentech";
 const DEMO_NAME = "DEMO — GreenTech (fictief)";
@@ -508,6 +509,13 @@ export function buildAllRows(): Record<string, Row[]> {
   // (OPTIONELE_TABELLEN). De maandtabel google_ads_checkout_funnel blijft bewust leeg: die leest de
   // maandanalyse, en daar hoort de demo niets nieuws te vinden.
   tables["google_ads_checkout_funnel_daily"] = checkoutPerDagUitCampagnes(DEMO_CLIENT, tables["ads_campaign_monthly"], TODAY, monthsBack(12).slice(0, 7));
+  // Google per dag (migratie 111): de campagnemaanden over hun dagen verdeeld, exact optellend tot de
+  // maanden, uit dezelfde generator als de mock (lib/demo/google-dag-demo.ts). VOORBEELDEN.
+  {
+    const dagen = googleDagRijen(DEMO_CLIENT, tables["ads_campaign_monthly"]);
+    tables["ads_account_daily"] = dagen.account;
+    tables["ads_campaign_daily"] = dagen.campagnes;
+  }
 
   tables["ads_account_monthly"] = [...byMonth.entries()].map(([mIdx, a]) => ({
     client_id: DEMO_CLIENT, month: monthsBack(mIdx), impressions: a.imp, clicks: a.clicks, cost: a.cost,
@@ -815,6 +823,8 @@ const sqlLit = (v: unknown): string => {
 // bestaan, in plaats van halverwege af te breken: de rest van de demo werkt zonder.
 const OPTIONELE_TABELLEN: Record<string, string> = {
   meta_period_reach: "migratie 110 (Meta-periodelezing); zonder deze tabel meldt de Meta-signaalroute 'frequentie niet te beoordelen'",
+  ads_account_daily: "migratie 111 (Google per dag); zonder deze tabel telt Google per week of maand, met dat in het label",
+  ads_campaign_daily: "migratie 111 (Google per dag); zonder deze tabel telt Google per week of maand, met dat in het label",
   google_ads_checkout_funnel_daily: "migratie 111 (Google per dag); zonder deze tabel toont het Overzicht bij Google geen stappen na de klik, met de reden",
 };
 

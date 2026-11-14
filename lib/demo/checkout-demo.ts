@@ -7,9 +7,9 @@
 // VOORBEELDEN, geen metingen van deze fictieve klant. Wel samenhangend met de demo-totalen: per
 // campagne per maand afgeleid van de conversies in ads_campaign_monthly. De winkelwagens zijn
 // ongeveer 1,2 keer de conversies van de maand, over de dagen verdeeld met splitInt (doordeweeks
-// zwaarder dan in het weekend); per dag gaat iets meer dan de helft door naar afrekenen, en daarvan
-// 60% naar een aankoop (een ticket). Naar beneden afgerond, zodat winkelwagen >= afrekenen >= aankoop
-// op elke dag, en de aankopen altijd onder de conversies van de maand blijven: niet elke conversie
+// zwaarder dan in het weekend); per maand gaat 55% door naar afrekenen en daarvan 60% naar een
+// aankoop (een ticket). Elke stap is de vorige plus een eigen deel, zodat winkelwagen >= afrekenen >=
+// aankoop op elke dag, en de aankopen altijd onder de conversies van de maand blijven: niet elke conversie
 // van deze beurs is een aankoop (een standaanvraag gaat via een formulier).
 
 import { splitInt } from "./split";
@@ -44,13 +44,21 @@ export function checkoutPerDagUitCampagnes(
     const dagen = dagenVan(maand, vandaag);
     if (!dagen.length) continue;
     const gewicht = dagen.map((d) => ([0, 6].includes(new Date(`${d}T00:00:00Z`).getUTCDay()) ? 0.7 : 1.2));
-    const winkelwagens = splitInt(Math.round(Number(r.conversions ?? 0) * 1.2), gewicht);
+    // Per MAAND afgeleid en dan over de dagen verdeeld, stap voor stap bovenop elkaar: eerst de
+    // aankopen, dan wat er bij afrekenen bij komt, dan wat er bij de winkelwagen bij komt. Per dag
+    // afronden (zoals eerst) liet bij gemiddeld minder dan een per campagne per dag van de aankopen
+    // niets over: 0 aankopen op 365 afrekenstarts.
+    const wagens = Math.round(Number(r.conversions ?? 0) * 1.2);
+    const afrekenenMaand = Math.round(wagens * 0.55);
+    const aankoopMaand = Math.round(afrekenenMaand * 0.6);
+    const aankoop = splitInt(aankoopMaand, gewicht);
+    const extraAfrekenen = splitInt(afrekenenMaand - aankoopMaand, gewicht);
+    const extraWagens = splitInt(wagens - afrekenenMaand, gewicht);
     dagen.forEach((datum, i) => {
-      const afrekenen = Math.floor(winkelwagens[i] * 0.55);
-      const aankoop = Math.floor(afrekenen * 0.6);
+      const afrekenen = aankoop[i] + extraAfrekenen[i];
       uit.push({
         client_id: clientId, date: datum, campaign_id: r.campaign_id, campaign_name: r.campaign_name, device: "UNSPECIFIED",
-        add_to_cart_count: winkelwagens[i], begin_checkout_count: afrekenen, purchase_count: aankoop,
+        add_to_cart_count: afrekenen + extraWagens[i], begin_checkout_count: afrekenen, purchase_count: aankoop[i],
       });
     });
   }

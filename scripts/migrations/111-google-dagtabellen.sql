@@ -1,8 +1,8 @@
 -- 111: Google per dag. ads_account_daily, ads_campaign_daily, ads_country_daily, ads_region_daily
 -- en google_ads_checkout_funnel_daily, plus google_dag_stand (tot waar de sync elke dagtabel vulde).
 --
--- STATUS: NIET GEDRAAID. Geschreven op 13 november 2026. Draaien wacht op akkoord van de eigenaar:
--- het zijn zes nieuwe, lege tabellen (RLS aan, een leespolicy per tabel), en er verandert niets
+-- STATUS: GEDRAAID op 14 november 2026, met akkoord van de eigenaar (RLS aan, een leespolicy per
+-- tabel). Geschreven op 13 november 2026. Het zijn zes nieuwe tabellen (RLS aan, een leespolicy per tabel), en er verandert niets
 -- aan bestaande tabellen of data. De code werkt zonder deze tabellen:
 -- - de Google-sync (lib/sync/orchestrator.ts, lib/sync/google-dagen.ts) leest eerst
 --   google_dag_stand; zonder die tabel vraagt hij Google niets per dag, schrijft een logregel en
