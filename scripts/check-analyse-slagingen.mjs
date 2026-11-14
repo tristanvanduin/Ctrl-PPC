@@ -50,7 +50,7 @@ if (KLANT !== null && !/^[a-z0-9_-]+$/i.test(KLANT)) {
 // Een select en niets anders. Het venster op started_at: een job die nooit startte heeft geen
 // uitkomst om te tellen.
 const rijen = await sql(`
-  select job_type, status, started_at, updated_at
+  select job_type, status, started_at, updated_at, triggered_by
   from generation_jobs
   where started_at >= now() - interval '${Math.round(DAGEN)} days'
   ${KLANT ? `and client_id = '${KLANT}'` : ""}`);

@@ -405,7 +405,7 @@ console.log("De bedrading: de schakelaar bereikt elk tabblad");
     check(`het klantdashboard geeft de schakelaar door aan ${naam}`, new RegExp(`<${naam} [^\\n]*nieuw=\\{nieuweWeergave\\}`).test(dashboard));
   }
   check("en aan GoogleView", /<GoogleView[\s\S]{0,700}nieuw=\{nieuweWeergave\}/.test(dashboard));
-  check("op Campagnes staat de kanaaltabel alleen in de nieuwe weergave", /channel === "blended" && nieuweWeergave && <CrossChannelView [^>]*alleenTabel \/>/.test(dashboard));
+  check("op Campagnes staat de kanaaltabel alleen in de nieuwe weergave", /channel === "blended" && nieuweWeergave && <CrossChannelView [^>]*alleenTabel[^>]*\/>/.test(dashboard));
   // Account Health leest zijn scores uit twee providers die een test niet kan vullen; dat de radar
   // en de toelichting in de lade zitten en de rangschikking erboven staat, staat hier op de bron
   // vast. Dat een dichte lade zijn inhoud niet maakt, is hierboven op gedrag getoetst ("De lade").

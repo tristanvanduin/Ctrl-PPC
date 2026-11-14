@@ -8,6 +8,7 @@ import {
   markProgressFailed,
   updateProgressPhase,
 } from "@/lib/progress/server";
+import { GESTART_DOOR_HANDMATIG } from "@/lib/progress/gestart-door";
 import { logger } from "@/lib/logger";
 
 /**
@@ -40,6 +41,7 @@ export async function GET(request: NextRequest) {
 
   await createProgressJob(supabase, {
     jobId,
+    triggeredBy: GESTART_DOOR_HANDMATIG, // geen cron roept deze route aan
     clientId,
     jobType: "pdf_generation",
     initialMessage: "Rapport PDF wordt voorbereid...",

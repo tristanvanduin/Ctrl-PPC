@@ -24,6 +24,9 @@ export interface GenerationJobRij {
   status: string | null;
   started_at: string | null;
   updated_at: string | null;
+  /** Wie hem startte: "cron", "handmatig" of een gebruikers-id; null bij rijen van voor
+   *  14 november 2026 (createProgressJob vulde hem toen nog niet). Alleen voor de weergave. */
+  triggered_by?: string | null;
 }
 
 export interface CadansUitslag {
@@ -32,6 +35,11 @@ export interface CadansUitslag {
   mislukt: number;
   vastgelopen: number;
   bezig: number;
+  /** Alle rijen van deze cadans naar wie ze startte (soortGestartDoor). Alleen weergave: de
+   *  beslisregels hieronder kijken er niet naar. */
+  gepland: number;
+  handmatig: number;
+  onbekend: number;
   /** afgerond / (afgerond + mislukt + vastgelopen), of null zonder afgesloten pogingen. */
   slagingspercentage: number | null;
   /** Onder de grens en met genoeg pogingen om er iets over te zeggen. */
@@ -54,9 +62,10 @@ export function vatSlagingenSamen(rijen: readonly GenerationJobRij[], opties: Sl
     const cadans = rij.job_type ?? "onbekend";
     let u = perCadans.get(cadans);
     if (!u) {
-      u = { cadans, afgerond: 0, mislukt: 0, vastgelopen: 0, bezig: 0, slagingspercentage: null, waarschuwing: false };
+      u = { cadans, afgerond: 0, mislukt: 0, vastgelopen: 0, bezig: 0, gepland: 0, handmatig: 0, onbekend: 0, slagingspercentage: null, waarschuwing: false };
       perCadans.set(cadans, u);
     }
+    u[soortGestartDoor(rij.triggered_by)] += 1;
     if (rij.status === "completed") u.afgerond += 1;
     else if (rij.status === "failed") u.mislukt += 1;
     else if (rij.status === "running") {
@@ -75,11 +84,28 @@ export function vatSlagingenSamen(rijen: readonly GenerationJobRij[], opties: Sl
   return [...perCadans.values()].sort((a, b) => a.cadans.localeCompare(b.cadans));
 }
 
+export type GestartDoorSoort = "gepland" | "handmatig" | "onbekend";
+
+/**
+ * Wie een run startte, voor de weergave. "cron" (GESTART_DOOR_CRON in lib/progress/gestart-door.ts)
+ * is gepland; leeg is onbekend (rijen van voordat het veld gevuld werd); al het andere -- "handmatig"
+ * of een gebruikers-id -- is handmatig. De waarde staat hier letterlijk omdat dit bestand zonder
+ * imports moet blijven.
+ */
+export function soortGestartDoor(triggeredBy: string | null | undefined): GestartDoorSoort {
+  const v = triggeredBy?.trim();
+  if (!v) return "onbekend";
+  return v === "cron" ? "gepland" : "handmatig";
+}
+
 /** Een regel per cadans, voor de terminal. */
 export function slagingsRegel(u: CadansUitslag): string {
   const pct = u.slagingspercentage === null ? "  -- " : `${Math.round(u.slagingspercentage * 100).toString().padStart(3)}%`;
   const label = u.waarschuwing ? "LAAG" : "    ";
-  return `  ${label}  ${u.cadans.padEnd(18)} ${pct}  afgerond ${u.afgerond}, mislukt ${u.mislukt}, vastgelopen ${u.vastgelopen}${u.bezig ? `, bezig ${u.bezig}` : ""}`;
+  // Wie ze startte, achteraan: een daling na het aanzetten van de cron moet je kunnen toeschrijven
+  // aan de nacht of aan het testen. "onbekend" alleen als die er zijn: na een paar maanden niet meer.
+  const bron = `gepland ${u.gepland}, handmatig ${u.handmatig}${u.onbekend ? `, onbekend ${u.onbekend}` : ""}`;
+  return `  ${label}  ${u.cadans.padEnd(18)} ${pct}  afgerond ${u.afgerond}, mislukt ${u.mislukt}, vastgelopen ${u.vastgelopen}${u.bezig ? `, bezig ${u.bezig}` : ""}  (${bron})`;
 }
 
 // ---------------------------------------------------------------------------------------------

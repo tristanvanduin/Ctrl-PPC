@@ -548,7 +548,7 @@ function CampagneScorecard({ clientId, type }: { clientId: string; type: Campagn
 
 /** De Campagnes-tab voor Google Ads: scorecard per campagnetype, wat draait er, de advertenties
  *  zelf, en waar het weglekt. */
-export function GoogleCampagnes({ clientId, geoClone, countryFilter, onCountryFilterChange }: GoogleCampagnesProps) {
+export function GoogleCampagnes({ clientId, geoClone, countryFilter, onCountryFilterChange, nieuw = false }: GoogleCampagnesProps & { nieuw?: boolean }) {
   const [campagneType, setCampagneType] = useState<CampagneType>("SEARCH");
   return (
     <div>
@@ -576,9 +576,9 @@ export function GoogleCampagnes({ clientId, geoClone, countryFilter, onCountryFi
       <Sectie
         icoon={<LayoutGrid className="w-4.5 h-4.5 text-brand-blue-ink" />}
         titel="Wat er draait"
-        bijschrift="Alle campagnes van dit account over de laatste 30 dagen"
+        bijschrift={nieuw ? "Alle campagnes van dit account over de gekozen periode" : "Alle campagnes van dit account over de laatste 30 dagen"}
       >
-        <CampaignTable clientId={clientId} geoClone={geoClone} countryFilter={countryFilter} onCountryFilterChange={onCountryFilterChange} />
+        <CampaignTable clientId={clientId} geoClone={geoClone} countryFilter={countryFilter} onCountryFilterChange={onCountryFilterChange} nieuw={nieuw} />
       </Sectie>
       {/* Wie de campagnes bereiken, tussen "wat draait er" en "hoe zien de advertenties eruit" --
           de doelgroepmix is een targeting-vraag, geen creative-vraag, en hoort dus vóór de

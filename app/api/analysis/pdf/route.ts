@@ -19,6 +19,7 @@ import {
   markProgressFailed,
   updateProgressPhase,
 } from "@/lib/progress/server";
+import { gestartDoorUitVerzoek } from "@/lib/progress/gestart-door";
 import { logger } from "@/lib/logger";
 
 // sop_analysis_output/agency_analysis_output slaan "output" op als tekst (soms al als object
@@ -90,6 +91,8 @@ export async function GET(request: NextRequest) {
 
   await createProgressJob(supabase, {
     jobId,
+    // automatisch=1 zet alleen de cron (trigger-sops); zonder het CRON_SECRET telt hij niet.
+    triggeredBy: gestartDoorUitVerzoek(request.headers, request.nextUrl.searchParams.get("automatisch") === "1"),
     clientId,
     jobType: "pdf_generation",
     initialMessage: "SOP PDF wordt voorbereid...",

@@ -9,6 +9,7 @@ import {
   markProgressFailed,
   updateProgressPhase,
 } from "@/lib/progress/server";
+import { GESTART_DOOR_HANDMATIG } from "@/lib/progress/gestart-door";
 
 /**
  * GET /api/second-opinion/pdf?run_id=xxx&client_name=yyy
@@ -37,6 +38,7 @@ export async function GET(request: NextRequest) {
 
   await createProgressJob(supabase, {
     jobId,
+    triggeredBy: GESTART_DOOR_HANDMATIG, // geen cron roept deze route aan
     clientId: run.client_id as string,
     jobType: "pdf_generation",
     initialMessage: "Second opinion PDF wordt voorbereid...",

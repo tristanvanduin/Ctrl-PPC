@@ -8,9 +8,7 @@
 // vercel.json. Zolang dat zo is vuurt niets hem automatisch af -- de enige manier om hem te laten
 // draaien is een expliciete aanroep met CRON_SECRET, precies zoals evaluate-code-rood en
 // process-action-queue getest werden voordat ze aan vercel.json werden toegevoegd. Activeren is
-// een aparte, bewuste stap:
-//
-//   { "path": "/api/cron/trigger-sops", "schedule": "0 3 * * *" }  toevoegen aan vercel.json
+// een aparte, bewuste stap; de regel en het tijdstip staan onder AANZETTEN hieronder.
 //
 // Een TWEEDE, onafhankelijke veiligheidslaag zit in de data zelf: dit bestand triggert alleen een
 // (klant, kanaal, cadans)-combinatie als hij "due" is (lib/scheduler/sop-cadence.ts) EN de klant
@@ -39,17 +37,105 @@
 // is de WHO/WANNEER-beslissing (is deze combinatie due), niet de HOE-uitvoering (die blijft het
 // bestaande synchrone pad).
 //
-// ── BATCHGROOTTE ─────────────────────────────────────────────────────────────
+// ── TIJD ────────────────────────────────────────────────────────────────────
 //
-// `limit` (default 1) begrenst hoeveel due items deze ENE invocatie daadwerkelijk draait. Monthly
-// duurt volgens de knoppen-UI 2-3 minuten; bij maxDuration 300s past dat maar net voor EEN monthly
-// run, dus de default is bewust behoudend in plaats van een geschat getal -- zelfde discipline als
-// PUMP_BATCH_SIZE in lib/scheduler/core.ts ("gemeten uit 756 echte stap-fases"), maar dan zonder
-// dat die meting hier al bestaat. Verhoog `?limit=` pas nadat de echte duur van een self-fetch
-// aanroep (inclusief het netwerkstapje, niet alleen de analyse zelf) in productie gemeten is. Items
-// die wel due zijn maar buiten het budget vallen komen terug als status "due_deferred" -- niet
-// stilzwijgend overgeslagen, zodat een volgende run (of een handmatige aanroep met hoger limit) ze
-// oppikt.
+// Deze route WACHT op /api/analysis/{weekly,biweekly,monthly} (de uitvoer is nodig voor de upload),
+// en die routes hebben maxDuration 600. Gemeten in generation_jobs, afgeronde runs vanaf 1 augustus
+// 2026 (completed_at - started_at):
+//
+//   biweekly_sop    14 runs, 4 boven 300 s, p90 410 s, max 508 s
+//   monthly_sop     21 runs, 2 boven 300 s, p90 295 s, max 390 s
+//   weekly_sop      16 runs, 1 boven 300 s, p90 148 s, max 303 s
+//   pdf_generation  80 runs, max 9 s
+//
+// Dat zijn knop- en testruns: deze cron is nooit gepland geweest (triggered_by was op alle rijen
+// leeg). Dat de cron bij 7 van die 51 runs zou afbreken is dus een VERWACHTING, geen waarneming.
+// Er waren twee grenzen die hem zouden laten afbreken, niet een:
+//
+//   1. De maxDuration van deze route (300). Een wachtende aanroeper moet minstens zo lang mogen
+//      leven als wat hij aanroept (600 + upload).
+//   2. De headers-timeout van fetch. De globale fetch van Node (undici) geeft het na 300 s zonder
+//      headers op, en de analyse-routes sturen pas aan het eind headers. Daar helpt geen maxDuration
+//      en geen AbortSignal.timeout tegen: met alleen een hogere maxDuration faalde de aanroep nog
+//      steeds na 300 s, als "failed", zonder upload, cross-channel of PDF-check.
+//
+// Gekozen, als het eenvoudigste dat werkt:
+//
+//   (a) maxDuration 800, het maximum van Vercel Pro met Fluid Compute. Het plan staat niet in de repo
+//       zelf; wat er wel staat: de analyse-routes zeggen "sinds de upgrade naar Vercel Pro", en
+//       /api/sync/cron draait al elke nacht met maxDuration 600 uit vercel.json -- op Hobby (max 300)
+//       wordt zo'n deploy geweigerd. Klopt dat toch niet, dan faalt de deploy hardop op deze 800,
+//       niet stil in de nacht.
+//   (b) wachten zonder fetch: alle aanroepen hieruit gaan via interneAanroep
+//       (lib/scheduler/interne-aanroep.ts, node:http zonder headers- of bodytimeout, met een eigen
+//       harde deadline). Waarom niet undici als dependency, streamende analyse-routes of een cron
+//       die niet wacht: zie de kop van dat bestand.
+//   (c) een tijdbudget (lib/scheduler/sop-tijdbudget.ts): een analyse start alleen als zijn volle
+//       maxDuration plus de upload in het restant van deze invocatie past; een vervolgstap krijgt
+//       het restant als timeout en wordt anders uitgesteld. Zo komt er altijd een JSON-overzicht.
+//   (d) meer tijdstippen in plaats van meer per invocatie: vier per nacht, elk met `limit` 1,
+//       ongeacht de cadans. Per cadans een eigen tijdstip geeft elke cadans maar een slot per nacht,
+//       ook als er van die cadans vier kanalen due zijn en van de andere niets.
+//
+// after() is hier geen oplossing: volgens node_modules/next/dist/docs/01-app/03-api-reference/
+// 04-functions/after.md loopt after() binnen de maxDuration van dezelfde route; het maakt alleen het
+// antwoord eerder, en Vercel Cron leest dat antwoord niet. De dure vervolgstap, de synthese, start
+// de maandroute zelf al in zijn after().
+//
+// `limit` (default 1) begrenst hoeveel due items een invocatie draait; het tijdbudget begrenst
+// daarnaast. Met 800 s past na een analyse alleen een tweede als de eerste binnen ~155 s klaar was.
+// Items die due zijn maar niet pasten komen terug als "due_deferred" met een `uitstelreden`
+// ("limiet" of "tijd") -- niet stilzwijgend overgeslagen -- en de volgende invocatie pakt ze op.
+// Een cross-channel die door tijdgebrek niet startte (`vervolg_uitgesteld`) wordt NIET vanzelf
+// ingehaald: hij hangt aan de maandrun van deze invocatie. Met 800 s blijft er na de traagste
+// analyse (600 + upload) ruim 150 s over voor een deterministische stap, dus dat is theorie. De
+// beslissing per item staat in verwerkDueItem (lib/scheduler/sop-cron-stappen.ts), getoetst met
+// een nepklok in lib/scheduler/__sop_cron_stappen_test.ts.
+//
+// ── AANZETTEN ───────────────────────────────────────────────────────────────
+//
+// Nog NIET gepland (besluit eigenaar). Aanzetten is deze regel in "crons" van vercel.json:
+//
+//   { "path": "/api/cron/trigger-sops", "schedule": "20 5-8 * * *" }
+//
+// Dat is 05:20, 06:20, 07:20 en 08:20 UTC (06:20-09:20 in de winter in Nederland): na de dagsync
+// van 05:00 (/api/sync/cron, maxDuration 600, dus om 05:10 klaar), zodat een analyse de cijfers
+// van gisteren ziet; vier invocaties van hooguit 800 s die elkaar niet overlappen. Meer dan een
+// cron per dag kan alleen op Pro.
+//
+// Volume, in de stand van 14 november 2026: 8 klanten hebben sops_enabled, samen 11 kanalen met
+// een eerdere run (demo-greentech 4, de rest 1). Gemiddeld is dat per week 11 weeklies, 5,5
+// biweeklies en ruim 2,5 maandanalyses: ~19 runs, ~2,7 per nacht, tegen een capaciteit van 4. Maar
+// het gemiddelde verbergt twee pieken, nagerekend met isSopDue en de volgorde van deze lus (klant,
+// kanaal, weekly-biweekly-monthly), voor die 11 kanalen:
+//
+//   - Bij het aanzetten is alles due: de laatste runs zijn van augustus en september, dus 11
+//     kanalen keer 3 cadansen is 33 items. Met 4 per nacht is die achterstand na 9 nachten weg; de
+//     laatste maandanalyse komt in de 9e nacht.
+//   - Op de 1e van elke maand worden alle 11 maandanalyses tegelijk due (isMonthlyDue kijkt naar de
+//     kalendermaand), met de weeklies en biweeklies ertussendoor. De laatste maandanalyse komt dan
+//     op de 7e tot 9e van de maand, en de maand-PDF van een klant met meer kanalen pas daarna.
+//
+// Wie de maandronde eerder wil: verbreed het venster (bijvoorbeeld "20 5-10 * * *", zes per nacht)
+// in plaats van `limit` te verhogen; het tijdbudget laat een tweede analyse in dezelfde invocatie
+// toch zelden toe. Hetzelfde geldt als er klanten of kanalen bijkomen en due_deferred met
+// uitstelreden "limiet" blijft groeien.
+//
+// Kosten per nacht, geschat uit llm_usage.cost_eur sinds 1 augustus 2026 (per run_key opgeteld):
+// een maandanalyse gemiddeld 0,14 euro voor Google (33 runs, hoogste 0,22) en 0,05-0,10 voor de
+// andere kanalen; een weekly 0,08-0,16 en een biweekly 0,08-0,21. Die laatste twee rusten op een
+// kleine en onvolledige steekproef: 2 tot 4 runs per kanaal, en 9 weekly-run_keys tegenover 16
+// afgeronde weekly-jobs -- niet elke run logt in llm_usage. Met vier runs per nacht is het plafond
+// ongeveer 0,90 euro per nacht (zo in de eerste 9 nachten en in de eerste week van elke maand);
+// gemiddeld ~0,12 euro per run maakt ~0,33 euro per nacht, ~2,30 per week. Niet in die schatting:
+// de kanaaloverstijgende synthese (staat niet in llm_usage) en herhaalpogingen -- een item dat
+// mislukt, blijft due en wordt de volgende invocatie opnieuw geprobeerd, tot vier keer per nacht.
+// Het uitgavenplafond (LLM_MAAND_PLAFOND_EUR, lib/analysis/uitgavenplafond.ts) geldt ook voor deze
+// runs.
+//
+// Wie wat startte staat in generation_jobs.triggered_by: "cron" voor runs uit deze route (herkend
+// aan het CRON_SECRET samen met de vlag automatisch, lib/progress/gestart-door.ts), anders
+// "handmatig". scripts/check-analyse-slagingen.mjs toont per cadans hoeveel van elk.
 //
 // ── HANDMATIG TESTEN ─────────────────────────────────────────────────────────
 //
@@ -59,6 +145,10 @@
 // dry_run=true evalueert alles (welke combinaties due zijn) zonder ook maar één analyse te
 // starten -- de veilige manier om te zien wat er zou gebeuren voordat er echt iets draait, en
 // zonder kosten (geen LLM-aanroep, geen self-fetch).
+//
+// Zonder dry_run start zo'n curl een echte run, en die telt in generation_jobs.triggered_by als
+// "cron": hij draait precies het geplande pad, met het geheim en de vlag automatisch. Wie het
+// onderscheid tussen nacht en testen zoekt, kijkt dan naar het tijdstip.
 
 import { NextRequest } from "next/server";
 import { getSupabase } from "@/lib/analysis/helpers";
@@ -67,10 +157,17 @@ import { laadBeschikbareKanalen, ALLE_KANALEN, type Kanaal } from "@/lib/kanalen
 import { CHANNEL_CONFIG, ALLE_SOP_TYPES, type SopChannel, type SopType } from "@/lib/analysis/sop-channel-config";
 import { isSopDue, AFRONDINGS_SECTIE, type SopCadence } from "@/lib/scheduler/sop-cadence";
 import { ruimVastgelopenRunsOp } from "@/lib/scheduler/vastgelopen-runs";
-import { today } from "@/lib/reporting-date";
+import { maakTijdbudget, vervolgTimeoutMs, type Tijdbudget } from "@/lib/scheduler/sop-tijdbudget";
+import {
+  interneHeaders, triggerCrossChannel, triggerCrossChannelSynthesis, verwerkDueItem, voerSopUit, type Vervolgstap,
+} from "@/lib/scheduler/sop-cron-stappen";
+import { interneAanroep } from "@/lib/scheduler/interne-aanroep";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-export const maxDuration = 300;
+// 800 s: het maximum van Vercel Pro met Fluid Compute. Moet een letterlijk getal zijn (Next leest de
+// route-config statisch uit). Waarom 800 en niet 300: zie "TIJD" in de kop hierboven en
+// lib/scheduler/sop-tijdbudget.ts -- deze route wacht op een analyse-route met maxDuration 600.
+export const maxDuration = 800;
 
 const DEFAULT_LIMIT = 1;
 
@@ -89,7 +186,9 @@ interface Uitkomst {
    *  kanaal/cadans, dus is er nog geen kanaal-combinatie geevalueerd om te noemen. */
   channel?: SopChannel;
   cadence?: SopType;
-  status: "triggered" | "failed" | "not_due" | "due_deferred" | "due_dry_run" | "sops_disabled";
+  status: "triggered" | "failed" | "not_due" | "due_deferred" | "due_dry_run" | "sops_disabled" | "tijd_op";
+  /** Bij due_deferred: de batch was vol (limit) of de tijd dekte geen volledige analyse meer. */
+  uitstelreden?: "limiet" | "tijd";
   lastRunDate?: string | null;
   analysisDate?: string;
   error?: string;
@@ -101,6 +200,8 @@ interface AccountRij {
 }
 
 export async function GET(request: NextRequest) {
+  // Als eerste: de klok loopt vanaf het begin van de invocatie, niet vanaf de eerste analyse.
+  const budget = maakTijdbudget(maxDuration, Date.now());
   const cronSecret = process.env.CRON_SECRET;
   if (!cronSecret) {
     return Response.json({ error: "CRON_SECRET niet geconfigureerd; de cron weigert bewust te draaien" }, { status: 500 });
@@ -146,8 +247,17 @@ export async function GET(request: NextRequest) {
   // Zelfde soort dedup, voor de PDF-gereedheidscheck hieronder -- die query't zelf de database
   // opnieuw (dus goedkoop om vaker te draaien), maar hoeft niet meermaals per klant per invocatie.
   const pdfGecheckt = new Set<string>();
+  // Vervolgstappen die niet meer in deze invocatie pasten. Geen fout: zie lib/scheduler/sop-tijdbudget.ts.
+  const vervolgUitgesteld: string[] = [];
 
   for (const clientId of klanten) {
+    // Ook het beoordelen kost tijd (een handvol queries per kanaal en cadans). Is de tijd op, dan
+    // zegt het overzicht dat per klant, in plaats van dat het platform de functie halverwege afbreekt
+    // en er helemaal geen overzicht komt.
+    if (vervolgTimeoutMs(budget, Date.now()) === null) {
+      resultaten.push({ clientId, status: "tijd_op" });
+      continue;
+    }
     if (!(await magSopDraaien(supabase, clientId))) {
       resultaten.push({ clientId, status: "sops_disabled" });
       continue;
@@ -191,37 +301,31 @@ export async function GET(request: NextRequest) {
           resultaten.push({ clientId, channel, cadence, status: "due_dry_run", lastRunDate });
           continue;
         }
-        if (getriggerd >= limit) {
-          resultaten.push({ clientId, channel, cadence, status: "due_deferred", lastRunDate });
-          continue;
-        }
-
-        try {
-          const analysisDate = await voerSopUit(supabase, origin, clientId, channel, cadence);
-          resultaten.push({ clientId, channel, cadence, status: "triggered", lastRunDate, analysisDate });
-          getriggerd += 1;
-          // Cross-channel hoort bij elke maandanalyse (masterplan 16.4: "cross channel moet de
-          // basis zijn in de maandanalyse"), niet alleen bij een handmatige klik op de losse knop
-          // (components/dashboard/cross-channel-analyses.tsx). Faalt dit, dan blijft de
-          // kanaalanalyse zelf een succes -- cross-channel is een aanvulling, geen voorwaarde.
-          // Alleen zinvol vanaf 2 kanalen (masterplan 16.6) -- met 1 kanaal is er niets om te
-          // kruisen; de route zelf gate't dit ook (defense-in-depth), maar hier voorkomt het al
-          // een nutteloze aanroep + de bijbehorende foutlog.
-          if (cadence === "monthly" && kanalen.length > 1 && !crossChannelGedaan.has(clientId)) {
-            crossChannelGedaan.add(clientId);
-            await triggerCrossChannel(origin, clientId).catch((err) => {
-              console.error(`[trigger-sops] cross-channel voor ${clientId} mislukt:`, err);
-            });
-            await triggerCrossChannelSynthesis(origin, clientId).catch((err) => {
-              console.error(`[trigger-sops] cross-channel-synthese voor ${clientId} mislukt:`, err);
-            });
-          }
-        } catch (err) {
-          resultaten.push({
-            clientId, channel, cadence, status: "failed", lastRunDate,
-            error: err instanceof Error ? err.message : String(err),
-          });
-        }
+        // Cross-channel hoort bij elke maandanalyse (masterplan 16.4: "cross channel moet de
+        // basis zijn in de maandanalyse"), niet alleen bij een handmatige klik op de losse knop
+        // (components/dashboard/cross-channel-analyses.tsx). Alleen zinvol vanaf 2 kanalen
+        // (masterplan 16.6) -- met 1 kanaal is er niets om te kruisen; de route zelf gate't dit ook
+        // (defense-in-depth), maar hier voorkomt het al een nutteloze aanroep + de bijbehorende
+        // foutlog. verwerkDueItem vraagt dit pas op na een gelukte analyse.
+        const vervolgstappen = (): Vervolgstap[] => {
+          if (cadence !== "monthly" || kanalen.length <= 1 || crossChannelGedaan.has(clientId)) return [];
+          crossChannelGedaan.add(clientId);
+          return [
+            { naam: `cross-channel ${clientId}`, stap: (ms) => triggerCrossChannel(origin, clientId, ms) },
+            // Uitgesteld is hier geen verlies: de maandroute start de synthese zelf in zijn after().
+            { naam: `cross-channel-synthese ${clientId}`, stap: (ms) => triggerCrossChannelSynthesis(origin, clientId, ms) },
+          ];
+        };
+        const { uitkomst, vervolgUitgesteld: uitgesteld } = await verwerkDueItem({
+          item: { clientId, channel, cadence, lastRunDate },
+          getriggerd, limit, budget,
+          nu: Date.now,
+          voerUit: (timeoutMs) => voerSopUit(supabase, origin, clientId, channel, cadence, timeoutMs),
+          vervolgstappen,
+        });
+        resultaten.push(uitkomst);
+        if (uitkomst.status === "triggered") getriggerd += 1;
+        vervolgUitgesteld.push(...uitgesteld);
       }
     }
 
@@ -234,9 +338,14 @@ export async function GET(request: NextRequest) {
     // veilig om te draaien, ook als er niets getriggerd is.
     if (!dryRun && (!cadenceFilter || cadenceFilter === "monthly") && !pdfGecheckt.has(clientId)) {
       pdfGecheckt.add(clientId);
-      await triggerMonthlyPdfIfComplete(supabase, origin, clientId, kanalen).catch((err) => {
-        console.error(`[trigger-sops] PDF-gereedheidscheck voor ${clientId} mislukt:`, err);
-      });
+      // Uitgesteld is hier geen verlies: de check leest de stand in de database, dus de volgende
+      // invocatie pakt hem op.
+      if (vervolgTimeoutMs(budget, Date.now()) === null) vervolgUitgesteld.push(`pdf ${clientId}`);
+      else {
+        await triggerMonthlyPdfIfComplete(supabase, origin, clientId, kanalen, budget).catch((err) => {
+          console.error(`[trigger-sops] PDF-gereedheidscheck voor ${clientId} mislukt:`, err);
+        });
+      }
     }
   }
 
@@ -246,49 +355,10 @@ export async function GET(request: NextRequest) {
     aantal_klanten: klanten.length,
     getriggerd,
     vastgelopen_afgesloten: vastgelopen,
+    vervolg_uitgesteld: vervolgUitgesteld,
+    seconden: Math.round((Date.now() - budget.startMs) / 1000),
     resultaten,
   });
-}
-
-// Volledig deterministisch, geen LLM-aanroep (model_used: "deterministisch", tokens_used: 0 in
-// app/api/analysis/cross-channel/route.ts) -- dus geen budgetimpact, alleen een handvol extra
-// Supabase-reads. Gooit door bij een fout; de aanroeper vangt en logt, zonder de kanaalanalyse
-// als mislukt te markeren.
-// Alle interne aanroepen op de eigen origin dragen het CRON_SECRET als Bearer: geen
-// browsersessie, en zodra O1_AUTH_ENFORCED aangaat is dit geheim de doorgang langs de
-// middleware en de route-eigen toegangscheck (vereisKlantToegangUitBody). Deze route draait
-// zelf alleen met een geldig CRON_SECRET, dus het geheim is hier per definitie aanwezig.
-function interneHeaders(extra: Record<string, string> = {}): Record<string, string> {
-  return { ...extra, ...(process.env.CRON_SECRET ? { Authorization: `Bearer ${process.env.CRON_SECRET}` } : {}) };
-}
-
-async function triggerCrossChannel(origin: string, clientId: string): Promise<void> {
-  const res = await fetch(`${origin}/api/analysis/cross-channel`, {
-    method: "POST",
-    headers: interneHeaders({ "Content-Type": "application/json" }),
-    body: JSON.stringify({ client_id: clientId }),
-  });
-  if (!res.ok) {
-    const data = await res.json().catch(() => ({}));
-    throw new Error(data.error || `cross-channel gaf ${res.status}`);
-  }
-}
-
-// Kanaaloverstijgende SYNTHESE (masterplan 17.12) -- ná de deterministische signalen hierboven,
-// zodat de synthese de vers berekende cross-channel-context kan lezen. 409 (skipped) is hier geen
-// fout: de route zelf beslist of alle beschikbare kanalen deze cyclus al klaar zijn, en met deze
-// cron-loop (limit vaak 1) is dat lang niet elke invocatie zo -- pas het laatste kanaal dat deze
-// nacht afrondt triggert daadwerkelijk een LLM-call.
-async function triggerCrossChannelSynthesis(origin: string, clientId: string): Promise<void> {
-  const res = await fetch(`${origin}/api/analysis/cross-channel-synthesis`, {
-    method: "POST",
-    headers: interneHeaders({ "Content-Type": "application/json" }),
-    body: JSON.stringify({ client_id: clientId }),
-  });
-  if (!res.ok && res.status !== 409) {
-    const data = await res.json().catch(() => ({}));
-    throw new Error(data.error || `cross-channel-synthesis gaf ${res.status}`);
-  }
 }
 
 // De agency-facing maand-PDF als losse, zelf-gatende stap (masterplan 17.x) -- zelfde vorm als
@@ -318,6 +388,7 @@ async function triggerMonthlyPdfIfComplete(
   origin: string,
   clientId: string,
   kanalen: readonly Kanaal[],
+  budget: Tijdbudget,
 ): Promise<void> {
   // Geen Google, geen rijke maand-PDF-vorm om te renderen -- bestaande beperking van de PDF-
   // route zelf (zie het kopcommentaar van app/api/analysis/pdf/route.ts), niet iets wat deze
@@ -382,83 +453,18 @@ async function triggerMonthlyPdfIfComplete(
     .limit(1);
   if (bestaandeFiles && bestaandeFiles.length > 0) return;
 
-  const res = await fetch(
-    `${origin}/api/analysis/pdf?${new URLSearchParams({ client_id: clientId, sop_type: "monthly" })}`,
-    { headers: interneHeaders() }
+  // De timeout pas hier: de queries hierboven kosten ook tijd.
+  const timeoutMs = vervolgTimeoutMs(budget, Date.now());
+  if (timeoutMs === null) throw new Error("geen tijd meer in deze invocatie; de volgende pakt de PDF op");
+  // automatisch=1: samen met het CRON_SECRET telt de PDF-job dan als gepland
+  // (generation_jobs.triggered_by, lib/progress/gestart-door.ts).
+  const res = await interneAanroep(
+    `${origin}/api/analysis/pdf?${new URLSearchParams({ client_id: clientId, sop_type: "monthly", automatisch: "1" })}`,
+    { headers: interneHeaders(), timeoutMs }
   );
   if (!res.ok) {
-    const data = await res.json().catch(() => ({}));
-    throw new Error(data.error || `pdf-generatie gaf ${res.status}`);
+    throw new Error(typeof res.data.error === "string" && res.data.error ? res.data.error : `pdf-generatie gaf ${res.status}`);
   }
   console.log(`[trigger-sops] maand-PDF gegenereerd voor ${clientId} (${analysisDate})`);
 }
 
-// Draait exact wat de handmatige knop doet (runSop in sop-trigger-buttons.tsx): het endpoint
-// aanroepen, de executive-summary/output tot markdown maken, en die naar Bestanden > SOP's
-// schrijven. Geeft de analysisDate terug voor het resultaatoverzicht.
-async function voerSopUit(
-  supabase: SupabaseClient,
-  origin: string,
-  clientId: string,
-  channel: SopChannel,
-  cadence: SopType,
-): Promise<string> {
-  const endpoint = `${origin}/api/analysis/${cadence}`;
-  const jobId = crypto.randomUUID();
-  const res = await fetch(endpoint, {
-    method: "POST",
-    headers: interneHeaders({ "Content-Type": "application/json" }),
-    // `automatisch: true` markeert dit als een AUTOMATISCHE run. Alleen dan geldt de
-    // sops_enabled-dekkingsgate in de analyse-routes; de handmatige knop laat de vlag weg en
-    // blijft dus altijd werken, ook voor accounts die buiten de dekking zijn gezet.
-    body: JSON.stringify({ client_id: clientId, job_id: jobId, channel, automatisch: true }),
-  });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error || `${endpoint} gaf ${res.status}`);
-
-  const analysisDate: string = data.analysisDate || today();
-  const period = cadence === "monthly" ? data.period : { start: data.periodStart, end: data.periodEnd };
-  const cadenceLabel = cadence === "monthly" ? "Maandelijkse" : cadence === "weekly" ? "Wekelijkse" : "Tweewekelijkse";
-  const typeLabel = `${cadenceLabel} ${CHANNEL_CONFIG[channel].headerLabel}`;
-  const header = `# ${typeLabel} Analyse\n**Client:** ${clientId}\n**Datum:** ${analysisDate}\n**Periode:** ${period?.start} t/m ${period?.end}\n**Model:** ${data.model}\n\n---\n\n`;
-  const markdown = header + (data.fullOutput || data.output || "Geen output");
-
-  const sopTypeKey = CHANNEL_CONFIG[channel].sopTypeKey[cadence];
-  const fileName = `${analysisDate}-${sopTypeKey}-analyse.md`;
-  const storagePath = `${clientId}/SOP's/${Date.now()}-${fileName}`;
-
-  const { error: storageErr } = await supabase.storage
-    .from("client-files")
-    .upload(storagePath, markdown, { contentType: "text/markdown" });
-  if (storageErr) throw new Error(`upload mislukt: ${storageErr.message}`);
-
-  // Zelfde dedup als de PDF-route (app/api/analysis/pdf/route.ts, 20 augustus 2026): een
-  // herdraaide analyse dezelfde dag (bestandsnaam is analysisDate-gekeyd) hoort de bestaande rij
-  // te VERVANGEN, niet er een tweede naast te zetten. .limit(1) i.p.v. .maybeSingle() om dezelfde
-  // reden als daar -- bij al bestaande dubbelen faalt .maybeSingle() stil op "meerdere rijen".
-  const { data: verouderdeBestanden } = await supabase
-    .from("client_files")
-    .select("id, storage_path")
-    .eq("client_id", clientId)
-    .eq("folder", "SOP's")
-    .eq("file_name", fileName);
-  if (verouderdeBestanden && verouderdeBestanden.length > 0) {
-    const oudePaden = verouderdeBestanden.map((f) => f.storage_path).filter((p): p is string => Boolean(p));
-    if (oudePaden.length > 0) {
-      await supabase.storage.from("client-files").remove(oudePaden).catch(() => {});
-    }
-    await supabase.from("client_files").delete().in("id", verouderdeBestanden.map((f) => f.id));
-  }
-
-  const { error: insertErr } = await supabase.from("client_files").insert({
-    client_id: clientId,
-    folder: "SOP's",
-    file_name: fileName,
-    file_size: Buffer.byteLength(markdown, "utf8"),
-    content_type: "text/markdown",
-    storage_path: storagePath,
-  });
-  if (insertErr) throw new Error(`client_files-rij mislukt: ${insertErr.message}`);
-
-  return analysisDate;
-}

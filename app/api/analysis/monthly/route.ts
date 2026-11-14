@@ -96,6 +96,7 @@ import {
   markProgressFailed,
   updateProgressPhase,
 } from "@/lib/progress/server";
+import { gestartDoorUitVerzoek } from "@/lib/progress/gestart-door";
 import type { GoogleAdsCredentials } from "@/lib/api/google-ads";
 import { logger } from "@/lib/logger";
 import { ruimVastgelopenRunsOp } from "@/lib/scheduler/vastgelopen-runs";
@@ -1180,7 +1181,8 @@ async function runMetaMonthlyAnalysis(
   supabase: SupabaseClient,
   adapter: ChannelAdapter,
   clientId: string,
-  jobId: string
+  jobId: string,
+  triggeredBy: string
 , evalCapture: { fixtureSet: string } | null = null): Promise<Response> {
   const apiKey = getOpenRouterKey();
   if (!apiKey) return Response.json({ error: "OPENROUTER_API_KEY niet geconfigureerd" }, { status: 500 });
@@ -1195,6 +1197,7 @@ async function runMetaMonthlyAnalysis(
   await createProgressJob(supabase, {
     jobId,
     clientId,
+    triggeredBy,
     jobType: "monthly_sop",
     initialMessage: "Meta-analyse wordt voorbereid...",
     metadata: { sop_type: adapter.sopTypeKey },
@@ -1459,7 +1462,8 @@ async function runLinkedinMonthlyAnalysis(
   supabase: SupabaseClient,
   adapter: ChannelAdapter,
   clientId: string,
-  jobId: string
+  jobId: string,
+  triggeredBy: string
 , evalCapture: { fixtureSet: string } | null = null): Promise<Response> {
   const apiKey = getOpenRouterKey();
   if (!apiKey) return Response.json({ error: "OPENROUTER_API_KEY niet geconfigureerd" }, { status: 500 });
@@ -1474,6 +1478,7 @@ async function runLinkedinMonthlyAnalysis(
   await createProgressJob(supabase, {
     jobId,
     clientId,
+    triggeredBy,
     jobType: "monthly_sop",
     initialMessage: "LinkedIn-analyse wordt voorbereid...",
     metadata: { sop_type: adapter.sopTypeKey },
@@ -1743,6 +1748,7 @@ async function runMicrosoftMonthlyAnalysis(
   adapter: ChannelAdapter,
   clientId: string,
   jobId: string,
+  triggeredBy: string,
   evalCapture: { fixtureSet: string } | null = null
 ): Promise<Response> {
   const apiKey = getOpenRouterKey();
@@ -1758,6 +1764,7 @@ async function runMicrosoftMonthlyAnalysis(
   await createProgressJob(supabase, {
     jobId,
     clientId,
+    triggeredBy,
     jobType: "monthly_sop",
     initialMessage: "Microsoft Ads-analyse wordt voorbereid...",
     metadata: { sop_type: adapter.sopTypeKey },
@@ -2035,15 +2042,20 @@ export async function POST(request: NextRequest) {
   // vastgelopen: afsluiten met de reden, zodat hij niet als lopend of gedraaid blijft gelden.
   await ruimVastgelopenRunsOp(supabase, { clientId });
 
+  // Gepland (CRON_SECRET en de vlag automatisch, zie lib/progress/gestart-door.ts) of handmatig: naar
+  // generation_jobs.triggered_by, zodat het slagingspercentage en het logboek die twee uit elkaar
+  // kunnen houden.
+  const triggeredBy = gestartDoorUitVerzoek(request.headers, automatisch);
+
   try {
     if (adapter.channel === "meta_ads") {
-      return await runMetaMonthlyAnalysis(supabase, adapter, clientId, jobId, evalCapture);
+      return await runMetaMonthlyAnalysis(supabase, adapter, clientId, jobId, triggeredBy, evalCapture);
     }
     if (adapter.channel === "linkedin_ads") {
-      return await runLinkedinMonthlyAnalysis(supabase, adapter, clientId, jobId, evalCapture);
+      return await runLinkedinMonthlyAnalysis(supabase, adapter, clientId, jobId, triggeredBy, evalCapture);
     }
     if (adapter.channel === "microsoft_ads") {
-      return await runMicrosoftMonthlyAnalysis(supabase, adapter, clientId, jobId, evalCapture);
+      return await runMicrosoftMonthlyAnalysis(supabase, adapter, clientId, jobId, triggeredBy, evalCapture);
     }
     // Vanaf hier tellen de LLM-calls van deze run, zodat de cachesamenvatting aan het eind
     // niet die van een eerdere analyse in hetzelfde proces meepakt.
@@ -2061,6 +2073,7 @@ export async function POST(request: NextRequest) {
     await createProgressJob(supabase, {
       jobId,
       clientId,
+      triggeredBy,
       jobType: "monthly_sop",
       initialMessage: "Analyse wordt voorbereid...",
       metadata: { sop_type: adapter.sopTypeKey },

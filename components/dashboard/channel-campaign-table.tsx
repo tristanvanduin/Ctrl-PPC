@@ -10,6 +10,12 @@ import { today } from "@/lib/reporting-date";
 import { eersteDagVanVenster } from "@/lib/period/dag-venster";
 import { Tabel, Kop, KolomKop, Body, Rij, NaamCel, GetalCel, AandeelCel, TotaalRij, TotaalCel } from "./data-table";
 import { CONFIG, eur, fmt, pctS, type ChannelKind, type DailyRow } from "./channel-performance";
+import { usePeriod } from "@/lib/period/period-context";
+import { uitMaandPeriode, type DagPeriode } from "@/lib/period/dag-periode";
+import { telCampagnes, vergelijkCampagnes, type CampagneRij, type CampagneSom } from "@/lib/campagnes/campagne-periode";
+import { useCampagnePeriode } from "@/lib/campagnes/use-campagne-periode";
+import { Vensterlabel } from "@/components/ui/vensterlabel";
+import { CampagneStatusCel } from "./campagne-verandering";
 
 // De campagnetabel voor Meta/LinkedIn op de Campagnes-tab -- verhuisd uit channel-performance.tsx
 // (22 augustus 2026, "unify de Overzicht-hero... structuur exact hetzelfde"). Google's campagnetabel
@@ -23,7 +29,18 @@ import { CONFIG, eur, fmt, pctS, type ChannelKind, type DailyRow } from "./chann
 interface Agg { impressions: number; clicks: number; spend: number; conv: number }
 const emptyAgg = (): Agg => ({ impressions: 0, clicks: 0, spend: 0, conv: 0 });
 
-export function ChannelCampaignTable({ clientId, channel, geoClone }: { clientId: string; channel: ChannelKind; geoClone?: string | null }) {
+/**
+ * Met de schakelaar uit (`nieuw` false) precies de tabel van altijd, over de laatste 28 dagen
+ * (ChannelCampaignTableVast, ongewijzigd). In de nieuwe weergave over de gekozen periode per dag, met
+ * de verandering per campagne (ChannelCampaignTablePeriode).
+ */
+export function ChannelCampaignTable({ clientId, channel, geoClone, nieuw = false }: { clientId: string; channel: ChannelKind; geoClone?: string | null; nieuw?: boolean }) {
+  return nieuw
+    ? <ChannelCampaignTablePeriode clientId={clientId} channel={channel} geoClone={geoClone} />
+    : <ChannelCampaignTableVast clientId={clientId} channel={channel} geoClone={geoClone} />;
+}
+
+function ChannelCampaignTableVast({ clientId, channel, geoClone }: { clientId: string; channel: ChannelKind; geoClone?: string | null }) {
   const cfg = CONFIG[channel];
   const [campaign, setCampaign] = useState<DailyRow[] | null>(null);
   const [names, setNames] = useState<Map<string, string>>(new Map());
@@ -126,6 +143,97 @@ export function ChannelCampaignTable({ clientId, channel, geoClone }: { clientId
           <TotaalCel getal>{pctS(ctr(som))}</TotaalCel>
           <TotaalCel getal>{fmt(som.conv, 1)}</TotaalCel>
           <TotaalCel getal>{eur(cpa(som))}</TotaalCel>
+        </TotaalRij>
+      </Tabel>
+    </div>
+  );
+}
+
+// ── De nieuwe weergave: over de gekozen periode, per dag ─────────────────────────────────────────
+//
+// Dezelfde lezing en dezelfde regels als "Wat er draait" bij Alle kanalen (lib/campagnes/): de
+// campagne-dagtabel van dit kanaal over de periode en de vergelijkingsperiode, met de selectie van
+// de klant, en een verandering alleen waar hij eerlijk is. De rijen van Alle kanalen en van deze tab
+// delen de cache, dus een wissel tussen de twee kost geen verzoek.
+
+function ChannelCampaignTablePeriode({ clientId, channel, geoClone }: { clientId: string; channel: ChannelKind; geoClone?: string | null }) {
+  const cfg = CONFIG[channel];
+  const periode = usePeriod();
+  const p: DagPeriode = periode.dag?.periode ?? uitMaandPeriode(periode.range);
+  const c: DagPeriode | null = periode.dag
+    ? (periode.dag.keuze.vergelijk === "none" ? null : periode.dag.vergelijking.periode)
+    : (periode.compareRange ? uitMaandPeriode(periode.compareRange) : null);
+  const vergelijkLabel = periode.dag ? periode.dag.vergelijking.label : "de vergelijkingsperiode";
+  const kanalen = useMemo(() => [channel], [channel]);
+  const staat = useCampagnePeriode({ clientId, kanalen, periode: p, vergelijking: c, actief: true });
+
+  const uit = useMemo(() => {
+    const r = staat.rijen?.[channel];
+    if (!r) return null;
+    const inScope = (x: CampagneRij) => !geoClone || matchGeoCloneByCampaignName(x.naam)?.abbreviation === geoClone;
+    const bron = { kanaal: channel, dagen: r.dagen.filter(inScope), maanden: [], bronStart: r.bronStart };
+    const nu = telCampagnes(p, bron);
+    const toen = c ? telCampagnes(c, bron) : null;
+    return { nu, toen, vergelijking: vergelijkCampagnes(nu, toen) };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [staat.rijen, channel, geoClone, p.start, p.eind, c?.start, c?.eind]);
+
+  if (staat.fouten.length > 0) return <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-body text-amber-800">{staat.fouten.join(" · ")}</div>;
+  if (staat.laden || !uit) return <Laadvlak vorm="tabel" regels={6} />;
+  const regels = uit.vergelijking.regels;
+  if (regels.length === 0) return <p className="py-6 text-center text-body text-muted-foreground">Geen campagne die in deze periode liep.</p>;
+
+  const convLabel = staat.convConfig ? selectedConversionLabels(cfg.channelKey, staat.convConfig).join(" + ") : "Conversies";
+  const useLeadsLabel = cfg.channelKey === "linkedin_ads";
+  const metVergelijking = uit.toen !== null;
+  const ctr = (a: CampagneSom): number | null => (a.impressions > 0 ? a.clicks / a.impressions : null);
+  const cpa = (a: CampagneSom): number | null => (a.conversions > 0 ? a.spend / a.conversions : null);
+  const grootste = (f: (a: CampagneSom) => number) => Math.max(0, ...regels.map(f));
+  const max = { spend: grootste((a) => a.spend), impressions: grootste((a) => a.impressions), clicks: grootste((a) => a.clicks), conv: grootste((a) => a.conversions) };
+  const deel = (v: number, m: number) => (m > 0 ? v / m : 0);
+  const som = uit.nu.totaal;
+
+  return (
+    <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
+      <div className="px-5 pt-3 flex flex-wrap items-center gap-2">
+        <Vensterlabel soort="periode" perDag />
+      </div>
+      {metVergelijking && uit.vergelijking.reden && <p className="px-5 pt-2 text-meta text-muted-foreground">{uit.vergelijking.reden}</p>}
+      <Tabel>
+        <Kop>
+          <KolomKop breed>Campagne</KolomKop>
+          <KolomKop getal bijschrift="aandeel">Spend</KolomKop>
+          <KolomKop getal>Vertoningen</KolomKop>
+          <KolomKop getal>Klikken</KolomKop>
+          <KolomKop getal>CTR</KolomKop>
+          <KolomKop getal>{convLabel}</KolomKop>
+          <KolomKop getal>{useLeadsLabel ? "CPL" : "CPA"}</KolomKop>
+          {metVergelijking && <KolomKop getal bijschrift={`t.o.v. ${vergelijkLabel.toLowerCase()}`}>Verandering</KolomKop>}
+        </Kop>
+        <Body>
+          {regels.map((r) => (
+            <Rij key={r.sleutel}>
+              <NaamCel>{r.naam}</NaamCel>
+              <AandeelCel waarde={eur(r.spend)} aandeel={deel(r.spend, max.spend)} />
+              <AandeelCel waarde={fmt(r.impressions)} aandeel={deel(r.impressions, max.impressions)} />
+              <AandeelCel waarde={fmt(r.clicks)} aandeel={deel(r.clicks, max.clicks)} />
+              <GetalCel>{pctS(ctr(r))}</GetalCel>
+              <AandeelCel waarde={fmt(r.conversions, 1)} aandeel={deel(r.conversions, max.conv)} />
+              <GetalCel>{eur(cpa(r))}</GetalCel>
+              {metVergelijking && <CampagneStatusCel r={r} />}
+            </Rij>
+          ))}
+        </Body>
+        <TotaalRij>
+          <TotaalCel>Totaal</TotaalCel>
+          {/* Met een beurs geen merkteken: dan is dit het totaal van de beurs, niet van het kanaal. */}
+          <TotaalCel getal>{geoClone ? eur(som.spend) : <span data-cijfer="campagnes-totaal-kosten" data-kanaal={channel}>{eur(som.spend)}</span>}</TotaalCel>
+          <TotaalCel getal>{fmt(som.impressions)}</TotaalCel>
+          <TotaalCel getal>{fmt(som.clicks)}</TotaalCel>
+          <TotaalCel getal>{pctS(ctr(som))}</TotaalCel>
+          <TotaalCel getal>{geoClone ? fmt(som.conversions, 1) : <span data-cijfer="campagnes-totaal-conversies" data-kanaal={channel}>{fmt(som.conversions, 1)}</span>}</TotaalCel>
+          <TotaalCel getal>{eur(cpa(som))}</TotaalCel>
+          {metVergelijking && <TotaalCel getal><span className="sr-only">geen verandering voor het totaal</span></TotaalCel>}
         </TotaalRij>
       </Tabel>
     </div>

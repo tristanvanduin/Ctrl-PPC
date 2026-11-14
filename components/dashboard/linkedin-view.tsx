@@ -291,7 +291,7 @@ function useLinkedInObjectiveGroups(clientId: string): ObjectiveGroupLike[] | nu
  * Geen ChannelViewHeader, net als bij Meta en Google: de koppelingsstatus is een overzichtsvraag
  * en hoort niet op elk tabblad herhaald te worden.
  */
-export function LinkedInCampagnes({ clientId, geoClone }: { clientId: string; geoClone?: string | null }) {
+export function LinkedInCampagnes({ clientId, geoClone, nieuw = false }: { clientId: string; geoClone?: string | null; nieuw?: boolean }) {
   const objectiveGroups = useLinkedInObjectiveGroups(clientId);
 
   return (
@@ -319,9 +319,9 @@ export function LinkedInCampagnes({ clientId, geoClone }: { clientId: string; ge
       <Sectie
         icoon={<LayoutGrid className="w-4.5 h-4.5 text-brand-blue-ink" />}
         titel="Wat er draait"
-        bijschrift="Alle campagnes van dit account over de laatste 28 dagen"
+        bijschrift={nieuw ? "Alle campagnes van dit account over de gekozen periode" : "Alle campagnes van dit account over de laatste 28 dagen"}
       >
-        <ChannelCampaignTable clientId={clientId} channel="linkedin" geoClone={geoClone} />
+        <ChannelCampaignTable clientId={clientId} channel="linkedin" geoClone={geoClone} nieuw={nieuw} />
       </Sectie>
 
       {/* LinkedIn-equivalent van Google's "Doelgroepsignalen" (23 augustus 2026). Zelfde component

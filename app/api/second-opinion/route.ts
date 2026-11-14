@@ -11,6 +11,7 @@ import {
   markProgressFailed,
   updateProgressPhase,
 } from "@/lib/progress/server";
+import { GESTART_DOOR_HANDMATIG } from "@/lib/progress/gestart-door";
 import { logger } from "@/lib/logger";
 import { today } from "@/lib/reporting-date";
 import { supabaseForClient } from "@/lib/demo/server-supabase";
@@ -56,6 +57,7 @@ export async function POST(request: NextRequest) {
   try {
     await createProgressJob(supabase, {
       jobId,
+      triggeredBy: GESTART_DOOR_HANDMATIG, // geen cron roept deze route aan
       clientId,
       jobType: "second_opinion",
       initialMessage: "Second opinion wordt voorbereid...",

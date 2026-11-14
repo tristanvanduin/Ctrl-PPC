@@ -187,9 +187,44 @@ scorebord toont de naam, het id staat alleen in de href. Wat niet als tegel staa
 merkteken dat de pagina zelf zet: `data-cijfer="jaardoel"` met `data-kpi` en `data-reeks` (Prognose en
 Doelen; alleen dezelfde reeks wordt vergeleken), en
 `data-cijfer="kanaaltotaal-conversies"`/`"kanaaltotaal-kosten"` op de totaalrij van de kanaaltotalen
-(Campagnes, alleen in de nieuwe weergave: de campagnetabellen eronder hebben een vast venster en
-tellen niet mee). Haal zo'n merkteken niet weg; `lib/__cijfer_merktekens_test.ts` bewaakt ze. Alles
-staat in de zelftest met een nep-pagina die goed-, af- of niet-gemeten wordt.
+(Campagnes, alleen in de nieuwe weergave). Haal zo'n merkteken niet weg; `lib/__cijfer_merktekens_test.ts`
+bewaakt ze. Alles staat in de zelftest met een nep-pagina die goed-, af- of niet-gemeten wordt.
+
+Op Campagnes (nieuwe weergave, Alle kanalen) legt hij ook per kanaal de rij in de kanaaltotalen
+(`data-cijfer="kanaalrij-kosten"`/`"-conversies"` met `data-kanaal`) naast de totaalrij van de
+campagnetabel van dat kanaal (`data-cijfer="campagnes-totaal-kosten"`/`"-conversies"`, zelfde
+`data-kanaal`), op `last_12m` en op een periode PER DAG (de 1e t/m de 20e van de vorige maand). Die
+tweede is nodig: op hele maanden kan een kanaalrij die maanden telt niet van een telling per dag
+verschillen, midden in een maand wel.
+
+Beide kanten tellen dezelfde dagen uit dezelfde sync (`lib/campagnes/campagne-periode.ts`):
+
+- Een periode die niet als maandkeuze kan: de kanaalrijen per dag, met de telling van de kerncijfers
+  (`useDagTelling`, `kanaalTotalenUitDagTelling`); de campagnetabellen per dag uit de `*_campaign_daily`
+  tabellen, Google uit `ads_campaign_daily` met voor het deel vóór de dagopslag hele maanden en het
+  label van `splitsOpDagOpslag`.
+- Hele maanden: de kanaalrijen uit de maandrijen, en Google in de campagnetabel uit
+  `ads_campaign_monthly`, niet uit de dagrijen. Dag- en maandrijen komen uit twee syncmomenten: op de
+  demo telt november 2026 per dag € 5.579 en 49 conversies, per maand (en in `fact_core`) € 5.576,66 en
+  47,12. Ze tellen dus NIET overal hetzelfde op; de lopende maand is het verschil.
+
+Alleen GEMERKTE totaalrijen tellen: de campagnetabellen in de vertrouwde weergave hebben een vast
+venster en geen merkteken, en met een gekozen beurs dragen ze er ook geen (dan is het de som van de
+beurs, niet van het kanaal). Een kanaal dat aan maar een kant staat, is NIET GEMETEN met de kant die
+ontbreekt; geen enkel merkteken op Campagnes ook. De Google-campagnetabel op het tabblad Google
+(`campaign-table.tsx`) volgt in de nieuwe weergave dezelfde regels en merktekens; hij staat niet op
+dezelfde pagina als de kanaalrijen en wordt dus niet vergeleken.
+
+Op de demo is Meta en LinkedIn rood: hun campagnerijen tellen niet op tot hun accountrijen en
+beginnen later (een seedprobleem, niet van de code). `BEKEND` in het script zegt dat bij de regel,
+maar laat hem FOUT: een poort die om een bekende reden groen wordt, leert rood te negeren. Haal de
+regel weg zodra de seed gerepareerd is.
+
+De verandering per campagne staat er alleen waar hij eerlijk is: beide periodes op dezelfde korrel,
+exact, en allebei op of na de eerste campagnerij van de bron (`bronStart`). Begint een periode
+eerder, dan geen percentage en ook geen "nieuw" of "gestopt", met de reden boven de tabel: op de demo
+begint `microsoft_campaign_daily` op 11 okt 2025, en twaalf maanden tegen vorig jaar was zonder die
+regel 21 dagen tegen 365 (+1.638%).
 
 ## De evaluatieset van de analyses
 
@@ -233,6 +268,41 @@ en zegt de poort dat, in plaats van "de keten staat stil": stilte is dan verwach
 **3** (niet gedraaid, dus niet groen), behalve als het percentage van wat wel met de hand gestart is
 onder de grens zit: dat blijft rood. Zet je de cron aan, dan geldt de termijnregel vanzelf weer. Let
 op: de poort leest de repo, niet het Vercel-dashboard.
+
+Per cadans staat erachter wie de runs startte: `gepland` (`generation_jobs.triggered_by = 'cron'`),
+`handmatig` (de knoppen, scripts, een gebruikers-id) en `onbekend` (rijen van voor 14 november 2026,
+toen het veld nog leeg bleef). Alleen weergave: de beslisregels kijken er niet naar. Gepland is het
+CRON_SECRET **en** de vlag `automatisch` (`lib/progress/gestart-door.ts`): het geheim alleen dragen ook
+handmatige aanroepen, zoals `score-evaluatieset.mjs --vers`. Een handmatige curl naar trigger-sops
+zonder `dry_run` telt wel als gepland, want die draait het geplande pad. `createProgressJob` eist
+`triggeredBy`.
+
+**De cron aanzetten.** Klaar, maar nog niet gepland (besluit eigenaar). Het is deze ene regel in
+`crons` van `vercel.json`:
+
+```
+{ "path": "/api/cron/trigger-sops", "schedule": "20 5-8 * * *" }
+```
+
+Vier invocaties, om 05:20, 06:20, 07:20 en 08:20 UTC: na de dagsync van 05:00 (`/api/sync/cron`, klaar
+om 05:10), elk een analyse (`limit` 1). Twee dingen zijn daarvoor veranderd. De route heeft
+`maxDuration` 800 (het maximum van Vercel Pro met Fluid Compute; het plan staat niet in de repo, maar
+`/api/sync/cron` draait al met 600 en dat deployt niet op Hobby), omdat hij wacht op analyse-routes met
+600. En hij wacht niet meer met `fetch`: undici geeft het na 300 s zonder headers op, wat de
+`maxDuration` ook is, en de analyse-routes sturen pas aan het eind headers. Alle aanroepen uit de cron
+gaan via `interneAanroep` (`lib/scheduler/interne-aanroep.ts`, node:http met een eigen deadline). Van de
+51 afgeronde knop- en testruns sinds augustus duurden er 7 langer dan 300 s (biweekly tot 508 s); dat
+de oude cron daar zou afbreken is een verwachting, want hij was nooit gepland. Een analyse start alleen
+als zijn volle 600 s plus upload nog in de invocatie past (`lib/scheduler/sop-tijdbudget.ts`); wat niet
+past komt terug als `due_deferred` met een `uitstelreden`.
+
+Reken op twee pieken. Bij het aanzetten is alles due (de laatste runs zijn van augustus en september):
+ongeveer 33 items, 9 nachten achterstand. En op de 1e van elke maand worden alle maandanalyses tegelijk
+due; de laatste komt dan op de 7e tot 9e. Eerder nodig: verbreed het venster, niet `limit`. Kosten,
+geschat uit `llm_usage.cost_eur`: ~0,12 euro per run, ~19 runs per week voor de 8 klanten met
+`sops_enabled`, dus ~0,33 euro per nacht en hooguit ~0,90 (vier runs, zo in de pieken). De steekproef
+voor weekly en biweekly is klein en onvolledig (niet elke run logt in `llm_usage`), en de synthese zit
+er niet in. De volledige onderbouwing staat in de kop van `app/api/cron/trigger-sops/route.ts`.
 
 ## CI
 

@@ -113,5 +113,39 @@ check("niet gepland maar onder de grens: rood (1), met beide meldingen",
   laagNietGepland.code === 1 && /niet gepland/.test(laagNietGepland.meldingen.join(" ")) && /onder de grens/.test(laagNietGepland.meldingen.join(" ")));
 check("gepland (standaard): de termijnregel geldt zoals voorheen", goedMaarOud.code === 1);
 
+// ── Gepland of handmatig (alleen weergave) ──────────────────────────────────
+// generation_jobs.triggered_by: "cron" uit app/api/cron/trigger-sops, "handmatig" of een
+// gebruikers-id uit de knoppen, null bij rijen van voordat het gevuld werd.
+const metBron = (status: string, triggered_by: string | null): GenerationJobRij =>
+  ({ ...rij("weekly_sop", status), triggered_by });
+const bronRijen: GenerationJobRij[] = [
+  ...herhaal(3, metBron("completed", "cron")),
+  metBron("failed", "cron"),
+  metBron("completed", "handmatig"),
+  metBron("completed", "3f1c-gebruiker"),
+  metBron("failed", null),
+];
+const bronUit = vatSlagingenSamen(bronRijen, { nu: NU, vastgelopenNaMinuten: STALE_RUNNING_MINUTES, grens: 0.8, minimumPogingen: 5 });
+const bronWeek = bronUit.find((u) => u.cadans === "weekly_sop")!;
+check("bron: 4 gepland (cron), ook de mislukte", bronWeek.gepland === 4, String(bronWeek.gepland));
+check("bron: 2 handmatig, een gebruikers-id telt als handmatig", bronWeek.handmatig === 2, String(bronWeek.handmatig));
+check("bron: 1 onbekend (null, van voor het veld)", bronWeek.onbekend === 1, String(bronWeek.onbekend));
+check("bron: de telling blijft per uitkomst gelijk", bronWeek.afgerond === 5 && bronWeek.mislukt === 2);
+const bronRegel = slagingsRegel(bronWeek);
+check("regel toont gepland, handmatig en onbekend",
+  bronRegel.includes("gepland 4, handmatig 2, onbekend 1"), bronRegel);
+check("regel zonder onbekende rijen noemt 'onbekend' niet",
+  !slagingsRegel({ ...bronWeek, onbekend: 0 }).includes("onbekend"));
+// De beslisregels kijken niet naar de bron: dezelfde rijen met alle bronnen omgedraaid geven
+// hetzelfde oordeel.
+const omgedraaid = bronRijen.map((r) => ({ ...r, triggered_by: r.triggered_by === "cron" ? "handmatig" : "cron" }));
+const bronA = vatSlagingenSamen(bronRijen, { nu: NU, vastgelopenNaMinuten: 15, grens: 0.8, minimumPogingen: 5 })[0];
+const bronB = vatSlagingenSamen(omgedraaid, { nu: NU, vastgelopenNaMinuten: 15, grens: 0.8, minimumPogingen: 5 })[0];
+check("bron verandert percentage en waarschuwing niet",
+  bronA.slagingspercentage === bronB.slagingspercentage && bronA.waarschuwing === bronB.waarschuwing);
+// En de uitslag zonder triggered_by (oude aanroepers) telt alles als onbekend.
+check("rijen zonder het veld: alles onbekend", maand.onbekend === 40 && maand.gepland === 0 && maand.handmatig === 0,
+  `${maand.gepland}/${maand.handmatig}/${maand.onbekend}`);
+
 console.log(`analyse-slagingen: ${passed} geslaagd, ${failed} gefaald`);
 if (failed > 0) process.exit(1);

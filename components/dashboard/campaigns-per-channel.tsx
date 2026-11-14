@@ -15,6 +15,14 @@ import { Laadvlak } from "@/components/ui/laadvlak";
 import { addDays, today } from "@/lib/reporting-date";
 import { Vensterlabel } from "@/components/ui/vensterlabel";
 import { formatMonth } from "@/lib/period/period-range";
+import { usePeriod } from "@/lib/period/period-context";
+import { uitMaandPeriode, type DagPeriode } from "@/lib/period/dag-periode";
+import {
+  telCampagnes, vergelijkCampagnes,
+  type CampagneKanaal, type CampagneRij, type CampagneTelling, type CampagneVergelijking,
+} from "@/lib/campagnes/campagne-periode";
+import { useCampagnePeriode, type CampagnePeriodeStaat } from "@/lib/campagnes/use-campagne-periode";
+import { CampagneStatusCel } from "./campagne-verandering";
 
 /** De vensters van dit blok, in één functie zodat kop en query hetzelfde zeggen. */
 export function campagneVensters(vandaag: string): { sinceDay: string; sinceMonth: string; dagLabel: string; maandLabel: string } {
@@ -90,7 +98,16 @@ export function campagnesUitDagen(
   return [...per.values()];
 }
 
-export function CampaignsPerChannel({ clientId, geoClone }: { clientId: string; geoClone?: string | null }) {
+/**
+ * "Wat er draait". Met de schakelaar uit (`nieuw` false) precies het blok van altijd, met zijn vaste
+ * venster (CampaignsVastVenster, ongewijzigd). In de nieuwe weergave volgt elke tabel de gekozen
+ * periode per dag, met de verandering per campagne (CampagnesOverPeriode).
+ */
+export function CampaignsPerChannel({ clientId, geoClone, nieuw = false }: { clientId: string; geoClone?: string | null; nieuw?: boolean }) {
+  return nieuw ? <CampagnesOverPeriode clientId={clientId} geoClone={geoClone} /> : <CampaignsVastVenster clientId={clientId} geoClone={geoClone} />;
+}
+
+function CampaignsVastVenster({ clientId, geoClone }: { clientId: string; geoClone?: string | null }) {
   const [blocks, setBlocks] = useState<ChannelBlock[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -248,5 +265,178 @@ export function CampaignsPerChannel({ clientId, geoClone }: { clientId: string; 
           Overzicht. Zie cross-channel-view. */}
       </Sectie>
     </div>
+  );
+}
+
+// ── De nieuwe weergave: elke tabel over de gekozen periode, per dag ──────────────────────────────
+//
+// Zie lib/campagnes/campagne-periode.ts voor de regels. Hier alleen de opbouw: per kanaal de
+// telling over de periode en, met een vergelijking, die over de vergelijkingsperiode, en de tabel.
+// De totaalrij draagt een merkteken (data-cijfer="campagnes-totaal-kosten"/"-conversies" met
+// data-kanaal): de cijfercontrole legt hem naast de rij van hetzelfde kanaal in de kanaaltotalen
+// erboven (scripts/check-cijfers-gelijk.mjs).
+
+const KANAAL_VAN: Record<CampagneKanaal, ChannelKey> = {
+  google: "google_ads", meta: "meta_ads", linkedin: "linkedin_ads", microsoft: "microsoft_ads",
+};
+const ALLE_KANALEN: readonly CampagneKanaal[] = ["google", "meta", "linkedin", "microsoft"];
+
+export interface PeriodeBlok {
+  kanaal: CampagneKanaal;
+  label: string;
+  convLabel: string;
+  /** Wat er bij dit kanaal als conversie telt; null bij Google (de acties van de sync). */
+  telt: string | null;
+  nu: CampagneTelling;
+  toen: CampagneTelling | null;
+  vergelijking: CampagneVergelijking;
+}
+
+/**
+ * De blokken uit de geladen rijen. Een beurs (`geoClone`) filtert op de campagnenaam, vóór het
+ * tellen: dan is ook de totaalrij die van de beurs. Een kanaal zonder campagne die liep, in geen
+ * van beide periodes, valt weg.
+ */
+export function bouwPeriodeBlokken(
+  rijen: CampagnePeriodeStaat["rijen"],
+  periode: DagPeriode,
+  vergelijkingsperiode: DagPeriode | null,
+  opties: { geoClone?: string | null; telt?: (k: CampagneKanaal) => string | null } = {},
+): PeriodeBlok[] {
+  if (!rijen) return [];
+  const inScope = (r: CampagneRij) => !opties.geoClone || matchGeoCloneByCampaignName(r.naam)?.abbreviation === opties.geoClone;
+  const uit: PeriodeBlok[] = [];
+  for (const kanaal of ALLE_KANALEN) {
+    const r = rijen[kanaal];
+    if (!r) continue;
+    const bron = { kanaal, dagen: r.dagen.filter(inScope), maanden: r.maanden.filter(inScope), eersteDag: r.eersteDag, bronStart: r.bronStart };
+    const nu = telCampagnes(periode, bron);
+    const toen = vergelijkingsperiode ? telCampagnes(vergelijkingsperiode, bron) : null;
+    const vergelijking = vergelijkCampagnes(nu, toen);
+    if (vergelijking.regels.length === 0) continue;
+    const meta = CHANNEL_META[KANAAL_VAN[kanaal]];
+    uit.push({ kanaal, label: meta.label, convLabel: meta.convLabel, telt: kanaal === "google" ? null : opties.telt?.(kanaal) ?? null, nu, toen, vergelijking });
+  }
+  return uit;
+}
+
+function CampagnesOverPeriode({ clientId, geoClone }: { clientId: string; geoClone?: string | null }) {
+  const periode = usePeriod();
+  // De periode per dag van de kiezer; zonder (buiten de nieuwe kiezer) de maanden als dagen.
+  const p: DagPeriode = periode.dag?.periode ?? uitMaandPeriode(periode.range);
+  const c: DagPeriode | null = periode.dag
+    ? (periode.dag.keuze.vergelijk === "none" ? null : periode.dag.vergelijking.periode)
+    : (periode.compareRange ? uitMaandPeriode(periode.compareRange) : null);
+  const vergelijkLabel = periode.dag ? periode.dag.vergelijking.label : "de vergelijkingsperiode";
+  const staat = useCampagnePeriode({ clientId, kanalen: ALLE_KANALEN, periode: p, vergelijking: c, actief: true });
+  const blokken = useMemo(() => {
+    const cfg = staat.convConfig;
+    return bouwPeriodeBlokken(staat.rijen, p, c, {
+      geoClone,
+      telt: (k) => (cfg ? selectedConversionLabels(KANAAL_VAN[k] as ChannelConversionChannel, cfg).join(" + ") : null),
+    });
+    // De periodes op hun datums: een nieuw object met dezelfde datums rekent niet opnieuw.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [staat.rijen, staat.convConfig, geoClone, p.start, p.eind, c?.start, c?.eind]);
+
+  // Een laadvlak zolang de rijen de periode niet dekken (zie useCampagnePeriode): een totaalrij over
+  // rijen van de vorige periode zou een verkeerd getal met een merkteken zijn.
+  if (staat.laden) return <Laadvlak vorm="tabel" regels={4} titel="Actieve kanalen &amp; campagnes" />;
+  return <CampagneTabellenPeriode blokken={blokken} geoClone={geoClone} fouten={staat.fouten} vergelijkLabel={c ? vergelijkLabel : null} />;
+}
+
+/** De sectie met de tabellen per kanaal. Los van het laden, zodat hij te toetsen is. */
+export function CampagneTabellenPeriode({ blokken, geoClone, fouten = [], vergelijkLabel = null }: {
+  blokken: readonly PeriodeBlok[];
+  geoClone?: string | null;
+  fouten?: readonly string[];
+  /** Waartegen de verandering staat ("Dezelfde datums vorig jaar"), of null zonder vergelijking. */
+  vergelijkLabel?: string | null;
+}) {
+  return (
+    <div className="space-y-4">
+      <Sectie
+        eerste
+        icoon={<Layers className="w-4.5 h-4.5 text-brand-blue-ink" />}
+        titel={`Wat er draait${geoClone ? ` — beurs ${geoClone}` : ""}`}
+        bijschrift={
+          blokken.length === 0
+            ? "Geen campagnes die in deze periode liepen, voor deze scope."
+            : `Actief op ${blokken.length} ${blokken.length === 1 ? "kanaal" : "kanalen"}: ${blokken.map((b) => `${b.label} (${b.vergelijking.regels.length})`).join(" · ")}. Volgt de gekozen periode per dag.`
+        }
+      >
+        {fouten.length > 0 && (
+          <div role="status" className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-body text-amber-800">
+            Niet geladen: {fouten.join(" · ")}
+          </div>
+        )}
+        {blokken.map((b) => <PeriodeTabel key={b.kanaal} blok={b} vergelijkLabel={vergelijkLabel} merk={!geoClone} />)}
+      </Sectie>
+    </div>
+  );
+}
+
+/**
+ * Eén tabel. `merk`: de totaalrij draagt de merktekens voor de cijfercontrole. Niet met een beurs:
+ * dan telt de tabel alleen de campagnes van die beurs en de kanaalrij erboven het hele kanaal, en
+ * zou de controle een verschil melden dat er per ontwerp is.
+ */
+function PeriodeTabel({ blok, vergelijkLabel, merk }: { blok: PeriodeBlok; vergelijkLabel: string | null; merk: boolean }) {
+  const regels = blok.vergelijking.regels;
+  const metVergelijking = blok.toen !== null;
+  const grootsteSpend = Math.max(0, ...regels.map((c) => c.spend));
+  const grootsteConv = Math.max(0, ...regels.map((c) => c.conversions));
+  const tot = blok.nu.totaal;
+  const kopId = `campagnes-${blok.kanaal}`;
+  return (
+    <section aria-labelledby={kopId} className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
+      <div className="px-5 py-3 border-b border-border flex flex-wrap items-center gap-2">
+        {CHANNEL_META[KANAAL_VAN[blok.kanaal]].icon}
+        <h3 id={kopId} className="text-title font-semibold text-brand-gray">{blok.label}</h3>
+        <span className="text-micro text-muted-foreground">{regels.length} campagne{regels.length === 1 ? "" : "s"}</span>
+        {blok.telt && <span className="text-micro text-muted-foreground">· telt: {blok.telt}</span>}
+        <Vensterlabel
+          soort="periode"
+          perDag
+          toevoeging={blok.nu.label ? "deels per maand" : undefined}
+          toevoegingUitleg={blok.nu.label ?? undefined}
+          className="ml-auto"
+        />
+      </div>
+      {/* Het venster voluit als Google een deel per maand telde: de toevoeging in het label staat
+          verder alleen in `title`, en die ziet niemand op een telefoon. */}
+      {blok.nu.label && <p data-campagne-venster className="px-5 pt-2 text-meta text-muted-foreground">{blok.label}: {blok.nu.label}.</p>}
+      {metVergelijking && blok.vergelijking.reden && <p className="px-5 pt-2 text-meta text-muted-foreground">{blok.vergelijking.reden}</p>}
+      <Tabel>
+        <Kop>
+          <KolomKop breed>Campagne</KolomKop>
+          <KolomKop getal bijschrift="aandeel">Spend</KolomKop>
+          <KolomKop getal bijschrift="aandeel">{blok.convLabel}</KolomKop>
+          <KolomKop getal>CPA</KolomKop>
+          {metVergelijking && <KolomKop getal bijschrift={vergelijkLabel ? `t.o.v. ${vergelijkLabel.toLowerCase()}` : undefined}>Verandering</KolomKop>}
+        </Kop>
+        <Body>
+          {regels.map((c) => (
+            <Rij key={c.sleutel}>
+              <NaamCel>{c.naam}</NaamCel>
+              <AandeelCel waarde={eur(c.spend)} aandeel={grootsteSpend > 0 ? c.spend / grootsteSpend : 0} />
+              <AandeelCel waarde={fmt(c.conversions, 1)} aandeel={grootsteConv > 0 ? c.conversions / grootsteConv : 0} kleur={CHART_CATEGORICAL[2]} />
+              <GetalCel zacht>{c.conversions > 0 ? eur(c.spend / c.conversions) : "—"}</GetalCel>
+              {metVergelijking && <CampagneStatusCel r={c} />}
+            </Rij>
+          ))}
+        </Body>
+        <TotaalRij>
+          <TotaalCel>Totaal</TotaalCel>
+          {/* data-cijfer: de cijfercontrole legt deze totalen naast de rij van dit kanaal in de
+              kanaaltotalen erboven, op het attribuut en niet op de opmaak. De som van ALLE
+              campagnerijen van de periode (CampagneTelling.totaal), niet alleen van de regels. */}
+          <TotaalCel getal>{merk ? <span data-cijfer="campagnes-totaal-kosten" data-kanaal={blok.kanaal}>{eur(tot.spend)}</span> : eur(tot.spend)}</TotaalCel>
+          <TotaalCel getal>{merk ? <span data-cijfer="campagnes-totaal-conversies" data-kanaal={blok.kanaal}>{fmt(tot.conversions, 1)}</span> : fmt(tot.conversions, 1)}</TotaalCel>
+          <TotaalCel getal>{tot.conversions > 0 ? eur(tot.spend / tot.conversions) : "—"}</TotaalCel>
+          {metVergelijking && <TotaalCel getal><span className="sr-only">geen verandering voor het totaal</span></TotaalCel>}
+        </TotaalRij>
+      </Tabel>
+    </section>
   );
 }

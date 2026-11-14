@@ -159,6 +159,10 @@ export const READABLE_TABLES: Record<string, TableReadPolicy> = {
   // Google (lib/period/dag-telling.ts). Zolang de tabel er niet is, antwoordt /api/data met de code
   // tabel_ontbreekt (lib/data-access/lees-fout.ts) en telt Google per week of maand zoals daarvoor.
   ads_account_daily: { capability: "client:read", clientColumn: "client_id" },
+  // De campagnedagrijen van Google (migratie 111), voor de campagnetabellen op Campagnes in de
+  // nieuwe weergave: die volgen de gekozen periode per dag (lib/campagnes/use-campagne-periode.ts),
+  // met voor het deel vóór de dagopslag ads_campaign_monthly hierboven. Alleen lezen, per klant.
+  ads_campaign_daily: { capability: "client:read", clientColumn: "client_id" },
   // De checkoutstappen van Google, voor de stappen na de klik op het Overzicht in de nieuwe weergave
   // (lib/overzicht/use-conversiestappen.ts): per dag, en zolang de dagtabel er niet is (migratie
   // 111) per maand. Alleen lezen, per klant.

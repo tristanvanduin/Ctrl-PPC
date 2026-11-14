@@ -10,6 +10,7 @@ import {
   markProgressFailed,
   updateProgressPhase,
 } from "@/lib/progress/server";
+import { GESTART_DOOR_HANDMATIG } from "@/lib/progress/gestart-door";
 import { logger } from "@/lib/logger";
 import { supabaseForClient } from "@/lib/demo/server-supabase";
 import { laadBeschikbareKanalen, KANAAL_NAAM, type Kanaal } from "@/lib/kanalen/beschikbaar";
@@ -215,6 +216,7 @@ export async function POST(request: NextRequest) {
   try {
     await createProgressJob(supabase, {
       jobId,
+      triggeredBy: GESTART_DOOR_HANDMATIG, // geen cron roept deze route aan
       clientId,
       jobType: "report_generation",
       initialMessage: "Rapport wordt voorbereid...",

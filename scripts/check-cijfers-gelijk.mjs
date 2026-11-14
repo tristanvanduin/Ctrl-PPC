@@ -19,10 +19,23 @@
 //   2. Overzicht nieuw: de kanaalkaarten opgeteld tegen de totaaltegel (conversies en kosten).
 //   3. Overzicht nieuw tegen Campagnes nieuw: conversies en kosten uit de totaalrij van de
 //      kanaaltotalen (data-cijfer="kanaaltotaal-*"). Alleen in de nieuwe weergave: daar staat die
-//      tabel op Campagnes en volgt hij de gekozen periode. De campagnetabellen eronder (en heel
-//      Campagnes in de vertrouwde weergave) hebben een vast venster, 90 dagen of hele maanden sinds
-//      90 dagen terug, en hun totaal is dus geen 12 maanden: dat naast het Overzicht leggen geeft een
-//      verschil dat niets zegt. Een eerdere versie telde die tfoot's op en las er nooit iets.
+//      tabel op Campagnes en volgt hij de gekozen periode.
+//   3b. Op Campagnes nieuw, per kanaal: de rij van het kanaal in de kanaaltotalen
+//      (data-cijfer="kanaalrij-*" met data-kanaal) tegen de totaalrij van de campagnetabel van dat
+//      kanaal eronder (data-cijfer="campagnes-totaal-*" met dezelfde data-kanaal). In de nieuwe
+//      weergave volgen die tabellen de gekozen periode per dag (lib/campagnes/campagne-periode.ts),
+//      dus hoort de som van de campagnes het kanaaltotaal te zijn. Alleen de GEMERKTE totaalrijen
+//      tellen: de campagnetabellen in de vertrouwde weergave hebben een vast venster (90 dagen) en
+//      geen merkteken, en een eerdere versie die alle tfoot's optelde, vergeleek 90 dagen met 12
+//      maanden. Staat een kanaal aan maar een kant, dan is dat kanaal NIET GEMETEN, met de kant die
+//      ontbreekt.
+//   3c. Hetzelfde over een periode PER DAG: de 1e t/m de 20e van de vorige maand (DAGVENSTER). Op
+//      last_12m zijn het hele maanden, en dan kan een kanaalrij die alle maanden telt die de periode
+//      raken, per constructie niet van een telling per dag verschillen. Midden in een maand wel: daar
+//      zat het verschil dat 3b alleen niet kon zien.
+//      Een verschil dat in de gegevens van de demo zit (de campagnerijen van Meta en LinkedIn passen
+//      niet bij hun accountrijen), blijft FOUT, maar zegt dat erbij (BEKEND hieronder): zo valt een
+//      nieuw verschil niet weg tussen bekende, en wordt een bekende niet groen.
 //   4. Prognose tegen Doelen & voortgang: het jaardoel (een doel is een invoer, geen berekening:
 //      het hoort overal hetzelfde getal te zijn), op data-cijfer="jaardoel", per KPI (data-kpi):
 //      de Prognose toont het doel van een KPI, Doelen een kaart per KPI. Het stond op beide
@@ -49,7 +62,8 @@
 //
 // Aan het eind laadt het script nep-pagina's (zonder server, via page.route) met een bewust
 // verschil en een verschil dat binnen de afronding valt, en eist dat de controle het eerste meldt en
-// het tweede niet. Ook de kanaalkaartsom, de kanaaltotalen op Campagnes en het jaardoel worden zo
+// het tweede niet. Ook de kanaalkaartsom, de kanaaltotalen op Campagnes, de campagnetotalen per
+// kanaal tegen de kanaalrijen en het jaardoel worden zo
 // nagespeeld, elk met een pagina die goedgekeurd, een die afgekeurd en een die niet gemeten moet
 // worden. Faalt de zelftest, dan faalt het script.
 
@@ -62,6 +76,28 @@ const KLANT = process.env.DEMO_CLIENT ?? "demo-greentech";
 const CHROOM = process.env.CHROMIUM ?? "/opt/pw-browsers/chromium";
 const WACHT = Number(process.env.WACHT_MS ?? 8000);
 const VENSTER = "last_12m";
+
+/** De 1e t/m de 20e van de vorige maand, als waarde voor ?periode= (3c in de kop). */
+export function dagVenster(vandaag = new Date()) {
+  const j = vandaag.getFullYear(), m = vandaag.getMonth(); // m: 0-11, de vorige maand is m-1
+  const vorig = new Date(j, m - 1, 1);
+  const mm = `${vorig.getFullYear()}-${String(vorig.getMonth() + 1).padStart(2, "0")}`;
+  return `${mm}-01..${mm}-20`;
+}
+const DAGVENSTER = dagVenster();
+
+/**
+ * Verschillen die in de gegevens van een klant zitten en niet in de code, per klant en kanaal. Ze
+ * blijven FOUT (een poort die om een bekende reden groen wordt, leert rood te negeren); de uitvoer
+ * zegt er alleen bij wat er bekend is, zodat een nieuw verschil niet verdwijnt tussen bekende.
+ * Verdwijnt het verschil (de seed is gerepareerd), haal de regel dan weg.
+ */
+export const BEKEND = {
+  "demo-greentech": {
+    meta: "bekend seedprobleem: meta_campaign_daily telt niet op tot meta_account_daily (okt 2026 € 17.015 tegen € 4.650) en begint op 13 jul in plaats van 8 jun; reparatie van de seed ligt bij de eigenaar",
+    linkedin: "bekend seedprobleem: linkedin_campaign_daily telt niet op tot linkedin_account_daily (okt 2026 € 14.930 tegen € 9.300) en begint op 13 jul in plaats van 8 jun; reparatie van de seed ligt bij de eigenaar",
+  },
+};
 
 // ── Getallen lezen ──────────────────────────────────────────────────────────
 
@@ -156,7 +192,7 @@ const LEES = (klant) => {
   }
   const cijfers = [...document.querySelectorAll("[data-cijfer]")]
     .filter((el) => el.getClientRects().length > 0)
-    .map((el) => ({ naam: el.getAttribute("data-cijfer"), kpi: el.getAttribute("data-kpi"), reeks: el.getAttribute("data-reeks"), tekst: schoon(el.textContent) }));
+    .map((el) => ({ naam: el.getAttribute("data-cijfer"), kpi: el.getAttribute("data-kpi"), reeks: el.getAttribute("data-reeks"), kanaal: el.getAttribute("data-kanaal"), tekst: schoon(el.textContent) }));
   return { tegels, kaarten, rijen, cijfers };
 };
 
@@ -174,6 +210,9 @@ const cel = (gelezen, patroon) => {
 /** Het eerste gemerkte cijfer met deze naam (en, als gegeven, deze KPI). */
 const cijfer = (gelezen, naam, kpi = undefined) =>
   gelezen?.cijfers?.find((c) => c.naam === naam && (kpi === undefined || c.kpi === kpi)) ?? null;
+/** Het gemerkte cijfer met deze naam voor dit kanaal (data-kanaal). */
+const kanaalCijfer = (gelezen, naam, kanaal) =>
+  gelezen?.cijfers?.find((c) => c.naam === naam && c.kanaal === kanaal) ?? null;
 
 // ── De vergelijkingen ───────────────────────────────────────────────────────
 
@@ -190,8 +229,8 @@ function vergelijkingen(p) {
   const uit = [];
   // `reden`: waarom niet gemeten, als er een kant ontbreekt. `nietVergelijkbaar`: beide kanten staan er,
   // maar gaan niet over hetzelfde (dan is een verschil geen fout, en gelijk ook geen bewijs).
-  const paar = (wat, plekA, a, plekB, b, reden = null, nietVergelijkbaar = null) =>
-    uit.push({ wat, plekA, plekB, a: a?.tekst ?? null, b: b?.tekst ?? null, reden, nietVergelijkbaar });
+  const paar = (wat, plekA, a, plekB, b, reden = null, nietVergelijkbaar = null, bekend = null) =>
+    uit.push({ wat, plekA, plekB, a: a?.tekst ?? null, b: b?.tekst ?? null, reden, nietVergelijkbaar, bekend });
 
   for (const [naam, patroon] of TEGELS) {
     paar(`${naam}`, "Overzicht oud (tegel)", tegel(p.oud, patroon), "Overzicht nieuw (tegel)", tegel(p.nieuw, patroon));
@@ -219,6 +258,36 @@ function vergelijkingen(p) {
         : !a ? `geen tegel ${naam} op Overzicht nieuw` : null;
     paar(naam, "Overzicht nieuw (tegel)", a, "Campagnes nieuw (kanaaltotalen, totaalrij)", b, reden);
   }
+
+  // Campagnes, per kanaal: de kanaalrij in de kanaaltotalen tegen de totaalrij van de campagnetabel
+  // van hetzelfde kanaal. Elk kanaal dat aan een van beide kanten staat, wordt vergeleken; zo valt
+  // een kanaal zonder campagnetabel (of een tabel zonder merkteken: een vast venster of een beurs)
+  // op als NIET GEMETEN in plaats van stil weg te vallen. Op last_12m (3b) en over een periode per
+  // dag (3c, `campagnesDag`).
+  const perKanaal = (gelezen, venster) => {
+    const plek = venster ? `Campagnes nieuw, ${venster}` : "Campagnes nieuw";
+    const kanalen = [...new Set((gelezen?.cijfers ?? [])
+      .filter((c) => c.kanaal && /^(kanaalrij|campagnes-totaal)-/.test(c.naam)).map((c) => c.kanaal))].sort();
+    if (!gelezen || kanalen.length === 0) {
+      for (const naam of ["Conversies", "Kosten"]) {
+        paar(naam, `${plek} (kanaaltotalen, per kanaal)`, null, `${plek} (campagnetabellen, totaalrij)`, null,
+          !gelezen ? "het tabblad Campagnes kon niet geopend worden (knop Prestaties of Campagnes niet gevonden)"
+            : "geen kanaalrijen en geen campagnetotalen met een merkteken op Campagnes: die staan er alleen in de nieuwe weergave, bij Alle kanalen");
+      }
+      return;
+    }
+    for (const kanaal of kanalen) {
+      for (const [naam, rij, totaal] of [["Conversies", "kanaalrij-conversies", "campagnes-totaal-conversies"], ["Kosten", "kanaalrij-kosten", "campagnes-totaal-kosten"]]) {
+        const a = kanaalCijfer(gelezen, rij, kanaal), b = kanaalCijfer(gelezen, totaal, kanaal);
+        paar(naam, `${plek} (kanaaltotalen, ${kanaal})`, a, `${plek} (campagnetabel ${kanaal}, totaalrij)`, b,
+          !a ? `${kanaal} staat niet in de kanaaltotalen (niets in de periode)`
+            : `geen campagnetabel met een gemerkte totaalrij voor ${kanaal} (geen campagne die in de periode liep, een tabel met een vast venster, of een gekozen beurs)`,
+          null, BEKEND[KLANT]?.[kanaal] ?? null);
+      }
+    }
+  };
+  perKanaal(p.campagnes, null);
+  if (p.campagnesDag !== undefined) perKanaal(p.campagnesDag, `per dag ${DAGVENSTER}`);
 
   // Het jaardoel: de KPI die de Prognose toont, en op Doelen & voortgang de kaart van diezelfde KPI.
   // Alleen over dezelfde reeks (data-reeks): zonder ingevoerd doel schat elke reeks zijn eigen doel
@@ -253,7 +322,9 @@ function beoordeel(v) {
   if (!a || !b) return { uitslag: "niet gemeten", tekst: `${v.plekA}: ${toon(a, v.a)}; ${v.plekB}: ${toon(b, v.b)}${v.reden ? ` (${v.reden})` : ""}` };
   if (v.nietVergelijkbaar) return { uitslag: "niet gemeten", tekst: `${v.plekA}: ${toon(a, v.a)}; ${v.plekB}: ${toon(b, v.b)} (${v.nietVergelijkbaar})` };
   const gelijk = gelijkBinnenAfronding(a, b);
-  return { uitslag: gelijk ? "gelijk" : "verschil", tekst: `${v.plekA}: ${toon(a, v.a)}  tegen  ${v.plekB}: ${toon(b, v.b)}` };
+  const tekst = `${v.plekA}: ${toon(a, v.a)}  tegen  ${v.plekB}: ${toon(b, v.b)}`;
+  // Een bekend verschil blijft een verschil; de uitvoer zegt alleen wat er bekend is.
+  return { uitslag: gelijk ? "gelijk" : "verschil", tekst: !gelijk && v.bekend ? `${tekst}  [${v.bekend}; telt als fout]` : tekst };
 }
 
 // ── Pagina's ophalen ────────────────────────────────────────────────────────
@@ -264,7 +335,7 @@ function beoordeel(v) {
  * WACHT ms: de Prognose en de kanaaltotalen laden hun data pas na de klik, en een vaste pauze die
  * net te kort is, leest als "staat er niet".
  */
-async function lees(p, url, knoppen = [], wachtOp = null) {
+async function lees(p, url, knoppen = [], wachtOp = []) {
   await p.goto(url, { waitUntil: "domcontentloaded", timeout: 60000 });
   await p.waitForTimeout(WACHT);
   for (const k of knoppen) {
@@ -273,7 +344,7 @@ async function lees(p, url, knoppen = [], wachtOp = null) {
     await knop.click();
     await p.waitForTimeout(4500);
   }
-  if (wachtOp) await p.waitForSelector(wachtOp, { timeout: WACHT }).catch(() => {});
+  for (const selector of [wachtOp].flat().filter(Boolean)) await p.waitForSelector(selector, { timeout: WACHT }).catch(() => {});
   return p.evaluate(LEES, KLANT);
 }
 
@@ -284,7 +355,10 @@ async function draai(browser) {
   const gelezen = {
     oud: await lees(p, klant("oud")),
     nieuw: await lees(p, klant("nieuw")),
-    campagnes: await lees(p, klant("nieuw"), [/^Prestaties$/, /^Campagnes$/], "[data-cijfer^='kanaaltotaal-']"),
+    // De kanaaltotalen en de campagnetabellen laden elk hun eigen data: wacht op allebei.
+    campagnes: await lees(p, klant("nieuw"), [/^Prestaties$/, /^Campagnes$/], ["[data-cijfer^='kanaaltotaal-']", "[data-cijfer^='campagnes-totaal-']"]),
+    // Dezelfde pagina over een periode per dag (3c): de kanaalrijen per dag tegen de campagnetabellen.
+    campagnesDag: await lees(p, `${BASIS}/client/${KLANT}?demo=1&weergave=nieuw&periode=${DAGVENSTER}`, [/^Prestaties$/, /^Campagnes$/], ["[data-cijfer^='kanaalrij-']", "[data-cijfer^='campagnes-totaal-']"]),
     prognose: await lees(p, klant("oud"), [/^Prestaties$/, /^Prognose$/], "[data-cijfer='jaardoel']"),
   };
   // Doelen rekent eerst op Google en schakelt over op Alle kanalen zodra die geladen is: wacht op een
@@ -311,6 +385,17 @@ const kanaaltotalen = (kosten, conv, stijl = "") =>
   `<div style="${stijl}"><h3>Kanaaltotalen</h3><table><thead><tr><th>Kanaal</th><th>Spend</th><th>Klikken</th><th>Conversies</th></tr></thead>` +
   `<tfoot><tr><td>Totaal</td><td><span data-cijfer="kanaaltotaal-kosten">${kosten}</span></td><td>9.000</td>` +
   `<td><span data-cijfer="kanaaltotaal-conversies">${conv}</span></td></tr></tfoot></table></div>`;
+// Zoals de kanaaltotalen op Campagnes in de nieuwe weergave: een rij per kanaal, gemerkt met data-kanaal.
+const kanaalrijen = (rijen) =>
+  `<table><thead><tr><th>Kanaal</th><th>Spend</th><th>Conversies</th></tr></thead><tbody>` +
+  rijen.map(([k, kosten, conv]) => `<tr><td>${k}</td><td><span data-cijfer="kanaalrij-kosten" data-kanaal="${k}">${kosten}</span></td>` +
+    `<td><span data-cijfer="kanaalrij-conversies" data-kanaal="${k}">${conv}</span></td></tr>`).join("") + `</tbody></table>`;
+// Zoals PeriodeTabel in campaigns-per-channel.tsx: de totaalrij van de campagnetabel, gemerkt per kanaal.
+const gemerkteCampagneTabel = (kanaal, spend, conv) =>
+  `<h3>${kanaal}</h3><table><thead><tr><th>Campagne</th><th>Spend</th><th>Conversies</th></tr></thead>` +
+  `<tbody><tr><td>${kanaal} | Brand</td><td>${spend}</td><td>${conv}</td></tr></tbody>` +
+  `<tfoot><tr><td>Totaal</td><td><span data-cijfer="campagnes-totaal-kosten" data-kanaal="${kanaal}">${spend}</span></td>` +
+  `<td><span data-cijfer="campagnes-totaal-conversies" data-kanaal="${kanaal}">${conv}</span></td></tr></tfoot></table>`;
 // Zoals KpiCard in dgm-view.tsx en ForecastSummaryTiles: het doel in kleine tekst, gemerkt per KPI.
 const doelKaart = (kpi, label, doel, reeks = "blended") =>
   `<div><p>${label}</p><p style="font-size:32px">812</p><span style="font-size:11px">Doel: <span data-cijfer="jaardoel" data-kpi="${kpi}" data-reeks="${reeks}">${doel}</span></span></div>`;
@@ -335,6 +420,16 @@ async function zelftest(browser) {
     // opgeteld zijn ze 1.246 en € 49.870, en dan zou "gelijk" hieronder niets bewijzen.
     campagnes: pagina(kanaaltotalen("€ 50.120", "1.312") + campagneTabel("Google Ads", "Conversies", "€ 40.000", "1.000") + campagneTabel("LinkedIn", "Leads", "€ 9.870", "246")),
     "campagnes-anders": pagina(kanaaltotalen("€ 61.200", "1.246")),
+    // Per kanaal: de kanaalrij tegen de gemerkte totaalrij van de campagnetabel. Google gelijk (de
+    // campagnes tellen "1.000,4" met een decimaal, de kanaalrij "1.000": binnen de afronding), Meta
+    // gelijk; in de variant telt de Meta-campagnetabel drie keer het kanaal, zoals de demo die
+    // campagnerijen heeft die niet bij de accountrijen passen.
+    "campagnes-per-kanaal": pagina(kanaaltotalen("€ 49.870", "1.246") + kanaalrijen([["google", "€ 40.000", "1.000"], ["meta", "€ 9.870", "246"]])
+      + gemerkteCampagneTabel("google", "€ 40.000", "1.000,4") + gemerkteCampagneTabel("meta", "€ 9.870", "246")),
+    "campagnes-per-kanaal-anders": pagina(kanaalrijen([["google", "€ 40.000", "1.000"], ["meta", "€ 9.870", "246"]])
+      + gemerkteCampagneTabel("google", "€ 40.000", "1.000") + gemerkteCampagneTabel("meta", "€ 29.610", "738")),
+    // De kanaalrijen staan er, de campagnetabel niet gemerkt (een vast venster): niet af te lezen.
+    "campagnes-per-kanaal-ongemerkt": pagina(kanaalrijen([["google", "€ 40.000", "1.000"]]) + campagneTabel("Google Ads", "Conversies", "€ 40.000", "1.000")),
     // De vertrouwde weergave: alleen campagnetabellen, en een verborgen tabel (zoals achter "Toon als
     // tabel") telt niet als afgelezen.
     "campagnes-oud": pagina(kanaaltotalen("€ 50.120", "1.312", "display:none") + campagneTabel("Google Ads", "Conversies", "€ 40.000", "1.000")),
@@ -395,6 +490,38 @@ async function zelftest(browser) {
       && /tabblad Campagnes kon niet geopend/.test(tekstMet({ campagnes: null }, "Conversies", "Overzicht nieuw", "Campagnes"))],
     ["Campagnes zonder kanaaltotalen: de reden noemt de kanaaltotalen", /geen kanaaltotalen op Campagnes/.test(tekstMet({ campagnes: g["campagnes-oud"] }, "Kosten", "Overzicht nieuw", "Campagnes"))],
     ["Campagnes, tegel ontbreekt: de reden noemt de tegel, niet de kanaaltotalen", /geen tegel Conversies op Overzicht nieuw/.test(campagnesZonderTegel) && !/kanaaltotalen op Campagnes/.test(campagnesZonderTegel)],
+    ["Campagnes per kanaal: de Google-campagnes € 40.000 gelijk aan de kanaalrij € 40.000",
+      met({ campagnes: g["campagnes-per-kanaal"] }, "Kosten", "Campagnes nieuw (kanaaltotalen, google)", "Campagnes nieuw (campagnetabel google") === "gelijk"],
+    ["Campagnes per kanaal: Google 1.000,4 tegen 1.000 valt binnen de afronding",
+      met({ campagnes: g["campagnes-per-kanaal"] }, "Conversies", "Campagnes nieuw (kanaaltotalen, google)", "Campagnes nieuw (campagnetabel google") === "gelijk"],
+    ["Campagnes per kanaal: Meta 246 gelijk aan 246 (het juiste kanaal, niet het eerste)",
+      met({ campagnes: g["campagnes-per-kanaal"] }, "Conversies", "Campagnes nieuw (kanaaltotalen, meta)", "Campagnes nieuw (campagnetabel meta") === "gelijk"],
+    ["Campagnes per kanaal: Meta-campagnes € 29.610 tegen de kanaalrij € 9.870 wordt gemeld",
+      met({ campagnes: g["campagnes-per-kanaal-anders"] }, "Kosten", "Campagnes nieuw (kanaaltotalen, meta)", "Campagnes nieuw (campagnetabel meta") === "verschil"],
+    ["Campagnes per kanaal: Meta-campagnes 738 tegen 246 wordt gemeld",
+      met({ campagnes: g["campagnes-per-kanaal-anders"] }, "Conversies", "Campagnes nieuw (kanaaltotalen, meta)", "Campagnes nieuw (campagnetabel meta") === "verschil"],
+    ["Campagnes per kanaal: een campagnetabel zonder merkteken is niet gemeten, met de reden",
+      met({ campagnes: g["campagnes-per-kanaal-ongemerkt"] }, "Kosten", "Campagnes nieuw (kanaaltotalen, google)", "Campagnes nieuw (campagnetabel google") === "niet gemeten"
+      && /geen campagnetabel met een gemerkte totaalrij voor google/.test(tekstMet({ campagnes: g["campagnes-per-kanaal-ongemerkt"] }, "Kosten", "Campagnes nieuw (kanaaltotalen, google)", "Campagnes nieuw (campagnetabel google"))],
+    ["Campagnes per kanaal: geen enkel merkteken is niet gemeten, niet weggelaten",
+      met({ campagnes: g["campagnes-oud"] }, "Conversies", "Campagnes nieuw (kanaaltotalen, per kanaal)", "Campagnes nieuw (campagnetabellen") === "niet gemeten"
+      && /geen kanaalrijen en geen campagnetotalen/.test(tekstMet({ campagnes: g["campagnes-oud"] }, "Conversies", "Campagnes nieuw (kanaaltotalen, per kanaal)", "Campagnes nieuw (campagnetabellen"))],
+    ["Campagnes per kanaal, per dag: dezelfde vergelijking over de dagperiode, met de periode in de plek",
+      met({ campagnesDag: g["campagnes-per-kanaal-anders"] }, "Kosten", `Campagnes nieuw, per dag ${DAGVENSTER} (kanaaltotalen, meta)`, `Campagnes nieuw, per dag ${DAGVENSTER} (campagnetabel meta`) === "verschil"
+      && met({ campagnesDag: g["campagnes-per-kanaal"] }, "Kosten", `Campagnes nieuw, per dag ${DAGVENSTER} (kanaaltotalen, google)`, `Campagnes nieuw, per dag ${DAGVENSTER} (campagnetabel google`) === "gelijk"],
+    ["Campagnes per kanaal, per dag: de pagina niet geopend is niet gemeten, niet weggelaten",
+      met({ campagnesDag: null }, "Kosten", `Campagnes nieuw, per dag ${DAGVENSTER} (kanaaltotalen, per kanaal)`) === "niet gemeten"],
+    ["Campagnes per kanaal: een bekend verschil van de klant blijft FOUT en zegt dat het bekend is",
+      (() => {
+        const x = vergelijkingen({ ...basis, campagnes: g["campagnes-per-kanaal-anders"] })
+          .find((y) => y.wat === "Kosten" && y.plekA === "Campagnes nieuw (kanaaltotalen, meta)");
+        const b = x ? beoordeel(x) : null;
+        return KLANT === "demo-greentech" ? b?.uitslag === "verschil" && /bekend seedprobleem.*telt als fout/.test(b.tekst) : b?.uitslag === "verschil";
+      })()],
+    ["Campagnes per kanaal: Google, zonder bekend verschil, zegt niets over bekend",
+      !/bekend/.test(tekstMet({ campagnes: g["campagnes-per-kanaal"] }, "Kosten", "Campagnes nieuw (kanaaltotalen, google)", "Campagnes nieuw (campagnetabel google"))],
+    ["dagVenster: 14 nov 2026 geeft 1 t/m 20 okt, 3 jan 2027 geeft 1 t/m 20 dec 2026",
+      dagVenster(new Date(2026, 10, 14)) === "2026-10-01..2026-10-20" && dagVenster(new Date(2027, 0, 3)) === "2026-12-01..2026-12-20"],
     ["Jaardoel: 1.650 tegen de conversiekaart 1.650 is gelijk (niet de CPA-kaart ervoor)", uitslag("Jaardoel", "Prognose (conversions", "Doelen") === "gelijk"],
     ["Jaardoel: Doelen over Google (1.430) tegen Prognose over alle kanalen is niet gemeten, geen verschil", met({ doelen: g["doelen-google"] }, "Jaardoel", "Prognose", "Doelen") === "niet gemeten"
       && /andere reeks/.test(tekstMet({ doelen: g["doelen-google"] }, "Jaardoel", "Prognose", "Doelen"))],
@@ -426,8 +553,7 @@ async function main() {
   let verschil = 0, nietGemeten = 0;
 
   if (!alleenZelftest) {
-    console.log(`Cijfercontrole op ${BASIS}, klant ${KLANT}, venster ${VENSTER}.`);
-    console.log("Niet vergeleken: de campagnetabellen op Campagnes (vast venster, ze volgen de gekozen periode niet; zie de kop).\n");
+    console.log(`Cijfercontrole op ${BASIS}, klant ${KLANT}, venster ${VENSTER}; de campagnetabellen ook per dag over ${DAGVENSTER}.\n`);
     for (const v of await draai(browser)) {
       const b = beoordeel(v);
       if (b.uitslag === "verschil") verschil += 1;

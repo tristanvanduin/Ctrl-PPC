@@ -368,7 +368,7 @@ function useMetaObjectiveGroups(clientId: string): ObjectiveGroupLike[] | null {
  * "Wat er draait" — de koppelingsstatus van een kanaal is een overzichtsvraag en hoort niet op
  * elk tabblad herhaald te worden.
  */
-export function MetaCampagnes({ clientId, geoClone }: { clientId: string; geoClone?: string | null }) {
+export function MetaCampagnes({ clientId, geoClone, nieuw = false }: { clientId: string; geoClone?: string | null; nieuw?: boolean }) {
   const objectiveGroups = useMetaObjectiveGroups(clientId);
 
   return (
@@ -396,9 +396,9 @@ export function MetaCampagnes({ clientId, geoClone }: { clientId: string; geoClo
       <Sectie
         icoon={<LayoutGrid className="w-4.5 h-4.5 text-brand-blue-ink" />}
         titel="Wat er draait"
-        bijschrift="Alle campagnes van dit account over de laatste 28 dagen"
+        bijschrift={nieuw ? "Alle campagnes van dit account over de gekozen periode" : "Alle campagnes van dit account over de laatste 28 dagen"}
       >
-        <ChannelCampaignTable clientId={clientId} channel="meta" geoClone={geoClone} />
+        <ChannelCampaignTable clientId={clientId} channel="meta" geoClone={geoClone} nieuw={nieuw} />
       </Sectie>
 
       {/* Meta-equivalent van Google's "Doelgroepsignalen" (23 augustus 2026). Google's sectie

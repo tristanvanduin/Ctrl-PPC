@@ -34,6 +34,7 @@ import {
   markProgressFailed,
   updateProgressPhase,
 } from "@/lib/progress/server";
+import { gestartDoorUitVerzoek } from "@/lib/progress/gestart-door";
 import { buildGeheugenMetTaken, alsContextBlok } from "@/lib/analysis/geheugen-grounding";
 import { ALLE_SOP_CHANNELS, type SopChannel } from "@/lib/analysis/sop-channel-config";
 import { magSopDraaien } from "@/lib/tenancy/sop-dekking";
@@ -53,10 +54,11 @@ import { triggerLiteCrossChannelSynthesisIfReady } from "@/lib/analysis/auto-cro
 // te duren op de oude 300s-grens.
 export const maxDuration = 600;
 
-async function runGoogleWeeklyAnalysis(supabase: SupabaseClient, apiKey: string, clientId: string, jobId: string): Promise<Response> {
+async function runGoogleWeeklyAnalysis(supabase: SupabaseClient, apiKey: string, clientId: string, jobId: string, triggeredBy: string): Promise<Response> {
   await createProgressJob(supabase, {
     jobId,
     clientId,
+    triggeredBy,
     jobType: "weekly_sop",
     initialMessage: "Wekelijkse analyse wordt voorbereid...",
     metadata: { sop_type: "weekly" },
@@ -421,10 +423,11 @@ function withMetaNames(rows: Array<Record<string, unknown>>, names: Map<string, 
   return rows.map((row) => ({ ...row, entity_name: names.get(String(row.entity_id ?? "")) ?? row.entity_id }));
 }
 
-async function runMetaWeeklyAnalysis(supabase: SupabaseClient, apiKey: string, clientId: string, jobId: string): Promise<Response> {
+async function runMetaWeeklyAnalysis(supabase: SupabaseClient, apiKey: string, clientId: string, jobId: string, triggeredBy: string): Promise<Response> {
   await createProgressJob(supabase, {
     jobId,
     clientId,
+    triggeredBy,
     jobType: "weekly_sop",
     initialMessage: "Wekelijkse Meta-analyse wordt voorbereid...",
     metadata: { sop_type: "meta_weekly" },
@@ -708,10 +711,11 @@ function withLinkedinNames(rows: Array<Record<string, unknown>>, names: Map<stri
   return rows.map((row) => ({ ...row, entity_name: names.get(String(row.entity_urn ?? "")) ?? row.entity_urn }));
 }
 
-async function runLinkedinWeeklyAnalysis(supabase: SupabaseClient, apiKey: string, clientId: string, jobId: string): Promise<Response> {
+async function runLinkedinWeeklyAnalysis(supabase: SupabaseClient, apiKey: string, clientId: string, jobId: string, triggeredBy: string): Promise<Response> {
   await createProgressJob(supabase, {
     jobId,
     clientId,
+    triggeredBy,
     jobType: "weekly_sop",
     initialMessage: "Wekelijkse LinkedIn-analyse wordt voorbereid...",
     metadata: { sop_type: "linkedin_weekly" },
@@ -993,10 +997,11 @@ const withMicrosoftNames = withMetaNames;
 // (op een tiende van Google-volumes is 0 conversies bij weinig spend "te vroeg", geen bleeder --
 // zie MICROSOFT_WEEKLY in lib/prompts/weekly-channel-content.ts) en het Audience Network als
 // aparte bleeder-soort. LIVE-ONGETEST: pas met een echt Microsoft-account te verifieren.
-async function runMicrosoftWeeklyAnalysis(supabase: SupabaseClient, apiKey: string, clientId: string, jobId: string): Promise<Response> {
+async function runMicrosoftWeeklyAnalysis(supabase: SupabaseClient, apiKey: string, clientId: string, jobId: string, triggeredBy: string): Promise<Response> {
   await createProgressJob(supabase, {
     jobId,
     clientId,
+    triggeredBy,
     jobType: "weekly_sop",
     initialMessage: "Wekelijkse Microsoft Ads-analyse wordt voorbereid...",
     metadata: { sop_type: "microsoft_weekly" },
@@ -1315,17 +1320,22 @@ export async function POST(request: NextRequest) {
   // vastgelopen: afsluiten met de reden, zodat hij niet als lopend of gedraaid blijft gelden.
   await ruimVastgelopenRunsOp(supabase, { clientId });
 
+  // Gepland (CRON_SECRET en de vlag automatisch, zie lib/progress/gestart-door.ts) of handmatig: naar
+  // generation_jobs.triggered_by, zodat het slagingspercentage en het logboek die twee uit elkaar
+  // kunnen houden.
+  const triggeredBy = gestartDoorUitVerzoek(request.headers, automatisch);
+
   try {
     if (channel === "meta_ads") {
-      return await runMetaWeeklyAnalysis(supabase, apiKey, clientId, jobId);
+      return await runMetaWeeklyAnalysis(supabase, apiKey, clientId, jobId, triggeredBy);
     }
     if (channel === "linkedin_ads") {
-      return await runLinkedinWeeklyAnalysis(supabase, apiKey, clientId, jobId);
+      return await runLinkedinWeeklyAnalysis(supabase, apiKey, clientId, jobId, triggeredBy);
     }
     if (channel === "microsoft_ads") {
-      return await runMicrosoftWeeklyAnalysis(supabase, apiKey, clientId, jobId);
+      return await runMicrosoftWeeklyAnalysis(supabase, apiKey, clientId, jobId, triggeredBy);
     }
-    return await runGoogleWeeklyAnalysis(supabase, apiKey, clientId, jobId);
+    return await runGoogleWeeklyAnalysis(supabase, apiKey, clientId, jobId, triggeredBy);
   } catch (err) {
     await markProgressFailed(supabase, {
       jobId,

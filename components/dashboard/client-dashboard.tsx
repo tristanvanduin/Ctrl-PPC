@@ -966,17 +966,18 @@ export function ClientDashboard({ client, bewaardeWeergave = null, kanaalbalkVan
                   geoClone={geoClone}
                   countryFilter={countryFilter}
                   onCountryFilterChange={setCountryFilter}
+                  nieuw={nieuweWeergave}
                 />
               )}
-              {channel === "meta" && <MetaCampagnes clientId={client.id} geoClone={geoClone} />}
-              {channel === "linkedin" && <LinkedInCampagnes clientId={client.id} geoClone={geoClone} />}
-              {channel === "microsoft" && <MicrosoftCampagnes clientId={client.id} geoClone={geoClone} />}
+              {channel === "meta" && <MetaCampagnes clientId={client.id} geoClone={geoClone} nieuw={nieuweWeergave} />}
+              {channel === "linkedin" && <LinkedInCampagnes clientId={client.id} geoClone={geoClone} nieuw={nieuweWeergave} />}
+              {channel === "microsoft" && <MicrosoftCampagnes clientId={client.id} geoClone={geoClone} nieuw={nieuweWeergave} />}
               {/* Alle kanalen op de Campagnes-tab: welke campagnes draaien per kanaal (niet de
                   blended maandgrafiek — die hoort bij Prognose/Overzicht). */}
               {/* De nieuwe weergave (fase 5, element 57): de kanaaltotalen staan hier open, boven de
                   campagnes. Op het Overzicht zitten ze dan achter "Toon als tabel". */}
-              {channel === "blended" && nieuweWeergave && <CrossChannelView clientId={client.id} kanalen={kanalen ?? []} alleenTabel />}
-              {channel === "blended" && <CampaignsPerChannel clientId={client.id} geoClone={geoClone} />}
+              {channel === "blended" && nieuweWeergave && <CrossChannelView clientId={client.id} kanalen={kanalen ?? []} alleenTabel googleData={clientData.data} />}
+              {channel === "blended" && <CampaignsPerChannel clientId={client.id} geoClone={geoClone} nieuw={nieuweWeergave} />}
             </div>
           )}
 

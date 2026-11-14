@@ -159,16 +159,16 @@ function MicrosoftViewRuw({ clientId, geoClone, edition, meerdereKanalen = true,
  * Meta/LinkedIn -- Microsoft-campagnes dragen geen objective-as; het keyword-niveau (de
  * search-tegenhanger) leeft in de analyses met de volumerem erbij.
  */
-export function MicrosoftCampagnes({ clientId, geoClone }: { clientId: string; geoClone?: string | null }) {
+export function MicrosoftCampagnes({ clientId, geoClone, nieuw = false }: { clientId: string; geoClone?: string | null; nieuw?: boolean }) {
   return (
     <div className="space-y-6">
       <Sectie
         eerste
         icoon={<Calendar className="w-4.5 h-4.5 text-brand-blue-ink" />}
         titel="Wat er draait"
-        bijschrift="Campagnes over de laatste 28 dagen"
+        bijschrift={nieuw ? "Campagnes over de gekozen periode" : "Campagnes over de laatste 28 dagen"}
       >
-        <ChannelCampaignTable clientId={clientId} channel="microsoft" geoClone={geoClone} />
+        <ChannelCampaignTable clientId={clientId} channel="microsoft" geoClone={geoClone} nieuw={nieuw} />
       </Sectie>
       <ChannelBleedersTable clientId={clientId} channel="microsoft" geoClone={geoClone} />
     </div>

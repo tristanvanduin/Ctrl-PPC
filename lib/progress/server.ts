@@ -145,6 +145,9 @@ export async function createProgressJob(supabase: SupabaseClient, input: {
   jobType: GenerationJobType;
   metadata?: Record<string, unknown>;
   initialMessage?: string | null;
+  /** Verplicht, zodat elke nieuwe aanroeper moet kiezen: "cron", "handmatig" of een gebruikers-id.
+   *  Bijna altijd gestartDoorUitVerzoek(request.headers) uit lib/progress/gestart-door.ts. */
+  triggeredBy: string;
 }) {
   if (shouldBypassProgressStorage()) return null;
 
@@ -154,6 +157,7 @@ export async function createProgressJob(supabase: SupabaseClient, input: {
     clientId: input.clientId ?? null,
     jobType: input.jobType,
     metadata: input.metadata,
+    triggeredBy: input.triggeredBy,
     now,
   });
 

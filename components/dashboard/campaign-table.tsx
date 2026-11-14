@@ -10,6 +10,13 @@ import { CHART_CATEGORICAL } from "@/lib/branding/chart-colors";
 import {
   Tabel, Kop, KolomKop, SorteerKop, Body, Rij, NaamCel, Cel, GetalCel, AandeelCel, TotaalRij, TotaalCel,
 } from "./data-table";
+import { Laadvlak } from "@/components/ui/laadvlak";
+import { Vensterlabel } from "@/components/ui/vensterlabel";
+import { usePeriod } from "@/lib/period/period-context";
+import { uitMaandPeriode, type DagPeriode } from "@/lib/period/dag-periode";
+import { telCampagnes, vergelijkCampagnes, type CampagneRegel } from "@/lib/campagnes/campagne-periode";
+import { useCampagnePeriode } from "@/lib/campagnes/use-campagne-periode";
+import { CampagneStatusCel } from "./campagne-verandering";
 
 interface CampaignRow {
   name: string;
@@ -95,7 +102,18 @@ interface CampaignTableProps {
   onCountryFilterChange?: (country: string | null) => void;
 }
 
-export function CampaignTable({ clientId, geoClone, countryFilter: externalCountryFilter, onCountryFilterChange }: CampaignTableProps) {
+/**
+ * "Wat er draait" op het tabblad Google. Met de schakelaar uit (`nieuw` false) precies de tabel van
+ * altijd, over de laatste 30 dagen uit de accountstructuur (CampaignTableVast, ongewijzigd). In de
+ * nieuwe weergave over de gekozen periode per dag uit ads_campaign_daily (CampaignTablePeriode), met
+ * dezelfde regels als de campagnetabellen van de andere kanalen (lib/campagnes/).
+ */
+export function CampaignTable(props: CampaignTableProps & { nieuw?: boolean }) {
+  const { nieuw = false, ...rest } = props;
+  return nieuw ? <CampaignTablePeriode {...rest} /> : <CampaignTableVast {...rest} />;
+}
+
+function CampaignTableVast({ clientId, geoClone, countryFilter: externalCountryFilter, onCountryFilterChange }: CampaignTableProps) {
   const dataState = useClientDataState();
   const [search, setSearch] = useState("");
   const [sortBy, setSortBy] = useState<SortKey>("spend");
@@ -416,5 +434,258 @@ export function CampaignTable({ clientId, geoClone, countryFilter: externalCount
         </TotaalRij>
       </Tabel>
     </div>
+  );
+}
+
+// ── De nieuwe weergave: over de gekozen periode, per dag ─────────────────────────────────────────
+//
+// De cijfers per campagne komen uit lib/campagnes (ads_campaign_daily, met voor hele maanden en het
+// deel vóór de dagopslag ads_campaign_monthly, en het label van splitsOpDagOpslag), niet uit de
+// 30-dagenvelden van de accountstructuur. De structuur levert alleen wat er per campagne vast staat:
+// type, biedstrategie, doel, land en de advertentiegroepen, gekoppeld op het campagne-id (en op de
+// naam als het id niet bekend is). Een campagne die in de periode liep maar niet in de structuur
+// staat, staat er ook, met een streep voor wat de structuur zou zeggen: anders telt de tabel niet
+// meer op tot het kanaal.
+//
+// De totaalrij draagt dezelfde merktekens als de andere campagnetabellen (data-cijfer
+// "campagnes-totaal-*", data-kanaal="google"), maar alleen zonder filter: met een zoekterm, een doel,
+// een land of een beurs is het de som van wat er staat en niet van het kanaal.
+
+export interface PeriodeCampagne extends CampaignRow {
+  regel: CampagneRegel;
+}
+
+type Structuur = AccountStructureData["campaigns"][number];
+
+/** De regels van de periode met wat de structuur per campagne weet. Zuiver, voor de tests. */
+export function campagnesMetStructuur(
+  regels: readonly CampagneRegel[],
+  structuur: readonly Structuur[],
+  geoMap: Record<string, string> = {},
+  sharesMap: Record<string, Record<string, number>> = {},
+): PeriodeCampagne[] {
+  const perId = new Map(structuur.map((c) => [String(c.id), c]));
+  const perNaam = new Map(structuur.map((c) => [c.name, c]));
+  return regels.map((r) => {
+    const c = perId.get(r.sleutel) ?? perNaam.get(r.naam) ?? null;
+    return {
+      name: r.naam,
+      type: c?.type ?? "",
+      purpose: c?.purpose ?? "onbekend",
+      bucketLabel: c?.bucketLabel ?? null,
+      biddingStrategy: c?.biddingStrategy ?? "UNKNOWN",
+      spend: r.spend,
+      conversions: r.conversions,
+      cpa: r.conversions > 0 ? r.spend / r.conversions : r.spend > 0 ? Infinity : 0,
+      roas: 0,
+      impressions: r.impressions,
+      adGroupCount: c?.adGroupCount ?? 0,
+      assetGroupCount: c?.assetGroupCount ?? 0,
+      country: geoMap[r.naam] ?? detectCountryFromName(r.naam),
+      countryShares: sharesMap[r.naam] ?? null,
+      regel: r,
+    };
+  });
+}
+
+const GOOGLE: readonly ["google"] = ["google"];
+
+/** De knopstijl van de filters, zoals in de vertrouwde tabel. */
+function filterKnop(actief: boolean, kleur: "blauw" | "oranje"): string {
+  const aan = kleur === "blauw" ? "bg-brand-blue text-white" : "bg-brand-orange text-white";
+  const uit = kleur === "blauw" ? "bg-gray-100 text-muted-foreground hover:text-brand-gray" : "bg-orange-50 text-muted-foreground hover:text-brand-gray";
+  return `px-2 py-1 text-micro font-medium rounded-md transition-colors ${actief ? aan : uit}`;
+}
+
+/** De tabel zelf, los van het laden, zodat hij te toetsen is. */
+export function CampagneTabelGoogle({ campagnes, nu, metVergelijking, reden, vergelijkLabel, geoClone = null, countryFilter = null, onCountryFilterChange, landen = [] }: {
+  campagnes: readonly PeriodeCampagne[];
+  /** De telling van de periode: het kanaaltotaal (zonder filter) en het venster. */
+  nu: { totaal: { spend: number; conversions: number; impressions: number }; label: string | null };
+  metVergelijking: boolean;
+  reden: string | null;
+  vergelijkLabel: string;
+  geoClone?: string | null;
+  countryFilter?: string | null;
+  onCountryFilterChange?: (country: string | null) => void;
+  landen?: readonly string[];
+}) {
+  const [search, setSearch] = useState("");
+  const [purposeFilter, setPurposeFilter] = useState<string | null>(null);
+  const [localCountryFilter, setLocalCountryFilter] = useState<string | null>(null);
+  const landFilter = onCountryFilterChange ? countryFilter : localCountryFilter;
+  const setLandFilter = onCountryFilterChange ?? setLocalCountryFilter;
+  const purposes = [...new Set(campagnes.map((x) => x.purpose))].sort();
+  const gefilterd = !!(search || purposeFilter || landFilter || geoClone);
+  const filtered = campagnes.filter((x) => {
+    if (search && !x.name.toLowerCase().includes(search.toLowerCase())) return false;
+    if (purposeFilter && x.purpose !== purposeFilter) return false;
+    if (landFilter && !((x.countryShares?.[landFilter] ?? 0) > 0 || x.country === landFilter)) return false;
+    if (geoClone && matchGeoCloneByCampaignName(x.name)?.abbreviation !== geoClone) return false;
+    return true;
+  });
+  // Zonder filter het kanaaltotaal over ALLE campagnerijen van de periode (ook die met alleen
+  // vertoningen); met een filter de som van wat er staat.
+  const som = gefilterd
+    ? filtered.reduce((t, x) => ({ spend: t.spend + x.spend, conversions: t.conversions + x.conversions, impressions: t.impressions + x.impressions }), { spend: 0, conversions: 0, impressions: 0 })
+    : nu.totaal;
+  const grootsteSpend = Math.max(0, ...filtered.map((x) => x.spend));
+  const grootsteConv = Math.max(0, ...filtered.map((x) => x.conversions));
+
+  return (
+    <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
+      <div className="px-5 py-4 border-b border-border space-y-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <p className="min-w-0 text-meta text-muted-foreground">
+            {filtered.length} campagnes · {num(som.conversions)} conversies · {fmt(som.spend)} spend
+          </p>
+          <Vensterlabel
+            soort="periode"
+            perDag
+            toevoeging={nu.label ? "deels per maand" : undefined}
+            toevoegingUitleg={nu.label ?? undefined}
+            className="ml-auto"
+          />
+        </div>
+        {/* Het venster voluit als Google een deel per maand telde: de toevoeging in het label staat
+            verder alleen in `title`, en die ziet niemand op een telefoon. */}
+        {nu.label && <p data-campagne-venster className="text-meta text-muted-foreground">Google Ads: {nu.label}.</p>}
+        {metVergelijking && reden && <p className="text-meta text-muted-foreground">{reden}</p>}
+        <div className="flex items-center gap-2 flex-wrap">
+          {landen.length > 1 && (
+            <div className="flex gap-1 items-center flex-wrap" role="group" aria-label="Land">
+              <Globe className="w-3.5 h-3.5 text-muted-foreground mr-0.5" aria-hidden />
+              <button type="button" aria-pressed={landFilter === null} onClick={() => setLandFilter(null)} className={filterKnop(landFilter === null, "oranje")}>Alle landen</button>
+              {landen.map((code) => (
+                <button type="button" key={code} aria-pressed={landFilter === code} onClick={() => setLandFilter(landFilter === code ? null : code)} className={filterKnop(landFilter === code, "oranje")}>
+                  {countryLabel(code)}
+                </button>
+              ))}
+            </div>
+          )}
+          <div className="flex gap-1 flex-wrap" role="group" aria-label="Doel">
+            <button type="button" aria-pressed={purposeFilter === null} onClick={() => setPurposeFilter(null)} className={filterKnop(purposeFilter === null, "blauw")}>Alle</button>
+            {purposes.map((x) => (
+              <button type="button" key={x} aria-pressed={purposeFilter === x} onClick={() => setPurposeFilter(purposeFilter === x ? null : x)} className={filterKnop(purposeFilter === x, "blauw")}>
+                {PURPOSE_LABELS[x] ?? leesbaar(x)}
+              </button>
+            ))}
+          </div>
+          <div className="relative">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" aria-hidden />
+            <input
+              type="search"
+              aria-label="Zoek een campagne"
+              placeholder="Zoek..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="pl-8 pr-3 py-1.5 text-xs border border-border rounded-lg w-40 focus:outline-none focus:border-brand-blue"
+            />
+          </div>
+        </div>
+      </div>
+      <Tabel>
+        <Kop>
+          <KolomKop breed>Campagne</KolomKop>
+          <KolomKop>Type</KolomKop>
+          <KolomKop>Bidding</KolomKop>
+          <KolomKop getal>Impressies</KolomKop>
+          <KolomKop getal bijschrift="aandeel">Spend</KolomKop>
+          <KolomKop getal bijschrift="aandeel">Conv.</KolomKop>
+          <KolomKop getal>CPA</KolomKop>
+          {metVergelijking && <KolomKop getal bijschrift={`t.o.v. ${vergelijkLabel.toLowerCase()}`}>Verandering</KolomKop>}
+        </Kop>
+        <Body>
+          {filtered.map((x) => (
+            <Rij key={x.regel.sleutel}>
+              <NaamCel>
+                <span className="inline-flex items-center gap-2 min-w-0" title={x.name}>
+                  <span className="truncate">{x.name}</span>
+                  {x.bucketLabel && <span className="text-micro font-bold uppercase px-1.5 py-0.5 rounded bg-gray-100 text-gray-500 shrink-0">{x.bucketLabel}</span>}
+                </span>
+              </NaamCel>
+              <Cel nowrap>
+                {x.type
+                  ? <span className={`text-micro font-semibold uppercase px-1.5 py-0.5 rounded ${PURPOSE_COLORS[x.purpose] ?? "bg-gray-100 text-gray-600"}`}>{PURPOSE_LABELS[x.purpose] ?? leesbaar(x.purpose)}</span>
+                  : <span className="text-muted-foreground" title="Niet in de accountstructuur">—<span className="sr-only">niet in de accountstructuur</span></span>}
+              </Cel>
+              <Cel zacht nowrap>{x.type ? (BIDDING_LABELS[x.biddingStrategy] ?? leesbaar(x.biddingStrategy)) : "—"}</Cel>
+              <GetalCel zacht>{num(x.impressions)}</GetalCel>
+              <AandeelCel waarde={fmt(x.spend)} aandeel={grootsteSpend > 0 ? x.spend / grootsteSpend : 0} />
+              <AandeelCel waarde={num(x.conversions)} aandeel={grootsteConv > 0 ? x.conversions / grootsteConv : 0} kleur={CHART_CATEGORICAL[2]} />
+              <GetalCel>{x.cpa === 0 ? "—" : x.cpa === Infinity ? "∞" : fmt(x.cpa)}</GetalCel>
+              {metVergelijking && <CampagneStatusCel r={x.regel} />}
+            </Rij>
+          ))}
+        </Body>
+        <TotaalRij>
+          <TotaalCel>Totaal ({filtered.length})</TotaalCel>
+          <TotaalCel>{""}</TotaalCel>
+          <TotaalCel>{""}</TotaalCel>
+          <TotaalCel getal>{num(som.impressions)}</TotaalCel>
+          {/* data-cijfer alleen zonder filter: dan is dit het kanaaltotaal, zoals bij de andere
+              campagnetabellen (campaigns-per-channel.tsx). */}
+          <TotaalCel getal>{gefilterd ? fmt(som.spend) : <span data-cijfer="campagnes-totaal-kosten" data-kanaal="google">{fmt(som.spend)}</span>}</TotaalCel>
+          <TotaalCel getal>{gefilterd ? num(som.conversions) : <span data-cijfer="campagnes-totaal-conversies" data-kanaal="google">{num(som.conversions)}</span>}</TotaalCel>
+          <TotaalCel getal>{som.conversions > 0 ? fmt(som.spend / som.conversions) : "—"}</TotaalCel>
+          {metVergelijking && <TotaalCel getal><span className="sr-only">geen verandering voor het totaal</span></TotaalCel>}
+        </TotaalRij>
+      </Tabel>
+    </div>
+  );
+}
+
+function CampaignTablePeriode({ clientId, geoClone, countryFilter, onCountryFilterChange }: CampaignTableProps) {
+  const dataState = useClientDataState();
+  const periode = usePeriod();
+  const p: DagPeriode = periode.dag?.periode ?? uitMaandPeriode(periode.range);
+  const c: DagPeriode | null = periode.dag
+    ? (periode.dag.keuze.vergelijk === "none" ? null : periode.dag.vergelijking.periode)
+    : (periode.compareRange ? uitMaandPeriode(periode.compareRange) : null);
+  const vergelijkLabel = periode.dag ? periode.dag.vergelijking.label : "de vergelijkingsperiode";
+  const staat = useCampagnePeriode({ clientId, kanalen: GOOGLE, periode: p, vergelijking: c, actief: true });
+
+  const telling = useMemo(() => {
+    const r = staat.rijen?.google;
+    if (!r) return null;
+    const bron = { kanaal: "google" as const, dagen: r.dagen, maanden: r.maanden, eersteDag: r.eersteDag, bronStart: r.bronStart };
+    const nu = telCampagnes(p, bron);
+    const toen = c ? telCampagnes(c, bron) : null;
+    return { nu, toen, vergelijking: vergelijkCampagnes(nu, toen) };
+    // De periodes op hun datums: een nieuw object met dezelfde datums rekent niet opnieuw.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [staat.rijen, p.start, p.eind, c?.start, c?.eind]);
+
+  const structuur = dataState?.accountStructure?.campaigns;
+  const geoMap = dataState?.campaignCountryMap;
+  const sharesMap = dataState?.campaignCountryShares;
+  const campagnes = useMemo(
+    () => (telling ? campagnesMetStructuur(telling.vergelijking.regels, structuur ?? [], geoMap ?? {}, sharesMap ?? {}) : []),
+    [telling, structuur, geoMap, sharesMap],
+  );
+  const gedetecteerdeLanden = dataState?.detectedCountries;
+  const landen = useMemo(() => {
+    if (gedetecteerdeLanden && gedetecteerdeLanden.length > 0) return gedetecteerdeLanden;
+    const counts = new Map<string, number>();
+    for (const x of campagnes) if (x.country) counts.set(x.country, (counts.get(x.country) ?? 0) + 1);
+    return [...counts.entries()].sort((a, b) => b[1] - a[1]).map(([code]) => code);
+  }, [campagnes, gedetecteerdeLanden]);
+
+  if (staat.fouten.length > 0) return <div role="status" className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-body text-amber-800">{staat.fouten.join(" · ")}</div>;
+  // Een laadvlak zolang de rijen de periode niet dekken: zie useCampagnePeriode.
+  if (staat.laden || !telling) return <Laadvlak vorm="tabel" regels={6} />;
+  if (campagnes.length === 0) return <p className="py-6 text-center text-body text-muted-foreground">Geen campagne die in deze periode liep.</p>;
+  return (
+    <CampagneTabelGoogle
+      campagnes={campagnes}
+      nu={telling.nu}
+      metVergelijking={telling.toen !== null}
+      reden={telling.vergelijking.reden}
+      vergelijkLabel={vergelijkLabel}
+      geoClone={geoClone}
+      countryFilter={countryFilter ?? null}
+      onCountryFilterChange={onCountryFilterChange}
+      landen={landen}
+    />
   );
 }

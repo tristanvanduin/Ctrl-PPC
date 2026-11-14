@@ -81,3 +81,53 @@ export function rijenInPeriode<T extends { month: string }>(rijen: readonly T[],
     return maand >= periode.start && maand <= periode.end;
   });
 }
+
+/** Wat een kanaal over de gekozen periode opleverde: een regel van de kanaaltotalen. */
+export interface KanaalTotaal {
+  /** De kanaalnaam van het dashboard ("google"): data-kanaal van de rij. */
+  kanaal: Kanaal;
+  channel: ChannelKey;
+  spend: number;
+  /** Null als de bron ze over deze periode niet kent (Google over hele maanden zonder tellers). */
+  clicks: number | null;
+  conversions: number;
+  waarde: number;
+  /** Wat de lezer moet weten als het kanaal niet precies de gevraagde dagen telde, anders null. */
+  uitleg: string | null;
+}
+
+/**
+ * De kanaaltotalen over een periode PER DAG, uit de telling van de kerncijfers (telDagPeriode in
+ * lib/period/dag-telling.ts): voor Campagnes in de nieuwe weergave, bij een periode die niet als
+ * maandkeuze kan (DagStaat.maandPad false).
+ *
+ * WAAROM. De kanaaltotalen telden de maandrijen van ALLE maanden die de periode raken. Bij "laatste
+ * 30 dagen" (15 okt t/m 13 nov) stond Google er dan met oktober en november heel, en de
+ * campagnetabel eronder telde de dertig dagen: twee totalen voor hetzelfde kanaal op één pagina.
+ * Nu telt de kanaalrij dezelfde dagen als de campagnetabel, met dezelfde terugval op hele maanden
+ * voor Google vóór de dagopslag, en met dezelfde getallen als de kerncijfers bovenaan.
+ *
+ * Een kanaal dat in de periode niets deed (geen kosten, conversies, waarde of klikken) staat er
+ * niet, zoals een kanaal zonder maandrij er bij de maandtelling niet stond. Op kosten aflopend.
+ */
+export function kanaalTotalenUitDagTelling(
+  perKanaal: readonly {
+    kanaal: Kanaal;
+    totalen: { conversions: number; revenue: number; adSpend: number };
+    tellers: { clicks: number } | null;
+    uitleg: string | null;
+  }[],
+): KanaalTotaal[] {
+  return perKanaal
+    .map((t) => ({
+      kanaal: t.kanaal,
+      channel: channelKeyVanKanaal(t.kanaal),
+      spend: t.totalen.adSpend,
+      clicks: t.tellers ? t.tellers.clicks : null,
+      conversions: t.totalen.conversions,
+      waarde: t.totalen.revenue,
+      uitleg: t.uitleg,
+    }))
+    .filter((t) => t.spend > 0 || t.conversions > 0 || t.waarde > 0 || (t.clicks ?? 0) > 0)
+    .sort((a, b) => b.spend - a.spend);
+}

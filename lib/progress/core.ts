@@ -118,6 +118,8 @@ export function buildQueuedJob(input: {
   clientId?: string | null;
   jobType: GenerationJobType;
   metadata?: Record<string, unknown>;
+  /** Wie de run startte: "cron", "handmatig" of een gebruikers-id (lib/progress/gestart-door.ts). */
+  triggeredBy?: string | null;
   now?: string;
 }): GenerationJobRow {
   const now = input.now ?? new Date().toISOString();
@@ -141,7 +143,7 @@ export function buildQueuedJob(input: {
     metadata: input.metadata ?? {},
     attempts: 0,
     scheduled_for: null,
-    triggered_by: null,
+    triggered_by: input.triggeredBy ?? null,
   };
 }
 

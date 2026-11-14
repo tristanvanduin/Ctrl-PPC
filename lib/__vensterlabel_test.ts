@@ -237,7 +237,7 @@ console.log("Bron: de blokken die de periode volgen");
   const cross = zonderCommentaar(lees("components/dashboard/cross-channel-view.tsx"));
   check("Alle kanalen: geen eigen venster van zes maanden meer", !/RECENT_MONTHS/.test(cross) && !/slice\(-6\)/.test(cross));
   check("de kanaaltabel telt de rijen van de periode", /const rows = rijenPeriode;/.test(cross));
-  check("een lege periode laat de blokken staan, met uitleg", /chartMonths\.length === 0 \?/.test(cross) && /rijenPeriode\.length === 0 &&/.test(cross));
+  check("een lege periode laat de blokken staan, met uitleg", /chartMonths\.length === 0 \?/.test(cross) && /\(dagTotalen \?\? rijenPeriode\)\?\.length === 0 &&/.test(cross));
   // Een blok dat de periode volgt, mag geen vast label dragen, en andersom.
   const ms = zonderCommentaar(lees("components/dashboard/channel-performance.tsx"));
   check("de kerncijfers over 28 dagen zeggen dat eerlijk", /<Vensterlabel soort="vast" venster="laatste 28 dagen" \/>/.test(ms));

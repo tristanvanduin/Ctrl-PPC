@@ -115,6 +115,18 @@ async function main() {
     check("conversies: data-cijfer=\"kanaaltotaal-conversies\" om fmt(tot.conversions)", /<span data-cijfer="kanaaltotaal-conversies">\{fmt\(tot\.conversions\)\}<\/span>/.test(bron));
     const totaalrij = bron.slice(bron.indexOf("<TotaalRij>"), bron.indexOf("</TotaalRij>"));
     check("beide binnen de totaalrij", /kanaaltotaal-kosten/.test(totaalrij) && /kanaaltotaal-conversies/.test(totaalrij));
+    // Per kanaal: de rij in de kanaaltotalen, met data-kanaal, tegen de campagnetabel eronder.
+    check("kanaalrij-kosten met data-kanaal om eur(a.spend)", /<span data-cijfer="kanaalrij-kosten" data-kanaal=\{a\.kanaal\}>\{eur\(a\.spend\)\}<\/span>/.test(bron));
+    check("kanaalrij-conversies met data-kanaal om fmt(a.conversions)", /<span data-cijfer="kanaalrij-conversies" data-kanaal=\{a\.kanaal\}>\{fmt\(a\.conversions\)\}<\/span>/.test(bron));
+  });
+
+  await deel("[4] Campagnes: de totaalrij van elke campagnetabel draagt de merktekens per kanaal", () => {
+    // De gerenderde totaalrij staat in lib/campagnes/__campagne_periode_test.ts; hier de bron, zodat
+    // een merkteken dat verdwijnt bij de andere merktekens opvalt.
+    const bron = readFileSync(join(__dirname, "..", "components/dashboard/campaigns-per-channel.tsx"), "utf8");
+    const totaalrij = bron.slice(bron.lastIndexOf("<TotaalRij>"), bron.lastIndexOf("</TotaalRij>"));
+    check("campagnes-totaal-kosten met data-kanaal om eur(tot.spend)", /<span data-cijfer="campagnes-totaal-kosten" data-kanaal=\{blok\.kanaal\}>\{eur\(tot\.spend\)\}<\/span>/.test(totaalrij));
+    check("campagnes-totaal-conversies met data-kanaal om fmt(tot.conversions, 1)", /<span data-cijfer="campagnes-totaal-conversies" data-kanaal=\{blok\.kanaal\}>\{fmt\(tot\.conversions, 1\)\}<\/span>/.test(totaalrij));
   });
 
   console.log(`\n${passed} geslaagd, ${failed} gefaald`);

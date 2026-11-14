@@ -6,7 +6,10 @@ import { GroupedMonthlyBars } from "./monthly-trend-chart";
 import { CampaignTypeSplit } from "./campaign-type-split";
 import { blendedReliability } from "@/lib/cross-channel/measurement-reliability";
 import type { ChannelKey } from "@/lib/cross-channel/lens-facts";
-import { kanaalMaandRijen, rijenInPeriode } from "@/lib/cross-channel/kanaal-maandrijen";
+import { kanaalMaandRijen, kanaalTotalenUitDagTelling, rijenInPeriode } from "@/lib/cross-channel/kanaal-maandrijen";
+import { useDagTelling } from "@/lib/period/use-dag-telling";
+import { tellersPerMaand } from "@/lib/overzicht/trechter";
+import { formatDagPeriode } from "@/lib/period/dag-periode";
 import { Tabel, Kop, KolomKop, Body, Rij, NaamCel, GetalCel, AandeelCel, TotaalRij, TotaalCel } from "./data-table";
 import { Lade, RegioToggle, useRememberedOpen } from "@/components/ui/disclosure";
 import { maandLabel } from "./chart-chrome";
@@ -148,6 +151,36 @@ function CrossChannelViewRuw({ clientId, kanalen = [], edition, nieuw = false, a
     [rows, periodeStart, periodeEind],
   );
 
+  // ── CAMPAGNES, NIEUWE WEERGAVE: DE KANAALTOTALEN PER DAG ─────────────────────────────────────
+  //
+  // Op Campagnes staan de kanaaltotalen boven de campagnetabellen, en die tellen de gekozen periode
+  // per dag (lib/campagnes/campagne-periode.ts). De maandrijen hierboven tellen alle maanden die de
+  // periode RAKEN: bij "laatste 30 dagen" stond Google er dan met twee hele maanden, de campagnetabel
+  // eronder met dertig dagen. Bij een periode die niet als maandkeuze kan, tellen de kanaaltotalen
+  // daar dus per dag, met de telling van de kerncijfers (useDagTelling: dezelfde rijen, dezelfde
+  // terugval voor Google vóór de dagopslag, dezelfde conversieselectie). Hele maanden met een
+  // maandvergelijking blijven de maandrijen: dat is per constructie dezelfde telling. Alleen hier
+  // (alleenTabel); op het Overzicht volgen de kerncijfers dat al.
+  const perDag = alleenTabel && !!periode.dag && !periode.dag.maandPad;
+  const googleTellers = useMemo(
+    () => tellersPerMaand(blended.perKanaal?.find((r) => r.kanaal === "google")?.maanden),
+    [blended.perKanaal],
+  );
+  const dagTelling = useDagTelling({
+    clientId, staat: perDag ? periode.dag : null, kanalen, gekozen: null, googleData, googleTellers,
+  });
+  const dagTotalen = useMemo(() => {
+    if (!perDag) return null;
+    const t = dagTelling.alle ? (dagTelling.alle.vergelijking?.huidig ?? dagTelling.alle.alleen) : null;
+    return t ? kanaalTotalenUitDagTelling(t.perKanaal) : null;
+  }, [perDag, dagTelling.alle]);
+  const dagFouten = perDag ? (dagTelling.alle?.fouten ?? []) : [];
+  // Per dag nog onderweg: geen tabel, want de maandrijen zijn er dan al en zouden even het andere
+  // getal tonen, met het merkteken erop.
+  const wachtOpDagen = perDag && dagTotalen === null;
+  // De periode in woorden, zoals de totaalrij en de lege staat hem noemen.
+  const periodeWoorden = perDag && periode.dag ? formatDagPeriode(periode.dag.periode) : formatRange(periode.range);
+
   // Lopen de maandkosten in de hoofdgrafiek en in de kanaaltabel uiteen? Dezelfde maanden, twee
   // lezingen van Google (zie bron-verschil.ts). Leeg als ze gelijk lopen; dan staat er niets.
   const bronVerschil = useMemo(() => {
@@ -174,10 +207,12 @@ function CrossChannelViewRuw({ clientId, kanalen = [], edition, nieuw = false, a
   // een verzonnen verdeling zou hier erger zijn dan geen verdeling.
   // Over de gekozen periode, net als de tabel waar dit getal naast staat: hier stond een eigen
   // venster van zes maanden, en dan claimde de zin een ander totaal dan de totaalrij ernaast.
+  // Per dag (Campagnes) over de kanaaltotalen per dag: dezelfde som als de tabel ernaast.
   const betrouwbaarheid = useMemo(() => {
-    if (!rijenPeriode || rijenPeriode.length === 0) return null;
+    const bron = dagTotalen ?? rijenPeriode;
+    if (!bron || bron.length === 0) return null;
     const perKanaal = new Map<ChannelKey, number>();
-    for (const r of rijenPeriode) {
+    for (const r of bron) {
       perKanaal.set(r.channel, (perKanaal.get(r.channel) ?? 0) + (r.conversions ?? 0));
     }
     if (perKanaal.size < 2) return null; // met één kanaal valt er niets op te tellen
@@ -185,7 +220,7 @@ function CrossChannelViewRuw({ clientId, kanalen = [], edition, nieuw = false, a
       [...perKanaal].map(([channel, conversions]) => ({ channel, conversions })),
       null // geen anker beschikbaar in deze weergave
     );
-  }, [rijenPeriode]);
+  }, [rijenPeriode, dagTotalen]);
   const chartSeries = [...new Set((rijenPeriode ?? []).map((r) => CHANNEL_LABEL[r.channel] ?? r.channel))];
   // Een maand waarin een kanaal niet gemeten is, krijgt géén nul. Hier stond `row[s] = 0` voor elke
   // serie, en daardoor las februari als "Meta heeft nul euro uitgegeven" terwijl Meta toen simpelweg
@@ -209,13 +244,16 @@ function CrossChannelViewRuw({ clientId, kanalen = [], edition, nieuw = false, a
   const tabelMetVoorbehoud = () => (
         <div className="grid gap-4 px-5 py-4 lg:grid-cols-12">
           <div className="min-w-0 lg:col-span-8">
-          {rows === null && !error && (
+          {(rows === null || wachtOpDagen) && !error && (
             <div className="flex items-center gap-2 text-body text-muted-foreground py-8 justify-center">
               <Loader2 className="w-4 h-4 animate-spin" /> Laden...
             </div>
           )}
           {error && (
             <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-body text-amber-800">{error}</div>
+          )}
+          {dagFouten.length > 0 && (
+            <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-body text-amber-800">{dagFouten.join(" ")}</div>
           )}
           {rows && rows.length === 0 && (
             <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-body text-amber-800">
@@ -224,12 +262,12 @@ function CrossChannelViewRuw({ clientId, kanalen = [], edition, nieuw = false, a
           )}
           {/* De rijen zijn er, maar geen enkele valt in de gekozen periode (een bereik van vóór de
               data). Neutraal en geen amber: er is niets mis, de periode is alleen leeg. */}
-          {rows && rows.length > 0 && rijenPeriode && rijenPeriode.length === 0 && (
+          {rows && rows.length > 0 && !wachtOpDagen && (dagTotalen ?? rijenPeriode)?.length === 0 && (
             <p className="py-8 text-center text-body text-muted-foreground">
-              In {formatRange(periode.range)} heeft geen enkel kanaal cijfers. Kies een latere periode om de kanalen te vergelijken.
+              In {periodeWoorden} heeft geen enkel kanaal cijfers. Kies een latere periode om de kanalen te vergelijken.
             </p>
           )}
-          {rijenPeriode && rijenPeriode.length > 0 && (() => {
+          {rijenPeriode && !wachtOpDagen && (dagTotalen ?? rijenPeriode).length > 0 && (() => {
             // De rijen van de gekozen periode. Hier stond `rows`: alle geladen maanden, op de demo
             // vierentwintig, onder een band die over twaalf ging. Hetzelfde woord "Conversies",
             // twee totalen.
@@ -245,23 +283,31 @@ function CrossChannelViewRuw({ clientId, kanalen = [], edition, nieuw = false, a
             // Nu eerst de kanaaltotalen (drie regels, met de verhouding zichtbaar), en de
             // maanddetails eronder achter een klik. De ruwe cijfers zijn niet weg; ze zijn alleen
             // niet meer het eerste wat je ziet.
-            const perKanaal = new Map<string, { spend: number; clicks: number; conversions: number; waarde: number }>();
-            for (const r of rows) {
-              const k = CHANNEL_LABEL[r.channel] ?? r.channel;
-              const a = perKanaal.get(k) ?? { spend: 0, clicks: 0, conversions: 0, waarde: 0 };
-              a.spend += r.spend ?? 0;
-              a.clicks += r.clicks ?? 0;
-              a.conversions += r.conversions ?? 0;
-              a.waarde += r.conversion_value ?? 0;
-              perKanaal.set(k, a);
+            //
+            // Per dag (Campagnes, nieuwe weergave, zie `perDag`) komen de kanaaltotalen uit de
+            // telling per dag; de maanddetails eronder blijven de maanden die de periode raken.
+            const perKanaal = new Map<string, { kanaal: string; spend: number; clicks: number | null; conversions: number; waarde: number }>();
+            if (dagTotalen) {
+              for (const t of dagTotalen) perKanaal.set(CHANNEL_LABEL[t.channel] ?? t.channel, { kanaal: t.kanaal, spend: t.spend, clicks: t.clicks, conversions: t.conversions, waarde: t.waarde });
+            } else {
+              for (const r of rows) {
+                const k = CHANNEL_LABEL[r.channel] ?? r.channel;
+                const a = perKanaal.get(k) ?? { kanaal: String(r.channel).replace(/_ads$/, ""), spend: 0, clicks: 0, conversions: 0, waarde: 0 };
+                a.spend += r.spend ?? 0;
+                a.clicks = (a.clicks ?? 0) + (r.clicks ?? 0);
+                a.conversions += r.conversions ?? 0;
+                a.waarde += r.conversion_value ?? 0;
+                perKanaal.set(k, a);
+              }
             }
             const kanalen = [...perKanaal.entries()].sort((a, b) => b[1].spend - a[1].spend);
             const grootsteSpend = Math.max(0, ...kanalen.map(([, a]) => a.spend));
             const grootsteConv = Math.max(0, ...kanalen.map(([, a]) => a.conversions));
+            // Klikken die een kanaal over deze periode niet kent (null), maken de som onbekend.
             const tot = kanalen.reduce((s, [, a]) => ({
-              spend: s.spend + a.spend, clicks: s.clicks + a.clicks,
+              spend: s.spend + a.spend, clicks: s.clicks === null || a.clicks === null ? null : s.clicks + a.clicks,
               conversions: s.conversions + a.conversions, waarde: s.waarde + a.waarde,
-            }), { spend: 0, clicks: 0, conversions: 0, waarde: 0 });
+            }), { spend: 0, clicks: 0 as number | null, conversions: 0, waarde: 0 });
 
             // ── EEN KOLOM DIE ALLEEN STREEPJES BEVAT, HOORT ER NIET TE STAAN ──────
             //
@@ -277,7 +323,8 @@ function CrossChannelViewRuw({ clientId, kanalen = [], edition, nieuw = false, a
 
             const opVolgorde = [...months].sort();
             const n = opVolgorde.length;
-            const periodeTekst = n === 0 ? null
+            const periodeTekst = dagTotalen ? `${periodeWoorden} · per dag`
+              : n === 0 ? null
               : n === 1 ? `${maandLabel(opVolgorde[0])} · 1 maand`
               : `${maandLabel(opVolgorde[0])} – ${maandLabel(opVolgorde[n - 1])} · ${n} maanden`;
 
@@ -296,10 +343,13 @@ function CrossChannelViewRuw({ clientId, kanalen = [], edition, nieuw = false, a
                     {kanalen.map(([naam, a]) => (
                       <Rij key={naam}>
                         <NaamCel>{naam}</NaamCel>
-                        <AandeelCel waarde={eur(a.spend)} aandeel={grootsteSpend > 0 ? a.spend / grootsteSpend : 0} />
+                        {/* data-cijfer per kanaal, alleen op Campagnes (alleenTabel): de cijfercontrole
+                            legt deze rij naast de totaalrij van de campagnetabel van hetzelfde kanaal
+                            eronder (data-kanaal). Elders blijft de opmaak zoals hij was. */}
+                        <AandeelCel waarde={alleenTabel ? <span data-cijfer="kanaalrij-kosten" data-kanaal={a.kanaal}>{eur(a.spend)}</span> : eur(a.spend)} aandeel={grootsteSpend > 0 ? a.spend / grootsteSpend : 0} />
                         <GetalCel zacht>{fmt(a.clicks)}</GetalCel>
                         <AandeelCel
-                          waarde={fmt(a.conversions)}
+                          waarde={alleenTabel ? <span data-cijfer="kanaalrij-conversies" data-kanaal={a.kanaal}>{fmt(a.conversions)}</span> : fmt(a.conversions)}
                           aandeel={grootsteConv > 0 ? a.conversions / grootsteConv : 0}
                           kleur={CHART_CATEGORICAL[2]}
                         />
@@ -336,6 +386,13 @@ function CrossChannelViewRuw({ clientId, kanalen = [], edition, nieuw = false, a
                     <TotaalCel getal>{tot.conversions > 0 ? eur(tot.spend / tot.conversions) : "—"}</TotaalCel>
                   </TotaalRij>
                 </Tabel>
+                {/* Per dag: wat een kanaal anders telde dan de gevraagde dagen (Google vóór de
+                    dagopslag per maand, een kanaal met data t/m gisteren), zoals de kerncijfers het zeggen. */}
+                {dagTotalen && dagTotalen.some((t) => t.uitleg) && (
+                  <ul className="mt-2 space-y-0.5 text-meta text-muted-foreground">
+                    {dagTotalen.filter((t) => t.uitleg).map((t) => <li key={t.kanaal}>{t.uitleg}</li>)}
+                  </ul>
+                )}
 
                 <div className="-mx-5 mt-4">
                   <RegioToggle
@@ -408,7 +465,7 @@ function CrossChannelViewRuw({ clientId, kanalen = [], edition, nieuw = false, a
             </div>
             {/* De weggevallen kolom, één keer uitgelegd in plaats van zes keer een streepje.
                 Zie de opmerking bij `heeftWaarde` hierboven. */}
-            {rijenPeriode && rijenPeriode.length > 0 && rijenPeriode.every((r) => !((r.conversion_value ?? 0) > 0)) && (
+            {(() => { const b = dagTotalen ?? (rijenPeriode ?? []).map((r) => ({ waarde: r.conversion_value ?? 0 })); return b.length > 0 && b.every((r) => !(r.waarde > 0)); })() && (
               <div className="rounded-lg border border-border bg-gray-50/70 px-4 py-3 text-meta leading-snug text-muted-foreground">
                 <p className="mb-1 flex items-center gap-1.5 font-semibold text-brand-gray">
                   <Info className="h-3.5 w-3.5 shrink-0" />
@@ -431,8 +488,8 @@ function CrossChannelViewRuw({ clientId, kanalen = [], edition, nieuw = false, a
         eerste
         icoon={<Layers className="w-4.5 h-4.5 text-brand-blue-ink" />}
         titel="Kanaaltotalen"
-        bijschrift={`Wat elk kanaal opleverde ${inPeriode}, en de maanden erachter`}
-        actie={<Vensterlabel soort="periode" />}
+        bijschrift={perDag ? `Wat elk kanaal opleverde in de gekozen periode (${periodeWoorden}), per dag, en de maanden erachter` : `Wat elk kanaal opleverde ${inPeriode}, en de maanden erachter`}
+        actie={<Vensterlabel soort="periode" perDag={perDag} />}
       >
         <div className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
           {tabelMetVoorbehoud()}

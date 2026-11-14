@@ -22,8 +22,10 @@ const UITLEG: Record<string, string> = {
 };
 
 /**
- * Het Overzicht volgt de kiezer altijd. Campagnes alleen in de nieuwe weergave (de tabel
- * Kanaaltotalen); de campagnetabellen daar noemen hun eigen vaste venster.
+ * Het Overzicht volgt de kiezer altijd. Campagnes alleen in de nieuwe weergave: daar volgen de
+ * kanaaltotalen hem, en de campagnetabellen van Alle kanalen, Google, Meta, LinkedIn en Microsoft per
+ * dag (lib/campagnes/campagne-periode.ts). Wat op die tabbladen verder een eigen venster heeft (de
+ * scorecards, de lekken), noemt dat in zijn eigen kop.
  */
 export function kiezerOpTab(tab: string, nieuweWeergave: boolean): KiezerOpTab {
   if (tab === "dashboard") return { toon: true };
