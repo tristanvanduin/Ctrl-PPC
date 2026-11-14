@@ -33,9 +33,6 @@
 //      last_12m zijn het hele maanden, en dan kan een kanaalrij die alle maanden telt die de periode
 //      raken, per constructie niet van een telling per dag verschillen. Midden in een maand wel: daar
 //      zat het verschil dat 3b alleen niet kon zien.
-//      Een verschil dat in de gegevens van de demo zit (de campagnerijen van Meta en LinkedIn passen
-//      niet bij hun accountrijen), blijft FOUT, maar zegt dat erbij (BEKEND hieronder): zo valt een
-//      nieuw verschil niet weg tussen bekende, en wordt een bekende niet groen.
 //   4. Prognose tegen Doelen & voortgang: het jaardoel (een doel is een invoer, geen berekening:
 //      het hoort overal hetzelfde getal te zijn), op data-cijfer="jaardoel", per KPI (data-kpi):
 //      de Prognose toont het doel van een KPI, Doelen een kaart per KPI. Het stond op beide
@@ -85,19 +82,6 @@ export function dagVenster(vandaag = new Date()) {
   return `${mm}-01..${mm}-20`;
 }
 const DAGVENSTER = dagVenster();
-
-/**
- * Verschillen die in de gegevens van een klant zitten en niet in de code, per klant en kanaal. Ze
- * blijven FOUT (een poort die om een bekende reden groen wordt, leert rood te negeren); de uitvoer
- * zegt er alleen bij wat er bekend is, zodat een nieuw verschil niet verdwijnt tussen bekende.
- * Verdwijnt het verschil (de seed is gerepareerd), haal de regel dan weg.
- */
-export const BEKEND = {
-  "demo-greentech": {
-    meta: "bekend seedprobleem: meta_campaign_daily telt niet op tot meta_account_daily (okt 2026 € 17.015 tegen € 4.650) en begint op 13 jul in plaats van 8 jun; reparatie van de seed ligt bij de eigenaar",
-    linkedin: "bekend seedprobleem: linkedin_campaign_daily telt niet op tot linkedin_account_daily (okt 2026 € 14.930 tegen € 9.300) en begint op 13 jul in plaats van 8 jun; reparatie van de seed ligt bij de eigenaar",
-  },
-};
 
 // ── Getallen lezen ──────────────────────────────────────────────────────────
 
@@ -229,8 +213,8 @@ function vergelijkingen(p) {
   const uit = [];
   // `reden`: waarom niet gemeten, als er een kant ontbreekt. `nietVergelijkbaar`: beide kanten staan er,
   // maar gaan niet over hetzelfde (dan is een verschil geen fout, en gelijk ook geen bewijs).
-  const paar = (wat, plekA, a, plekB, b, reden = null, nietVergelijkbaar = null, bekend = null) =>
-    uit.push({ wat, plekA, plekB, a: a?.tekst ?? null, b: b?.tekst ?? null, reden, nietVergelijkbaar, bekend });
+  const paar = (wat, plekA, a, plekB, b, reden = null, nietVergelijkbaar = null) =>
+    uit.push({ wat, plekA, plekB, a: a?.tekst ?? null, b: b?.tekst ?? null, reden, nietVergelijkbaar });
 
   for (const [naam, patroon] of TEGELS) {
     paar(`${naam}`, "Overzicht oud (tegel)", tegel(p.oud, patroon), "Overzicht nieuw (tegel)", tegel(p.nieuw, patroon));
@@ -281,8 +265,7 @@ function vergelijkingen(p) {
         const a = kanaalCijfer(gelezen, rij, kanaal), b = kanaalCijfer(gelezen, totaal, kanaal);
         paar(naam, `${plek} (kanaaltotalen, ${kanaal})`, a, `${plek} (campagnetabel ${kanaal}, totaalrij)`, b,
           !a ? `${kanaal} staat niet in de kanaaltotalen (niets in de periode)`
-            : `geen campagnetabel met een gemerkte totaalrij voor ${kanaal} (geen campagne die in de periode liep, een tabel met een vast venster, of een gekozen beurs)`,
-          null, BEKEND[KLANT]?.[kanaal] ?? null);
+            : `geen campagnetabel met een gemerkte totaalrij voor ${kanaal} (geen campagne die in de periode liep, een tabel met een vast venster, of een gekozen beurs)`);
       }
     }
   };
@@ -322,9 +305,7 @@ function beoordeel(v) {
   if (!a || !b) return { uitslag: "niet gemeten", tekst: `${v.plekA}: ${toon(a, v.a)}; ${v.plekB}: ${toon(b, v.b)}${v.reden ? ` (${v.reden})` : ""}` };
   if (v.nietVergelijkbaar) return { uitslag: "niet gemeten", tekst: `${v.plekA}: ${toon(a, v.a)}; ${v.plekB}: ${toon(b, v.b)} (${v.nietVergelijkbaar})` };
   const gelijk = gelijkBinnenAfronding(a, b);
-  const tekst = `${v.plekA}: ${toon(a, v.a)}  tegen  ${v.plekB}: ${toon(b, v.b)}`;
-  // Een bekend verschil blijft een verschil; de uitvoer zegt alleen wat er bekend is.
-  return { uitslag: gelijk ? "gelijk" : "verschil", tekst: !gelijk && v.bekend ? `${tekst}  [${v.bekend}; telt als fout]` : tekst };
+  return { uitslag: gelijk ? "gelijk" : "verschil", tekst: `${v.plekA}: ${toon(a, v.a)}  tegen  ${v.plekB}: ${toon(b, v.b)}` };
 }
 
 // ── Pagina's ophalen ────────────────────────────────────────────────────────
@@ -511,15 +492,6 @@ async function zelftest(browser) {
       && met({ campagnesDag: g["campagnes-per-kanaal"] }, "Kosten", `Campagnes nieuw, per dag ${DAGVENSTER} (kanaaltotalen, google)`, `Campagnes nieuw, per dag ${DAGVENSTER} (campagnetabel google`) === "gelijk"],
     ["Campagnes per kanaal, per dag: de pagina niet geopend is niet gemeten, niet weggelaten",
       met({ campagnesDag: null }, "Kosten", `Campagnes nieuw, per dag ${DAGVENSTER} (kanaaltotalen, per kanaal)`) === "niet gemeten"],
-    ["Campagnes per kanaal: een bekend verschil van de klant blijft FOUT en zegt dat het bekend is",
-      (() => {
-        const x = vergelijkingen({ ...basis, campagnes: g["campagnes-per-kanaal-anders"] })
-          .find((y) => y.wat === "Kosten" && y.plekA === "Campagnes nieuw (kanaaltotalen, meta)");
-        const b = x ? beoordeel(x) : null;
-        return KLANT === "demo-greentech" ? b?.uitslag === "verschil" && /bekend seedprobleem.*telt als fout/.test(b.tekst) : b?.uitslag === "verschil";
-      })()],
-    ["Campagnes per kanaal: Google, zonder bekend verschil, zegt niets over bekend",
-      !/bekend/.test(tekstMet({ campagnes: g["campagnes-per-kanaal"] }, "Kosten", "Campagnes nieuw (kanaaltotalen, google)", "Campagnes nieuw (campagnetabel google"))],
     ["dagVenster: 14 nov 2026 geeft 1 t/m 20 okt, 3 jan 2027 geeft 1 t/m 20 dec 2026",
       dagVenster(new Date(2026, 10, 14)) === "2026-10-01..2026-10-20" && dagVenster(new Date(2027, 0, 3)) === "2026-12-01..2026-12-20"],
     ["Jaardoel: 1.650 tegen de conversiekaart 1.650 is gelijk (niet de CPA-kaart ervoor)", uitslag("Jaardoel", "Prognose (conversions", "Doelen") === "gelijk"],

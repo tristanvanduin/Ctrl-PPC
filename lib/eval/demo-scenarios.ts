@@ -83,7 +83,7 @@ export const DEMO_SCENARIOS: readonly Scenario[] = [
   { id: "S7", titel: "Zaai-oogst (social naar brand)", kanaal: "cross", verwachtingen: [
     { soort: "moet", wat: "het verband tussen meer social-vertoningen en meer brand-klikken", groepen: [/zaai|oogst|halo|social|Meta|LinkedIn/i, /brand|merk/i, /klik|zoek|vraag|verkeer/i] },
   ] },
-  { id: "S8", titel: "Mix-shift / Simpson (LinkedIn-spend x3)", kanaal: "cross", verwachtingen: [
+  { id: "S8", titel: "Mix-shift / Simpson (LinkedIn-spend ruim x2)", kanaal: "cross", verwachtingen: [
     { soort: "moet", wat: "een blended CPA die stijgt door een verschuiving in de mix, niet door een slechter kanaal", groepen: [/mix|simpson|samenstelling|verschuiving|aandeel/i, /LinkedIn/i, /CPA/i] },
   ] },
   { id: "S9", titel: "Doelgroep-tegenspraak (Education buiten het ICP)", kanaal: "cross", verwachtingen: [

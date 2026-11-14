@@ -14,8 +14,9 @@
 //   [S5]  LinkedIn form drop-off     — GRT ABM: 10% completion op 60+ opens
 //   [S6]  LinkedIn CPL-druk          — GRT ABM: CPL +25% recent vs prior venster (leads + websiteconversies);
 //                                      "GreenTech Gids Downloads": kosten per websiteconversie +77%
-//   [S7]  Zaai-oogst (cross)         — social-vertoningen juni +40%, brand-klikken +18%
-//   [S8]  Mix-shift/Simpson (cross)  — LinkedIn-spend juni x3 (eigen CPA stabiel) => blended CPA stijgt
+//   [S7]  Zaai-oogst (cross)         — social-vertoningen in de laatste volle maand ~+50%, brand-klikken +18%
+//   [S8]  Mix-shift/Simpson (cross)  — LinkedIn-spend in die maand ruim x2 (eigen CPA stabiel) => blended CPA stijgt
+//         (beide via de campagne "GreenTech Najaarsoffensief"; het account is de som van de campagnes)
 //   [S9]  Doelgroep-tegenspraak      — LinkedIn-leads 75% uit "Education", buiten het Google-ICP
 //   [S10] Beursanalyse GRT           — aanloop 2026 ~35% achter op 2025 bij gelijke spend (effectiviteitsvraag)
 //   [S11] Beursanalyse GRA           — op koers (+10%) => geen actie
@@ -180,7 +181,7 @@ const META_CAMPAIGNS = [
 // jonge GRN-markt; de ads erven de AOV van hun campagne.
 const META_AOV: Record<string, number> = {
   "demo-mc-awareness": 140, "demo-mc-retargeting": 150, "demo-mc-traffic": 90, "demo-mc-leads": 160,
-  "demo-mc-gra-awareness": 175, "demo-mc-grn-leads": 105, "demo-meta-account": 130,
+  "demo-mc-gra-awareness": 175, "demo-mc-grn-leads": 105,
   "demo-ad-hero-a": 140, "demo-ad-lifestyle-b": 140, "demo-ad-banner-c": 150, "demo-ad-carousel-d": 150,
 };
 const metaAov = (entity: string): number => META_AOV[entity] ?? 130;
@@ -237,59 +238,84 @@ function metaPeriodReach(dagRijen: MetaDaily[]): Row[] {
     });
 }
 
-// Campagne-dagrijen lopen CAMPAGNE_DAGEN terug in plaats van 64: de objective-analyse (--check)
-// rekent alleen op VOLLE maanden, en met 64 dagen is dat er één. De signaalvensters (2 x 28
-// dagen) liggen ruim binnen dit bereik; alles ouder dan 28 dagen heeft de "prior"-waarden.
-const CAMPAGNE_DAGEN = 125;
+// Campagne-dagrijen lopen ACCOUNT_DAGEN terug, net als de accountrijen, want het account IS de
+// som van zijn campagnes (accountUitCampagnes hieronder). Tot 14 november liepen de campagnes 125
+// dagen terug en het account 160, en waren het twee losse verzinsels: in oktober 2026 telde Meta
+// € 17.015 in de campagnes tegen € 4.650 in het account, LinkedIn € 14.930 tegen € 9.300. Het
+// tabblad Campagnes telt per periode, en daar kwam een ander totaal uit dan op het Overzicht.
+//
+// Waarom de campagnes naar 160 dagen en niet het account naar 125: het Overzicht begon op 8 juni
+// en blijft daar beginnen, de cross-detectors [S7, S8] houden hun vier volle maanden, en de
+// objective-analyse krijgt er een volle maand bij. Alles ouder dan 28 dagen heeft de
+// "prior"-waarden, dus de signaalvensters (2 x 28 dagen) zien precies wat ze zagen.
+const ACCOUNT_DAGEN = 160;
 
-function metaCampaignDaily(): MetaDaily[] {
-  const rows: MetaDaily[] = [];
-  for (let d = CAMPAGNE_DAGEN - 1; d >= 0; d--) {
-    const date = addDays(TODAY, -d);
-    const recent = d < 28;
-    // [S2] Awareness-campagne: over 28 dagen frequentie 4.6 (META_PERIODE_FREQUENTIE), per dag 1.6.
-    rows.push({ entity: "demo-mc-awareness", date, imp: 3000, linkClicks: 28, spend: 100, conv: 4, freq: recent ? 1.6 : 1.3, hook: null, hold: null });
-    rows.push({ entity: "demo-mc-retargeting", date, imp: 2000, linkClicks: 18, spend: 55, conv: 2, freq: 1.2, hook: null, hold: null });
-    // Traffic: CTR zakt van 1,2% naar 0,6% terwijl besteding juist stijgt -- duurdere kliks voor
-    // hetzelfde resultaat, het cpc-rising-scenario voor OUTCOME_TRAFFIC.
-    rows.push({ entity: "demo-mc-traffic", date, imp: 4000, linkClicks: recent ? 24 : 48, spend: recent ? 220 : 150, conv: 3, freq: null, hook: null, hold: null });
-    // Leads: geen tweede Leads-campagne in de demo, dus geen CPL-baseline om tegen af te zetten
-    // (getest los in __meta_campaign_analysis_test.ts) -- hier gaat het om de manualChecks
-    // (form-completion, leadkwaliteit) die ook zonder baseline al relevant zijn.
-    rows.push({ entity: "demo-mc-leads", date, imp: 1800, linkClicks: 22, spend: 95, conv: 2, freq: null, hook: null, hold: null, leads: 1.6 });
-    // [S11-Meta] GRA: aanloop naar september, spend/kliks lopen geleidelijk op -- spiegelt de
-    // gezonde Google-koers voor dezelfde beurs.
-    rows.push({ entity: "demo-mc-gra-awareness", date, imp: recent ? 3600 : 2200, linkClicks: recent ? 34 : 19, spend: recent ? 140 : 80, conv: recent ? 5 : 2, freq: null, hook: null, hold: null });
-    // [S12-Meta] GRN: jonge campagne, pas de laatste 3 weken actief -- "eerste editie".
-    if (d < 21) rows.push({ entity: "demo-mc-grn-leads", date, imp: 900, linkClicks: 9, spend: 45, conv: 1, freq: null, hook: null, hold: null, leads: 0.7 });
-  }
-  return rows;
-}
-
-// Account-dagniveau voedt de blended view. 160 dagen => 4+ VOLLE maanden. De boosts zijn
-// op kalendermaand uitgelijnd (de detectors sluiten de lopende, halve maand uit): de golf
-// [S7] zit in de laatste volle maand en loopt door in de lopende maand.
+// De golfmaanden [S7, S8]: de laatste volle maand en de lopende. Op kalendermaand uitgelijnd, want
+// de cross-detectors vergelijken volle maanden (de lopende sluiten ze uit).
 const CUR_MONTH = TODAY.slice(0, 7);
 const PREV_FULL_MONTH = monthsBack(1).slice(0, 7);
 const isSurgeMonth = (date: string) => { const m = date.slice(0, 7); return m === CUR_MONTH || m === PREV_FULL_MONTH; };
 
-function metaAccountDaily(): MetaDaily[] {
+// De stappen na de klik, per campagne, in de verhoudingen die het account altijd had:
+// landingspagina = 5 x de conversies, winkelwagen 40% daarvan (in de laatste 28 dagen 24%: de
+// materiele drop-off voor de losse funnel-analyse), afrekenen 90% van de winkelwagens.
+// VOORBEELDEN, maar samenhangend: landingspagina >= winkelwagen >= afrekenen >= conversies, op elke
+// dag en in elke campagne, en de landingspagina blijft onder de linkklikken. Omdat elke campagne
+// dezelfde verhoudingen heeft, heeft hun som (het account) ze ook.
+const metaStappen = (conv: number, recent28: boolean) => {
+  const atc = Math.round(conv * (recent28 ? 1.2 : 2) * 100) / 100;
+  return { lpv: conv * 5, atc, ic: Math.round(atc * 0.9 * 100) / 100 };
+};
+
+function metaCampaignDaily(): MetaDaily[] {
   const rows: MetaDaily[] = [];
-  for (let d = 159; d >= 0; d--) {
+  const met = (r: MetaDaily, recent: boolean): MetaDaily => ({ ...r, ...metaStappen(r.conv, recent) });
+  for (let d = ACCOUNT_DAGEN - 1; d >= 0; d--) {
     const date = addDays(TODAY, -d);
-    const surge = isSurgeMonth(date);
-    // Funnel-fasen: landing->winkelwagen zakt in de laatste 28 dagen van 40% naar 24% (dezelfde
-    // relatieve daling van 40% als eerder; materiele drop-off voor de losse funnel-analyse).
-    // VOORBEELDEN, maar samenhangend: landingspagina >= winkelwagen >= afrekenen >= conversies, op
-    // elke dag. Eerder stonden hier 6 conversies op 4 (recent 2,4) gestarte afrekeningen: meer
-    // aankopen dan mensen die begonnen met afrekenen. De conversies (6) blijven gelijk, want die
-    // tellen in de demo-totalen; de winkelwagens en afrekeningen zijn erboven gelegd. Afrekenen is
-    // 90% van de winkelwagens, in beide vensters.
-    const recent28 = d < 28;
-    rows.push({ entity: "demo-meta-account", date, imp: surge ? 7000 : 5000, linkClicks: surge ? 63 : 45, spend: 150, conv: 6, freq: null, hook: null, hold: null, lpv: 30, atc: recent28 ? 7.2 : 12, ic: recent28 ? 6.48 : 10.8 });
+    const recent = d < 28;
+    // [S2] Awareness-campagne: over 28 dagen frequentie 4.6 (META_PERIODE_FREQUENTIE), per dag 1.6.
+    rows.push(met({ entity: "demo-mc-awareness", date, imp: 3000, linkClicks: 28, spend: 100, conv: 4, freq: recent ? 1.6 : 1.3, hook: null, hold: null }, recent));
+    rows.push(met({ entity: "demo-mc-retargeting", date, imp: 2000, linkClicks: 18, spend: 55, conv: 2, freq: 1.2, hook: null, hold: null }, recent));
+    // Traffic: CTR zakt van 1,2% naar 0,6% terwijl besteding juist stijgt -- duurdere kliks voor
+    // hetzelfde resultaat, het cpc-rising-scenario voor OUTCOME_TRAFFIC.
+    rows.push(met({ entity: "demo-mc-traffic", date, imp: 4000, linkClicks: recent ? 24 : 48, spend: recent ? 220 : 150, conv: 3, freq: null, hook: null, hold: null }, recent));
+    // Leads: geen tweede Leads-campagne in de demo, dus geen CPL-baseline om tegen af te zetten
+    // (getest los in __meta_campaign_analysis_test.ts) -- hier gaat het om de manualChecks
+    // (form-completion, leadkwaliteit) die ook zonder baseline al relevant zijn.
+    rows.push(met({ entity: "demo-mc-leads", date, imp: 1800, linkClicks: 22, spend: 95, conv: 2, freq: null, hook: null, hold: null, leads: 1.6 }, recent));
+    // [S11-Meta] GRA: aanloop naar september, spend/kliks lopen geleidelijk op -- spiegelt de
+    // gezonde Google-koers voor dezelfde beurs.
+    rows.push(met({ entity: "demo-mc-gra-awareness", date, imp: recent ? 3600 : 2200, linkClicks: recent ? 34 : 19, spend: recent ? 140 : 80, conv: recent ? 5 : 2, freq: null, hook: null, hold: null }, recent));
+    // [S12-Meta] GRN: jonge campagne, pas de laatste 3 weken actief -- "eerste editie".
+    if (d < 21) rows.push(met({ entity: "demo-mc-grn-leads", date, imp: 900, linkClicks: 9, spend: 45, conv: 1, freq: null, hook: null, hold: null, leads: 0.7 }, recent));
   }
   return rows;
 }
+
+/**
+ * Het account als som van zijn campagnes, per dag en per kolom. Een kolom die op een dag in geen
+ * enkele campagne gevuld is, blijft leeg (null) in plaats van 0: geen gemeten nul verzinnen. De
+ * overige kolommen (frequentie, hook rate, hold rate) zijn niet optelbaar en blijven leeg, zoals
+ * ze dat op accountniveau altijd waren. Afgerond op centen tegen zwevendekommaruis in de sommen.
+ */
+function accountUitCampagnes(campagneRijen: Row[], sleutel: string, accountId: string, kolommen: readonly string[]): Row[] {
+  const perDag = new Map<string, Row>();
+  for (const r of campagneRijen) {
+    const date = String(r.date);
+    const acc = perDag.get(date) ?? { client_id: r.client_id, date, [sleutel]: accountId };
+    for (const k of kolommen) {
+      const v = r[k];
+      if (v == null) { if (!(k in acc)) acc[k] = null; continue; }
+      acc[k] = Math.round((Number(acc[k] ?? 0) + Number(v)) * 100) / 100;
+    }
+    perDag.set(date, acc);
+  }
+  return [...perDag.values()].sort((a, b) => String(a.date).localeCompare(String(b.date)));
+}
+
+/** De optelbare kolommen per kanaal: wat het account van zijn campagnes erft (en wat de test toetst). */
+export const META_SOM_KOLOMMEN = ["impressions", "link_clicks", "spend", "conversions", "conversion_value", "landing_page_views", "add_to_cart", "initiate_checkout", "leads"] as const;
+export const LINKEDIN_SOM_KOLOMMEN = ["impressions", "clicks", "spend", "one_click_leads", "one_click_lead_form_opens", "external_website_conversions", "conversion_value", "video_starts", "video_completions"] as const;
 
 // Waar het budget heen gaat, per uitsplitsing (17.38: de opener op Meta Overzicht toont dit als
 // donut naast de kaart, net als CampaignTypeSplit bij Google -- die had precies dit euvel
@@ -341,10 +367,15 @@ const LI_CAMPAIGNS = [
   { urn: "urn:li:sponsoredCampaign:demo3", name: "GreenTech Gids Downloads", objective: "WEBSITE_VISITS" },
   { urn: "urn:li:sponsoredCampaign:demo4", name: "GreenTech Productvideo", objective: "VIDEO_VIEWS" },
   // GRA/GRN op LinkedIn -- voorheen bestond alleen GRT hier, dus was de beurs-scope voor GRA/GRN
-  // op LinkedIn altijd leeg. Toegevoegd aan het EIND (niet ertussenin): liCampaignDaily/liAccountDaily
-  // en het --check-blok verwijzen naar LI_CAMPAIGNS[0..3] op index, dus invoegen zou die verschuiven.
+  // op LinkedIn altijd leeg. Toegevoegd aan het EIND (niet ertussenin): liCampaignDaily en het
+  // --check-blok verwijzen naar LI_CAMPAIGNS[0..5] op index, dus invoegen zou die verschuiven.
   { urn: "urn:li:sponsoredCampaign:demo5", name: "GRA ABM Americas", objective: "LEAD_GENERATION" },
   { urn: "urn:li:sponsoredCampaign:demo6", name: "GRN Lead Gen NA", objective: "LEAD_GENERATION" },
+  // [S7, S8] De najaarsgolf: alleen actief in de golfmaanden (de laatste volle en de lopende). Hij
+  // droeg vroeger als losse "boost" op de accountrij, die niet bij de campagnes hoorde; nu het
+  // account de som van de campagnes is, moet de golf in een campagne zitten. Geen GRT/GRA/GRN in
+  // de naam, dus buiten de beurs-scope [S10-S12].
+  { urn: "urn:li:sponsoredCampaign:demo7", name: "GreenTech Najaarsoffensief", objective: "LEAD_GENERATION" },
 ];
 
 // Gemiddelde orderwaarde per LinkedIn-campagne -- eerder overal conversion_value:0. GRA (VS) sluit
@@ -354,7 +385,7 @@ const LI_CAMPAIGNS = [
 const LI_AOV: Record<string, number> = {
   "urn:li:sponsoredCampaign:demo1": 260, "urn:li:sponsoredCampaign:demo2": 220,
   "urn:li:sponsoredCampaign:demo5": 300, "urn:li:sponsoredCampaign:demo6": 190,
-  "demo-li-account": 240,
+  "urn:li:sponsoredCampaign:demo7": 240,
 };
 const liAov = (urn: string): number => LI_AOV[urn] ?? 240;
 
@@ -381,7 +412,8 @@ function liCampaignDaily(): LiDaily[] {
   const s4 = { leads: { cum: 0, vorig: 0 }, opens: { cum: 0, vorig: 0 }, conv: { cum: 0, vorig: 0 } };
   const s5 = { leads: { cum: 0, vorig: 0 }, opens: { cum: 0, vorig: 0 }, conv: { cum: 0, vorig: 0 } };
   const s2 = { conv: { cum: 0, vorig: 0 } };
-  for (let d = CAMPAGNE_DAGEN - 1; d >= 0; d--) {
+  const s6 = { leads: { cum: 0, vorig: 0 }, opens: { cum: 0, vorig: 0 }, conv: { cum: 0, vorig: 0 } };
+  for (let d = ACCOUNT_DAGEN - 1; d >= 0; d--) {
     const date = addDays(TODAY, -d);
     const recent = d < 28;
     // [S5]+[S6] GRT ABM: 10% form-completion op ruime opens; spend recent hoger bij gelijke leads => CPL +25%.
@@ -400,20 +432,12 @@ function liCampaignDaily(): LiDaily[] {
     rows.push({ urn: LI_CAMPAIGNS[4].urn, date, imp: recent ? 1800 : 1100, clicks: recent ? 28 : 16, spend: recent ? 130 : 70, leads: heelGetal(s4.leads, recent ? 0.6 : 0.3), opens: heelGetal(s4.opens, recent ? 2.0 : 1.2), conv: heelGetal(s4.conv, recent ? 0.5 : 0.2), vidStart: 0, vidDone: 0 });
     // [S12-LinkedIn] GRN: jonge campagne, pas de laatste 3 weken actief -- "eerste editie".
     if (d < 21) rows.push({ urn: LI_CAMPAIGNS[5].urn, date, imp: 600, clicks: 7, spend: 35, leads: heelGetal(s5.leads, 0.2), opens: heelGetal(s5.opens, 0.8), conv: heelGetal(s5.conv, 0.1), vidStart: 0, vidDone: 0 });
-  }
-  return rows;
-}
-
-function liAccountDaily(): LiDaily[] {
-  const rows: LiDaily[] = [];
-  const s = { leads: { cum: 0, vorig: 0 }, opens: { cum: 0, vorig: 0 }, conv: { cum: 0, vorig: 0 } };
-  for (let d = 159; d >= 0; d--) {
-    const date = addDays(TODAY, -d);
-    const surge = isSurgeMonth(date);
-    // [S8] Golf-maand: spend x3 met evenredig meer conversies => eigen CPA stabiel (~150),
-    // maar het blended gewicht verschuift naar het dure kanaal (mix-druk zichtbaar).
-    // [S7] Vertoningen mee omhoog: onderdeel van de zaai-golf.
-    rows.push({ urn: "demo-li-account", date, imp: surge ? 3400 : 2400, clicks: surge ? 62 : 45, spend: surge ? 300 : 100, leads: heelGetal(s.leads, surge ? 1.4 : 1.1), opens: heelGetal(s.opens, 5), conv: heelGetal(s.conv, surge ? 2.0 : 0.66), vidStart: 70, vidDone: 40 });
+    // [S7, S8] Najaarsoffensief, alleen in de golfmaanden. [S8] Hij verdubbelt ruwweg de
+    // LinkedIn-spend tegen dezelfde kosten per websiteconversie als de rest van LinkedIn (~€ 260),
+    // dus de eigen CPA van het kanaal blijft staan terwijl het blended gewicht naar het dure kanaal
+    // verschuift. [S7] Zijn vertoningen zijn de social-golf (~+50% over Meta en LinkedIn samen; zie --check).
+    // Verder gezond (completion 30%, CTR rond de mediaan), zodat de campagnedetectors stil blijven.
+    if (isSurgeMonth(date)) rows.push({ urn: LI_CAMPAIGNS[6].urn, date, imp: 8900, clicks: 160, spend: 400, leads: heelGetal(s6.leads, 1.4), opens: heelGetal(s6.opens, 4.6), conv: heelGetal(s6.conv, 1.55), vidStart: 0, vidDone: 0 });
   }
   return rows;
 }
@@ -598,7 +622,10 @@ export function buildAllRows(): Record<string, Row[]> {
   tables["meta_campaign_daily"] = metaCampaignDaily().map(metaBase);
   // Na meta_ad_daily en meta_campaign_daily: hun vertoningen zijn de teller van de periodefrequentie.
   tables["meta_period_reach"] = metaPeriodReach([...metaAdDaily(), ...metaCampaignDaily()]);
-  tables["meta_account_daily"] = metaAccountDaily().map(metaBase);
+  // Het account is de som van zijn campagnes, per dag (zie ACCOUNT_DAGEN): een totaal dat het
+  // Overzicht toont en een campagnetabel die iets anders optelt, kan niet meer.
+  tables["meta_account_daily"] = accountUitCampagnes(tables["meta_campaign_daily"], "entity_id", "demo-meta-account", META_SOM_KOLOMMEN)
+    .map((r) => ({ ...r, frequency: null, hook_rate: null, hold_rate: null }));
   tables["meta_breakdown_daily"] = metaBreakdownDaily();
 
   // LinkedIn-structuur + dagdata.
@@ -610,7 +637,7 @@ export function buildAllRows(): Record<string, Row[]> {
     conversion_value: Math.round(r.conv * liAov(r.urn) * 100) / 100, video_starts: r.vidStart, video_completions: r.vidDone,
   });
   tables["linkedin_campaign_daily"] = liCampaignDaily().map(liRow);
-  tables["linkedin_account_daily"] = liAccountDaily().map(liRow);
+  tables["linkedin_account_daily"] = accountUitCampagnes(tables["linkedin_campaign_daily"], "entity_urn", "demo-li-account", LINKEDIN_SOM_KOLOMMEN);
   tables["linkedin_urn_labels"] = LI_DEMO_FUNCTIONS.map((f) => ({ urn: f.urn, label: f.label, taxonomy: "function" }));
   const demoRows: Row[] = [];
   // leads is bigint (linkedin_demographic_daily); zelfde cumulatieve-afronding als heelGetal()
@@ -1287,7 +1314,12 @@ async function check() {
   if (failed > 0) process.exit(1);
 }
 
-const mode = process.argv[2];
-if (mode === "--sql") printSql(buildAllRows());
-else if (mode === "--check") check();
-else insertViaSupabase(buildAllRows());
+// Alleen als script: lib/demo/__seed_samenhang_test.ts importeert buildAllRows, en een import mag
+// nooit een insert starten (zelfde patroon als seed-geoclone-clients.ts).
+const isMain = typeof process.argv[1] === "string" && /seed-demo-client\.(ts|js)$/.test(process.argv[1]);
+if (isMain) {
+  const mode = process.argv[2];
+  if (mode === "--sql") printSql(buildAllRows());
+  else if (mode === "--check") check();
+  else insertViaSupabase(buildAllRows());
+}

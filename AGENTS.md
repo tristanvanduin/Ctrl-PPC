@@ -215,10 +215,10 @@ ontbreekt; geen enkel merkteken op Campagnes ook. De Google-campagnetabel op het
 (`campaign-table.tsx`) volgt in de nieuwe weergave dezelfde regels en merktekens; hij staat niet op
 dezelfde pagina als de kanaalrijen en wordt dus niet vergeleken.
 
-Op de demo is Meta en LinkedIn rood: hun campagnerijen tellen niet op tot hun accountrijen en
-beginnen later (een seedprobleem, niet van de code). `BEKEND` in het script zegt dat bij de regel,
-maar laat hem FOUT: een poort die om een bekende reden groen wordt, leert rood te negeren. Haal de
-regel weg zodra de seed gerepareerd is.
+In de demo-seed is het account van Meta en LinkedIn de som van zijn campagnes, per dag, vanaf
+dezelfde eerste dag (`accountUitCampagnes` in `scripts/demo/seed-demo-client.ts`, bewaakt door
+`lib/demo/__seed_samenhang_test.ts`). Een verschil tussen kanaaltotaal en campagnetabel is daar dus
+een fout in de code, geen seedprobleem.
 
 De verandering per campagne staat er alleen waar hij eerlijk is: beide periodes op dezelfde korrel,
 exact, en allebei op of na de eerste campagnerij van de bron (`bronStart`). Begint een periode

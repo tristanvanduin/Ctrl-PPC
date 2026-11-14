@@ -419,11 +419,9 @@ const vorig = { start: "2025-11-01", eind: "2025-11-02" };
   const seed = lees("scripts/demo/seed-demo-client.ts");
   check("de seed schrijft dezelfde Google-dagrijen (de browser leest de database, niet de mock)",
     /tables\["google_ads_checkout_funnel_daily"\] = checkoutPerDagUitCampagnes\(/.test(seed) && /google_ads_checkout_funnel_daily: "migratie 111/.test(seed));
-  const m = /lpv: (\d+), atc: recent28 \? ([\d.]+) : ([\d.]+), ic: recent28 \? ([\d.]+) : ([\d.]+) \}\);/.exec(seed);
-  const conv = /entity: "demo-meta-account".*?conv: (\d+)/.exec(seed);
-  check("seed Meta: samenhangend (afrekenen >= conversies, in beide vensters)", !!m && !!conv
-    && Number(m[1]) >= Number(m[3]) && Number(m[2]) >= Number(m[4]) && Number(m[3]) >= Number(m[5])
-    && Number(m[4]) >= Number(conv![1]) && Number(m[5]) >= Number(conv![1]), m?.[0] ?? "niet gevonden");
+  // "seed Meta: samenhangend" (landingspagina >= winkelwagen >= afrekenen >= conversies) staat in
+  // lib/demo/__seed_samenhang_test.ts: het Meta-account is daar de som van zijn campagnes, en de toets
+  // draait op de gebouwde rijen in plaats van op de brontekst van een accountregel die niet meer bestaat.
 }
 
 // ── De schakelaar ────────────────────────────────────────────────────────────────────────────────
