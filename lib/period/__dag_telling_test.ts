@@ -286,11 +286,12 @@ async function main() {
     const gepaardeSom = vv.perKanaal.filter((x) => x.gepaard).reduce((s, x) => s + x.gepaard!.huidig.adSpend, 0);
     check("maar niet in het percentage", vv.deltas.adSpend.huidig === gepaardeSom && vv.huidig.totaal.adSpend - gepaardeSom >= msHuidig - 1e-6,
       `${vv.deltas.adSpend.huidig} vs ${gepaardeSom}, ongepaard ${vv.ongepaard.join(",")}`);
-    // De regel voor elk kanaal: gepaard precies als beide periodes op of na zijn start beginnen.
-    // (Google telt hier per week, en de weekrijen van de demo beginnen pas in mei 2026: ook Google
-    // valt dan buiten het percentage, met dezelfde reden.)
+    // De regel voor elk kanaal: gepaard precies als beide periodes op of na zijn start beginnen, en
+    // beide even veel dagen tellen. (De weekrijen van de demo beginnen pas in mei 2026: het deel van
+    // Google daarvóór telt per hele maand, en hele maanden tegen weken valt buiten het percentage.)
     for (const x of vv.perKanaal) {
-      const moet = !!x.huidig?.bronStart && !!x.vorig?.bronStart && pm.start >= x.huidig.bronStart && vm.periode!.start >= x.vorig.bronStart;
+      const moet = !!x.huidig?.bronStart && !!x.vorig?.bronStart && pm.start >= x.huidig.bronStart && vm.periode!.start >= x.vorig.bronStart
+        && x.huidig.exact !== false && x.vorig.exact !== false;
       check(`${x.kanaal}: gepaard precies als beide periodes na de start beginnen`, (x.gepaard !== null) === moet && (moet || !!x.uitleg), `${x.huidig?.bronStart} ${x.uitleg}`);
     }
 

@@ -223,6 +223,9 @@ export function KanaalTrechter({ kanaal, trechter, uitleg, venster, children }: 
       </div>
       {trechter === null ? (
         <div className="h-32 rounded-lg bg-muted/40" aria-hidden />
+      ) : trechter.nietGelopen ? (
+        // Het kanaal was er in deze periode nog niet: een regel, geen rij nullen die als meting leest.
+        <p data-trechter-niet-gelopen className="text-body text-muted-foreground">{trechter.nietGelopen}</p>
       ) : (
         <>
           <div className="space-y-1.5" aria-hidden>

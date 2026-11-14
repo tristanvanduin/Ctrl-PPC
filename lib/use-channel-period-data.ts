@@ -11,7 +11,7 @@ import { monthsAgo } from "@/lib/reporting-date";
 import { HISTORIE_JAREN } from "@/lib/api/google-vergelijking";
 import { WACHT_MS, type Kanaal } from "@/lib/kanalen/beschikbaar";
 import {
-  HELE_HISTORIE_GELADEN_VANAF, NIET_GOOGLE, kanaalDagbron, kanaalStandUitDagen, kanaalStandUitMaanden, maandTotalenUitMaandreeks, samenvoegen,
+  HELE_HISTORIE_GELADEN_VANAF, MAANDEN_TERUG, NIET_GOOGLE, kanaalDagbron, kanaalStandUitDagen, kanaalStandUitMaanden, maandTotalenUitMaandreeks, samenvoegen,
   type KanaalStand, type NietGoogleKanaal,
 } from "@/lib/period/kanaal-maanden";
 import type { BlendedClientDataState } from "@/lib/use-blended-client-data";
@@ -87,7 +87,8 @@ const PAGINA = 1000;
 // Daarna 24 maanden, en dat was te kort: "Vorig jaar" tegen het jaar daarvoor loopt tot januari van
 // twee jaar terug (35 maanden), en de laatste twaalf maanden schuiven mee terug zodra de data
 // achterloopt. De band noemde de laadgrens dan "de data begint in" (review [5], [41]).
-const MAANDEN_TERUG = 36;
+// MAANDEN_TERUG staat in lib/period/kanaal-maanden.ts: de kaart in de demo leest dezelfde dagrijen
+// server-side (lib/demo/geo-demo-periode.ts) en hoort op dezelfde laadgrens te beginnen.
 
 /** Een "YYYY-MM-DD" uit een rij, of "" als hij er niet is. */
 const dagVan = (r: Record<string, unknown>): string => String(r.date ?? "").slice(0, 10);

@@ -18,7 +18,7 @@ import { Vensterlabel } from "@/components/ui/vensterlabel";
 // Eén gedeelde component i.p.v. de melding drie keer kopiëren (GeoBreakdown en GeoMapCard delen
 // hem; GeoRanglijstCard laat een enkel land wél stil vallen -- een ranglijst van één rij heeft
 // niets om te ranken en zou naast deze kaart pure herhaling zijn).
-export function GeoEnkelLandKaart({ channel, land, voorbehoud, voorbehoudUitleg }: {
+export function GeoEnkelLandKaart({ channel, land, voorbehoud, voorbehoudUitleg, perDag }: {
   channel: Channel;
   land: GeoAgg | null;
   /** Een voorbehoud bij deze cijfers ("zonder Microsoft"), uit de wereldkaart van de nieuwe weergave.
@@ -26,6 +26,9 @@ export function GeoEnkelLandKaart({ channel, land, voorbehoud, voorbehoudUitleg 
   voorbehoud?: string;
   /** Dat voorbehoud voluit, voor de uitleg bij het label. */
   voorbehoudUitleg?: string;
+  /** De nieuwe weergave: de kaart volgt de periodekiezer per dag. Dan zegt het label dat, en niet
+   *  het vaste venster van 180 dagen dat alleen de vertrouwde weergave heeft. */
+  perDag?: boolean;
 }) {
   return (
     <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
@@ -33,7 +36,9 @@ export function GeoEnkelLandKaart({ channel, land, voorbehoud, voorbehoudUitleg 
         <Globe2 className="w-4.5 h-4.5 text-brand-blue-ink" />
         <h3 className="text-title font-semibold text-brand-gray">Waar komt het vandaan</h3>
         <span className="text-micro font-medium text-muted-foreground bg-muted px-1.5 py-0.5 rounded">{CHANNEL_LABEL[channel]}</span>
-        {voorbehoud && <Vensterlabel soort="vast" venster="laatste 180 dagen" toevoeging={voorbehoud} toevoegingUitleg={voorbehoudUitleg} />}
+        {perDag
+          ? <Vensterlabel soort="periode" perDag toevoeging={voorbehoud} toevoegingUitleg={voorbehoudUitleg} />
+          : voorbehoud && <Vensterlabel soort="vast" venster="laatste 180 dagen" toevoeging={voorbehoud} toevoegingUitleg={voorbehoudUitleg} />}
       </div>
       {/* Deze kaart heeft geen lade waar de zin in kan staan, en is klein: hier staat hij open. */}
       {voorbehoudUitleg && <p className="border-b border-border px-5 py-2 text-micro leading-snug text-muted-foreground" data-venster-uitleg>{voorbehoudUitleg}</p>}

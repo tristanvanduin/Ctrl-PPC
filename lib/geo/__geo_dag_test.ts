@@ -1,18 +1,19 @@
 // De kaart per dag (nieuwe weergave): wat elk kanaal over de periode van de kiezer per land telde
 // (lib/geo/geo-dag.ts), de terugval van Google op de maanden alleen voor het deel vóór de dagopslag,
-// de verandering per land tegen de vergelijkingsperiode (ook met een ontbrekend land), de demo per
-// dag die optelt tot de bestaande demo-totalen, en dat /api/geo zonder periode precies het oude
-// antwoord geeft (de schakelaar uit).
+// de verandering per land tegen de vergelijkingsperiode (ook met een ontbrekend land), en dat
+// /api/geo zonder periode precies het oude antwoord geeft (de schakelaar uit).
 // Draaien: tsx --tsconfig ./tsconfig.json lib/geo/__geo_dag_test.ts
 
 import { NextRequest } from "next/server";
-import { geoVergelijking, somPerCode, telGeoKanaal, type GeoDagRij, type GeoKanaalTelling } from "./geo-dag";
-import { metaGeoDagen, resolveGeoPeriode, telGeoPeriode } from "./geo-periode";
+import { geoVergelijking, telGeoKanaal, type GeoDagRij, type GeoKanaalTelling } from "./geo-dag";
+import { metaGeoDagen, telGeoPeriode } from "./geo-periode";
 import { resolveGeo } from "./geo-source";
-import { geoDagRegels } from "./use-geo-breakdown";
-import { demoDag, demoGeoCountries, demoGeoDagen, demoGeoStates, DEMO_GEO_RECENT, type GeoAgg } from "../demo/geo-demo";
+import type { GeoAgg } from "../demo/geo-demo";
 import { DEMO_GREENTECH_ID } from "../demo/greentech-mock";
 import { GET } from "../../app/api/geo/route";
+
+// Nooit een echte database: de kaart van de demo leest met sleutels de geseede database (geo-periode.ts).
+for (const k of ["NEXT_PUBLIC_SUPABASE_URL", "SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY", "NEXT_PUBLIC_SUPABASE_ANON_KEY"]) delete process.env[k];
 
 let passed = 0, failed = 0;
 function check(label: string, cond: boolean, detail = ""): void {
@@ -101,38 +102,8 @@ async function main() {
     check("zonder vergelijking alleen totalen", zonder.vergelijking === null && zonder.kanalen[0].toen === null);
   }
 
-  console.log("De demo per dag");
-  {
-    const vandaag = demoDag(0);
-    const recentVan = demoDag(DEMO_GEO_RECENT - 1);
-    for (const kanaal of ["google", "meta", "linkedin"] as const) {
-      for (const [niveau, basis] of [["country", demoGeoCountries(kanaal)], ["region", demoGeoStates(kanaal)]] as const) {
-        const dagen = demoGeoDagen(kanaal, niveau);
-        const recent = somPerCode(dagen.filter((d) => d.date >= recentVan));
-        const ok = basis.every((b) => {
-          const s = recent.find((x) => x.code === b.code);
-          return !!s && s.cost === Math.round(b.cost) && s.conversions === Math.round(b.conversions) && s.clicks === Math.round(b.clicks);
-        });
-        check(`${kanaal}/${niveau}: de laatste ${DEMO_GEO_RECENT} dagen tellen exact op tot de demo-totalen`, ok && recent.length === basis.length);
-        check(`${kanaal}/${niveau}: geen dag in de toekomst`, dagen.every((d) => d.date <= vandaag));
-      }
-    }
-
-    // De kaart over de laatste 180 dagen, tegen dezelfde dagen een jaar eerder.
-    const periode = { start: recentVan, eind: vandaag };
-    const vergelijking = { start: demoDag(DEMO_GEO_RECENT - 1 + 364), eind: demoDag(364) };
-    const res = await resolveGeoPeriode({ clientId: DEMO_GREENTECH_ID, channel: "blended", periode, vergelijking });
-    const ms = res.kanalen.find((k) => k.kanaal === "microsoft")!;
-    check("Microsoft heeft in de demo geen landdata, en dat wordt gezegd", ms.nu.country.rows.length === 0 && ms.nu.country.opmerking === "Microsoft Ads heeft geen landdata.");
-    const regels = geoDagRegels(res.kanalen, "country", []);
-    check("de kaart zegt welk kanaal ontbreekt", regels.toevoeging === "zonder Microsoft Ads" && regels.regels.includes("Microsoft Ads heeft geen landdata."), JSON.stringify(regels));
-    const google = res.kanalen.find((k) => k.kanaal === "google")!;
-    check("Google in de demo per dag, zonder terugval", google.nu.country.label === null && google.nu.country.exact);
-    const v = geoVergelijking(res.kanalen.map((k) => k.nu.country), res.kanalen.flatMap((k) => (k.toen ? [k.toen.country] : [])), conv);
-    check("Frankrijk is dit jaar geopend: geen percentage, wel de reden", v.perCode.get("FR")?.pct === null && v.perCode.get("FR")?.reden === "geen data in de vergelijkingsperiode", JSON.stringify(v.perCode.get("FR")));
-    check("Nederland heeft een verandering", typeof v.perCode.get("NL")?.pct === "number");
-    check("Microsoft valt niet in de verandering (geen data nu, dus niet genoemd als buiten)", !v.gepaard.includes("microsoft"));
-  }
+  // De demo per dag staat in lib/demo/__geo_demo_periode_test.ts: de kaart telt daar op tot de
+  // kanaaltotalen van de kerncijfers, uit dezelfde rijen.
 
   console.log("/api/geo: zonder periode het oude antwoord, met periode per dag");
   {
@@ -141,11 +112,11 @@ async function main() {
     const verwacht = { country: await resolveGeo({ clientId: DEMO_GREENTECH_ID, channel: "google", level: "country" }), region: await resolveGeo({ clientId: DEMO_GREENTECH_ID, channel: "google", level: "region" }) };
     check("zonder van/tot: hetzelfde antwoord als voorheen (het vaste venster)",
       JSON.stringify(oud.niveaus) === JSON.stringify(verwacht) && oud.kanalen === undefined);
-    const nieuw = await (await vraag(`&van=${demoDag(9)}&tot=${demoDag(0)}`)).json();
-    check("met van/tot: per kanaal per dag", Array.isArray(nieuw.kanalen) && nieuw.kanalen[0].kanaal === "google" && nieuw.periode.start === demoDag(9));
+    const nieuw = await (await vraag("&van=2026-11-01&tot=2026-11-10")).json();
+    check("met van/tot: per kanaal per dag", Array.isArray(nieuw.kanalen) && nieuw.kanalen[0].kanaal === "google" && nieuw.periode.start === "2026-11-01");
     const fout = await vraag("&van=2026-11-10&tot=2026-11-01");
     check("een omgekeerde periode is een 400", fout.status === 400);
-    const vfout = await vraag(`&van=${demoDag(9)}&tot=${demoDag(0)}&vvan=2025-13-01&vtot=2025-11-10`);
+    const vfout = await vraag("&van=2026-11-01&tot=2026-11-10&vvan=2025-13-01&vtot=2025-11-10");
     check("een ongeldige vergelijking is een 400", vfout.status === 400);
   }
 

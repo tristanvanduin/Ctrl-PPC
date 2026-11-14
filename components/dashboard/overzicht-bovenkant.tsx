@@ -31,7 +31,7 @@ import { usePeriod } from "@/lib/period/period-context";
 import { bandDataStand } from "@/lib/period/band-stand";
 import { grafiekMaanden, kaartCijfers, kaartCijfersUitDagen, kaartDagRegel, kaartStand, kanaalTotalen } from "@/lib/overzicht/bovenkant";
 import {
-  bijdragePerKanaal, kanaalParenUitDagen, kanaalParenUitMaanden, statusRegel, tellersOver, tellersPerMaand, trechter,
+  bijdragePerKanaal, kanaalParenUitDagen, kanaalParenUitMaanden, nietGelopenInMaanden, statusRegel, tellersOver, tellersPerMaand, trechter,
   type KanaalStand, type Tellers,
 } from "@/lib/overzicht/trechter";
 import { comparePeriods } from "@/lib/period/apply-period";
@@ -40,6 +40,7 @@ import { alsMaandPeriode, formatDagPeriode, uitMaandPeriode, type DagPeriode } f
 import { ketenNaDeKlik, naDeKlikPerStap, telKanaalStappen } from "@/lib/overzicht/conversiestappen";
 import { useConversiestappen } from "@/lib/overzicht/use-conversiestappen";
 import { useDagTelling } from "@/lib/period/use-dag-telling";
+import { nogNietGelopen } from "@/lib/period/dag-telling";
 import { opbouwVertraging, useEersteOpbouw } from "@/lib/beweging";
 import { heeftGecachteInstellingen, loadClientSettings } from "@/lib/client-settings";
 import { INSTELLINGEN_WACHT_MS } from "@/lib/client-data-provider";
@@ -262,12 +263,16 @@ function OverzichtBovenkantRuw({ clientId, channel, kanalen, onKies, onBeoordeel
     if (dagPad) {
       const alle = dagTelling.alle;
       const t = alle ? (alle.vergelijking?.huidig ?? alle.alleen)?.perKanaal.find((x) => x.kanaal === trechterKanaal) : null;
-      return t ? { totalen: t.totalen, tellers: t.tellers } : null;
+      // Liep het kanaal in deze periode nog niet, dan een regel in plaats van een rij nullen.
+      return t ? { totalen: t.totalen, tellers: t.tellers, nietGelopen: nogNietGelopen(t) } : null;
     }
     const bron = band.perKanaal[trechterKanaal];
     // Wacht op de route zolang die nog laadt: anders stond er eerst "niet bekend" bij de klikken.
     if (!bron || (route.perKanaal === null && route.loading)) return null;
-    return { totalen: kanaalTotalen(bron, periode.range), tellers: tellersOver(tellersPerKanaal[trechterKanaal], monthsIn(periode.range)) };
+    return {
+      totalen: kanaalTotalen(bron, periode.range), tellers: tellersOver(tellersPerKanaal[trechterKanaal], monthsIn(periode.range)),
+      nietGelopen: nietGelopenInMaanden(trechterKanaal, bron, periode.range),
+    };
   }, [trechterKanaal, bandKlaar, dagPad, dagTelling.alle, band.perKanaal, route.perKanaal, route.loading, tellersPerKanaal, periode.range]);
   const trechterVergelijk = trechterKanaal ? paren?.find((p) => p.kanaal === trechterKanaal) ?? null : null;
   // Het venster van de trechter op een dagperiode: wat het kanaal WERKELIJK telde. Google telt een
@@ -310,9 +315,10 @@ function OverzichtBovenkantRuw({ clientId, channel, kanalen, onKies, onBeoordeel
       return m ? tellersOver(tellersPerKanaal.google, monthsIn(m))?.clicks ?? null : null;
     };
     const { p, v } = stapVensters;
+    const perMaand = tellersPerKanaal.google ?? null;
     return lijst.map((k) => ketenNaDeKlik(
-      telKanaalStappen(k, p, stapBron.trechter, stapBron.rijen, googleKlikken(p)),
-      v ? telKanaalStappen(k, v, stapBron.trechter, stapBron.rijen, googleKlikken(v)) : null,
+      telKanaalStappen(k, p, stapBron.trechter, stapBron.rijen, googleKlikken(p), perMaand),
+      v ? telKanaalStappen(k, v, stapBron.trechter, stapBron.rijen, googleKlikken(v), perMaand) : null,
     ));
   }, [stapBron, stapVensters, lijst, tellersPerKanaal]);
   const naDeKlik = useMemo(() => (ketens ? naDeKlikPerStap(ketens) : null), [ketens]);

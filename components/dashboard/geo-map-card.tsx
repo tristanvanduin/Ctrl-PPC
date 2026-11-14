@@ -59,7 +59,7 @@ export function GeoMapCard({ state, channel = "google", verdieping, naast, voet,
   // vaakst.
   // Het voorbehoud bij het venster gaat mee: deze stand heeft geen eigen kop met een vensterlabel, en
   // zonder stond "zonder Microsoft" bij een klant met één land nergens meer.
-  if (eenLandOfMinder) return <GeoEnkelLandKaart channel={channel} land={countries[0] ?? null} voorbehoud={toevoeging} voorbehoudUitleg={toevoegingUitleg} />;
+  if (eenLandOfMinder) return <GeoEnkelLandKaart channel={channel} land={countries[0] ?? null} voorbehoud={toevoeging} voorbehoudUitleg={toevoegingUitleg} perDag={!!dagVenster} />;
 
   // De kolom ernaast alleen als de ranglijst iets toont: zonder rijen voor de gekozen metriek stond
   // er rechts een leeg omrand vak naast "Geen data voor deze metric".

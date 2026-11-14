@@ -28,8 +28,8 @@
 //
 // Zuiver en zonder React, zodat lib/overzicht/__trechter_test.ts het zonder pagina kan toetsen.
 
-import { delta, gepaardeTotalen, type BronReeks, type PeriodDelta, type Totalen } from "@/lib/period/apply-period";
-import { formatRange, monthsIn, type Month, type PeriodRange } from "@/lib/period/period-range";
+import { bronStart, delta, gepaardeTotalen, type BronReeks, type PeriodDelta, type Totalen } from "@/lib/period/apply-period";
+import { formatRange, monthIndex, monthsIn, type Month, type PeriodRange } from "@/lib/period/period-range";
 import type { DagVergelijkingTelling, Tellers } from "@/lib/period/dag-telling";
 import { somVergelijking, verhoudingVergelijking } from "@/lib/period/vergelijkbaar-deel";
 import { ALLE_KANALEN, KANAAL_NAAM, type Kanaal, type Kanaalkeuze } from "@/lib/kanalen/beschikbaar";
@@ -51,6 +51,11 @@ export interface KanaalStand {
   totalen: Totalen;
   /** Null als de bron de vertoningen en klikken niet kent: dan staan die stappen er "niet bekend". */
   tellers: Tellers | null;
+  /**
+   * De regel als het kanaal in deze periode nog niet liep (nogNietGelopen in dag-telling.ts, of
+   * nietGelopenInMaanden hieronder): dan toont de trechter die regel en geen rij nullen.
+   */
+  nietGelopen?: string | null;
 }
 
 /** Wat van een kanaal in de vergelijking zit: de gepaarde maanden of dagen, aan beide kanten. */
@@ -272,6 +277,12 @@ export interface Trechter {
   /** Of en hoe er vergeleken is: niet, over de hele periode, of over een deel (`over`). */
   vergelijking: "geen" | "heel" | "deel";
   over: string | null;
+  /**
+   * "Meta liep in deze periode nog niet; eerste dag met data: 7 jun 2026": het kanaal was er nog
+   * niet. Dan staat deze regel er in plaats van de stappen: vertoningen 0 en "kosten per 1.000
+   * vertoningen niet te berekenen" lazen als een gemeten nul. Null als het kanaal liep, ook met nul.
+   */
+  nietGelopen: string | null;
 }
 
 const PER_DUIZEND = 1000;
@@ -324,7 +335,10 @@ export function trechter(getoond: KanaalStand, paar: KanaalPaar | null): Trechte
   const opmerkingen: string[] = [];
   const [imp, klik] = nu.waarden;
   const conv = getoond.totalen.conversions;
-  if (getoond.tellers === null) {
+  const nietGelopen = getoond.nietGelopen ?? null;
+  if (nietGelopen) {
+    // Geen opmerkingen over nullen: er is niets gemeten, en de regel zegt waarom.
+  } else if (getoond.tellers === null) {
     opmerkingen.push("Vertoningen en klikken zijn voor deze periode niet bekend; hier staan alleen de conversies en de kosten.");
   } else if (!imp && !klik && !conv) {
     opmerkingen.push("Geen vertoningen, klikken of conversies in deze periode.");
@@ -343,9 +357,25 @@ export function trechter(getoond: KanaalStand, paar: KanaalPaar | null): Trechte
       { label: "Conversieratio", waarde: nu.cr, vorig: pt?.cr ?? null },
     ],
     opmerkingen,
-    vergelijking: !paar ? "geen" : paar.heel ? "heel" : "deel",
-    over: paar?.over ?? null,
+    vergelijking: !paar || nietGelopen ? "geen" : paar.heel ? "heel" : "deel",
+    over: nietGelopen ? null : paar?.over ?? null,
+    nietGelopen,
   };
+}
+
+/**
+ * Over hele maanden (de weg van de band): de regel als het kanaal in de hele periode nog niet liep,
+ * dus als zijn eerste maand met data (bronStart van de reeks) na de periode ligt en er in de periode
+ * geen enkele maandrij is. Bij een dagkanaal is een maandrij met alleen nullen een gemeten maand (de
+ * reeks heeft alleen maanden met dagrijen): dan liep het kanaal, en staan de nullen er, net als bij
+ * nogNietGelopen in dag-telling.ts. Google niet: zijn maandreeks wordt per jaar aangevuld met
+ * nulmaanden (buildClientDataFromApi), dus daar zegt een nulmaand niets. Null anders.
+ */
+export function nietGelopenInMaanden(kanaal: Kanaal, bron: BronReeks, periode: PeriodRange): string | null {
+  const { start } = bronStart(bron);
+  if (!start || monthIndex(start) <= monthIndex(periode.end)) return null;
+  if (kanaal !== "google" && monthsIn(periode).some((m) => bron.maanden.has(m))) return null;
+  return `${KANAAL_NAAM[kanaal]} liep in deze periode nog niet; eerste maand met data: ${formatRange({ start, end: start })}.`;
 }
 
 /**

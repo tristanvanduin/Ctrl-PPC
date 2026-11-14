@@ -35,6 +35,10 @@ export const CONVERSIE_KANAAL: Record<NietGoogleKanaal, ChannelConversionChannel
   microsoft: "microsoft_ads",
 };
 
+/** Hoeveel maanden dagrijen per kanaal geladen worden (fetchKanaalRijen in use-channel-period-data.ts,
+ *  en de kaart in de demo): de start van een kanaal komt uit deze rijen, dus overal dezelfde grens. */
+export const MAANDEN_TERUG = 36;
+
 /** De dagtabel en de select-lijst van een kanaal, zoals elke lezer van die tabel ze gebruikt. */
 export function kanaalDagbron(kanaal: NietGoogleKanaal): { table: string; select: string } {
   const ck = CONVERSIE_KANAAL[kanaal];

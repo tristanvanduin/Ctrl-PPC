@@ -618,7 +618,7 @@ export function ClientDashboard({ client, bewaardeWeergave = null, kanaalbalkVan
   // Periode en Vergelijk met, met de events van de klant en vrije datums. Met de schakelaar uit de
   // vertrouwde kiezer, precies zoals hij was.
   const periodeKiezer = kiezerHier.toon && nieuweWeergave ? (
-    <PeriodeKiezer scope={`client-${client.id}`} clientId={client.id} events={eventPeriodes} kanalen={kanalen ?? GEEN_KANALEN} laden={!bandKlaar}
+    <PeriodeKiezer scope={`client-${client.id}`} clientId={client.id} events={eventPeriodes} kanalen={kanalen ?? GEEN_KANALEN} googleData={googleData} laden={!bandKlaar}
       onNaarEvents={() => setActiveTab("settings")} />
   ) : kiezerHier.toon ? (
     <DashboardPeriodPicker klaar={bandKlaar} jaarlijkseEditie={upcomingEdition?.cadence === "annual"} snelVanafTablet={nieuweWeergave} />

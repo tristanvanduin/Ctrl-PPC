@@ -50,21 +50,26 @@ export function dagStart(eersteDagRij: Dag | null): Dag | null {
  * Splitst een periode op de dagopslag. `eersteDagRij` is de vroegste dag met een rij in de dagtabel
  * (over ALLE rijen, niet alleen die van de periode), of null als er geen dagopslag is: dan telt de
  * hele periode per maand.
+ *
+ * `opslag` "week": dezelfde regel voor Google zonder dagrijen, met de eerste weekrij als grens
+ * (telGoogle in dag-telling.ts). Alleen het label zegt dan "per week" en "de weekcijfers".
  */
-export function splitsOpDagOpslag(p: DagPeriode, eersteDagRij: Dag | null): DagOpslagSplitsing {
+export function splitsOpDagOpslag(p: DagPeriode, eersteDagRij: Dag | null, opslag: "dag" | "week" = "dag"): DagOpslagSplitsing {
   // Op of na de eerste dagrij: de dagrijen dekken de hele periode, er valt niets terug.
   const start = eersteDagRij !== null && p.start >= eersteDagRij ? p.start : dagStart(eersteDagRij);
   const dagDeel = start === null ? null : start <= p.start ? p : start <= p.eind ? { start, eind: p.eind } : null;
   const maandDeel = start === null ? p : start > p.start ? { start: p.start, eind: start <= p.eind ? addDays(start, -1) : p.eind } : null;
   const maanden = maandDeel ? omhullendeMaanden(maandDeel) : null;
   const maandenRuimer = !!maandDeel && !!maanden && (!maandDeel.start.endsWith("-01") || maandDeel.eind !== laatsteDagVanMaand(maanden.end));
-  return { dagDeel, maandDeel, maanden, maandenRuimer, label: terugvalLabel(dagDeel, maanden, maandenRuimer, start !== null) };
+  return { dagDeel, maandDeel, maanden, maandenRuimer, label: terugvalLabel(dagDeel, maanden, maandenRuimer, start !== null, opslag) };
 }
 
-function terugvalLabel(dagDeel: DagPeriode | null, maanden: PeriodRange | null, ruimer: boolean, heeftOpslag: boolean): string | null {
+function terugvalLabel(dagDeel: DagPeriode | null, maanden: PeriodRange | null, ruimer: boolean, heeftOpslag: boolean, opslag: "dag" | "week"): string | null {
   if (!maanden) return null;
-  const waarom = heeftOpslag ? "voor de dagopslag begon" : "er is nog geen dagopslag";
+  const waarom = opslag === "dag"
+    ? (heeftOpslag ? "voor de dagopslag begon" : "er is nog geen dagopslag")
+    : (heeftOpslag ? "voor de weekcijfers begonnen" : "er zijn geen weekcijfers");
   const heel = ruimer ? " (hele maanden: een maand wordt niet naar rato verdeeld)" : "";
   const maandTekst = `${formatRangeKort(maanden)} per maand, ${waarom}${heel}`;
-  return dagDeel ? `${formatDagPeriode(dagDeel)} per dag; ${maandTekst}` : maandTekst;
+  return dagDeel ? `${formatDagPeriode(dagDeel)} per ${opslag}; ${maandTekst}` : maandTekst;
 }

@@ -135,7 +135,7 @@ export function kaartCijfersUitDagen(
 /** De regel op een kanaalkaart bij een periode per dag: hoe fijn hij telt, en de verandering of
  *  waarom hij buiten het percentage valt. */
 export interface KaartDagRegel {
-  fijnheid: "per dag" | "per week" | "per maand" | "per dag en maand";
+  fijnheid: "per dag" | "per week" | "per maand" | "per dag en maand" | "per week en maand";
   /** "+12,4% conversies", of null zonder vergelijking of zonder paar. */
   delta: string | null;
   /** Waarom het kanaal buiten het percentage valt, of wat er anders geteld is; anders null. */
@@ -151,14 +151,16 @@ const PROCENT = new Intl.NumberFormat("nl-NL", { minimumFractionDigits: 1, maxim
  * over de gepaarde conversies, zoals het percentage in de tegels.
  */
 export function kaartDagRegel(
-  telling: { fijnheid: "dag" | "week" | "maand" | "dag+maand"; uitleg: string | null } | null,
+  telling: { fijnheid: "dag" | "week" | "maand" | "dag+maand" | "week+maand"; uitleg: string | null } | null,
   vergelijking: { gepaard: { huidig: Totalen; vorig: Totalen } | null; uitleg: string | null } | null,
   metVergelijking: boolean,
 ): KaartDagRegel | null {
   if (!telling) return null;
   const fijnheid = telling.fijnheid === "dag" ? "per dag" : telling.fijnheid === "week" ? "per week"
     // Google per dag, met het deel vóór de dagopslag per maand: de uitleg zegt welk deel hoe.
-    : telling.fijnheid === "dag+maand" ? "per dag en maand" : "per maand";
+    : telling.fijnheid === "dag+maand" ? "per dag en maand"
+    // Google zonder dagrijen per week, met het deel vóór de eerste weekrij per maand.
+    : telling.fijnheid === "week+maand" ? "per week en maand" : "per maand";
   if (!metVergelijking) return { fijnheid, delta: null, uitleg: telling.uitleg, buiten: false };
   const g = vergelijking?.gepaard ?? null;
   if (!g) return { fijnheid, delta: null, uitleg: vergelijking?.uitleg ?? null, buiten: true };

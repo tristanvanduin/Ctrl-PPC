@@ -3,8 +3,7 @@
 import { useState, useEffect } from "react";
 import { getAllClients, type Client } from "./clients";
 import { type ClientHistoricalData } from "./types";
-import { buildClientDataFromApi, googleKlantnummer, type ApiMonthlyData, type ApiWeeklyData, type YearDataInput } from "./api/adapter";
-import { today } from "./reporting-date";
+import { googleDataUitAntwoord, googleKlantnummer, type GoogleAntwoord } from "./api/adapter";
 import { maakZaadbak, type Zaad } from "./overzicht/zaadbak";
 
 export interface ConversionAction {
@@ -145,33 +144,10 @@ interface ApiCampaignRow {
 const cache = new Map<string, { data: ClientDataState; timestamp: number }>();
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
-/**
- * Het lichaam van /api/google-ads/client-data zoals de browser het leest (res.json()). Alleen de
- * velden die hier gelezen worden zijn benoemd; de rest gaat ongezien door naar de staat.
- */
-export type GoogleAntwoord = Record<string, unknown> & { error?: string };
-
-/**
- * De Google-reeks uit het antwoord van de route: precies wat deze hook altijd bouwde. Los, zodat de
- * kerncijfers die de server al in de HTML zet (components/dashboard/band-uit-zaad.tsx) dezelfde
- * reeks uit hetzelfde antwoord bouwen, en niet een tweede vertaling die ergens anders afrondt.
- */
-export function googleDataUitAntwoord(clientId: string, apiData: GoogleAntwoord): ClientHistoricalData {
-  return {
-    ...buildClientDataFromApi(
-      clientId,
-      (apiData.historicalYears as YearDataInput[]) ?? [],
-      (apiData.currentYearMonthly as ApiMonthlyData[]) ?? [],
-      (apiData.currentYearWeekly as ApiWeeklyData[]) ?? [],
-      apiData.targetCurrentYear as Parameters<typeof buildClientDataFromApi>[4],
-      (apiData.currentYear as number | undefined) ?? Number(today().slice(0, 4)),
-      apiData.realizedThroughMonth as number,
-    ),
-    // Tot waar de route de data definitief acht. Het venster van de KPI-band eindigt hierop;
-    // zonder (een oudere route) volgen de presets de kalender.
-    dataStand: (apiData.dataStand as ClientHistoricalData["dataStand"]) ?? null,
-  };
-}
+// De Google-reeks uit het antwoord van de route staat in lib/api/adapter.ts (googleDataUitAntwoord):
+// zonder "use client", zodat ook een serverroute (de kaart in de demo, lib/demo/geo-demo-periode.ts)
+// precies dezelfde reeks bouwt als deze hook.
+export { googleDataUitAntwoord, type GoogleAntwoord };
 
 // Het antwoord dat de server met de pagina meestuurde (lib/overzicht/zaad-server.ts), op dezelfde
 // manier als de blended route (lib/use-blended-client-data.ts): de eerste ophaalronde van een klant

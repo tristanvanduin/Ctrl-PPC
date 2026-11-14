@@ -25,7 +25,7 @@ import { KANAAL_NAAM, type Kanaal } from "@/lib/kanalen/beschikbaar";
 import type { ClientHistoricalData } from "@/lib/types";
 import { NIET_GOOGLE, type NietGoogleKanaal } from "./kanaal-maanden";
 import {
-  telDagPeriode, telDagVergelijking,
+  eersteWeekRij, telDagPeriode, telDagVergelijking,
   type DagTelInvoer, type DagTelling, type DagVergelijkingTelling, type GoogleDagRij, type GoogleWeekRij, type Tellers,
 } from "./dag-telling";
 import type { Month } from "./period-range";
@@ -45,13 +45,26 @@ interface DagBronnen {
 // Per klant en kanalenset één lezing, ook als twee blokken tegelijk vragen.
 const bronnen = new Map<string, Promise<DagBronnen>>();
 
-async function laadWeken(clientId: string): Promise<GoogleWeekRij[]> {
+async function laadWekenRuw(clientId: string): Promise<GoogleWeekRij[]> {
   const { data, error } = await dbSelect<GoogleWeekRij>("ads_account_weekly", {
     select: "week_start,impressions,clicks,cost,conversions,conversions_value", clientId,
     order: { column: "week_start", ascending: false }, limit: 1000,
   });
   if (error) throw new Error(error.message);
   return data;
+}
+
+// De weekrijen van Google per klant één keer: de telling en de regel in de periodekiezer lezen
+// dezelfde rijen, dus dezelfde eerste week. Een fout wordt niet bewaard.
+const googleWeken = new Map<string, Promise<GoogleWeekRij[]>>();
+
+function laadWeken(clientId: string): Promise<GoogleWeekRij[]> {
+  const er = googleWeken.get(clientId);
+  if (er) return er;
+  const belofte = laadWekenRuw(clientId);
+  belofte.catch(() => googleWeken.delete(clientId));
+  googleWeken.set(clientId, belofte);
+  return belofte;
 }
 
 // Een pagina per verzoek: de database geeft er niet meer dan dit in een antwoord.
@@ -113,6 +126,26 @@ export function useGoogleDagStart(clientId: string | null, actief: boolean): Dag
     return () => { weg = true; };
   }, [clientId, actief]);
   return stand && stand.clientId === clientId ? stand.eerste : undefined;
+}
+
+/**
+ * Waar de weekrijen van Google beginnen (eersteWeekRij), voor de regel in de periodekiezer: zonder
+ * dagopslag telt Google het deel van een periode vóór de eerste weekrij per hele maand
+ * (telGoogleZonderDagen), en dan moet de regel dat ook zeggen. `{ eersteWeek: null }` zonder
+ * weekrijen, null als ze niet te laden waren, undefined zolang het laadt.
+ */
+export function useGoogleWeekStart(clientId: string | null, actief: boolean): { eersteWeek: Dag | null } | null | undefined {
+  const [stand, setStand] = useState<{ clientId: string; uit: { eersteWeek: Dag | null } | null } | null>(null);
+  useEffect(() => {
+    if (!actief || !clientId) return;
+    let weg = false;
+    laadWeken(clientId).then(
+      (r) => { if (!weg) setStand({ clientId, uit: { eersteWeek: eersteWeekRij(r) } }); },
+      () => { if (!weg) setStand({ clientId, uit: null }); },
+    );
+    return () => { weg = true; };
+  }, [clientId, actief]);
+  return stand && stand.clientId === clientId ? stand.uit : undefined;
 }
 
 function laadBronnen(clientId: string, kanalen: readonly Kanaal[]): Promise<DagBronnen> {

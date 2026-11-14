@@ -5,7 +5,6 @@
 // vertellen heeft. Puur presentatie — nooit vermengd met echte data; alleen actief in demo-modus.
 
 import { splitAlong, splitInt } from "./split";
-import type { GeoDagRij } from "@/lib/geo/geo-dag";
 
 export interface GeoAgg {
   code: string; // alpha-2 land óf USPS-staat
@@ -296,85 +295,7 @@ export function geoYoyMonthly(agg: GeoAgg, months: string[]): GeoYoyPct[] | null
 }
 
 // ── Per dag (de kaart in de nieuwe weergave) ───────────────────────────────
-// VOORBEELDEN, geen echte cijfers: dezelfde markten per dag, zodat de kaart in de nieuwe weergave
-// elke periode van de kiezer per dag kan volgen, met een vergelijking per land.
-//
-// Twee eigenschappen, en die zijn het punt:
-// 1. De laatste DEMO_GEO_RECENT dagen tellen per kanaal en per code EXACT op tot de totalen van
-//    demoGeoCountries/demoGeoStates hierboven (splitInt, grootste rest): wie die dagen optelt, krijgt
-//    precies wat de vertrouwde kaart over zijn 180 dagen toont.
-// 2. Daarvóór loopt de reeks door tot twee jaar, op het niveau van het vorige jaar
-//    (COUNTRY_PRIOR_YEAR, anders 0,9). Frankrijk begint pas binnen het recente venster: die markt is
-//    dit jaar geopend, dus een vergelijking met vorig jaar heeft daar geen percentage maar een reden.
-// Het verloop per dag draagt een weekdagpatroon (Google en LinkedIn lichter in het weekend, Meta
-// juist niet), Black Friday (21 nov t/m 1 dec) en de twee weken voor elke beurs (GreenTech
-// Amsterdam half juni, Americas half september, North America begin november), zodat de demo-events
-// op de kaart terug te zien zijn als je ze als periode kiest.
-
-export const DEMO_GEO_RECENT = 180;
-const DEMO_GEO_DAGEN = 730;
-const DAG_MS = 86_400_000;
-
-/** De dag `terug` dagen voor vandaag, in UTC zoals de rest van de demo (lib/demo/demo-rows.ts). */
-export function demoDag(terug: number): string {
-  const n = new Date();
-  return new Date(Date.UTC(n.getUTCFullYear(), n.getUTCMonth(), n.getUTCDate()) - terug * DAG_MS).toISOString().slice(0, 10);
-}
-
-/** De beursdagen (maand-dag) uit de demo-instellingen: de twee weken ervoor draait er meer. */
-const BEURS_DAGEN = ["06-11", "09-15", "11-04"];
-
-function dagGewicht(dag: string, kanaal: Exclude<Channel, "blended">, i: number): number {
-  const d = new Date(`${dag}T00:00:00Z`);
-  const weekend = d.getUTCDay() === 0 || d.getUTCDay() === 6;
-  const weekdag = weekend ? (kanaal === "meta" ? 1.08 : kanaal === "linkedin" ? 0.45 : 0.72) : 1;
-  const md = dag.slice(5);
-  const blackFriday = (md >= "11-21" && md <= "11-30") || md === "12-01" ? 1.55 : 1;
-  const beurs = BEURS_DAGEN.some((b) => {
-    const tot = Date.parse(`${dag.slice(0, 4)}-${b}T00:00:00Z`) - d.getTime();
-    return tot >= 0 && tot <= 14 * DAG_MS;
-  }) ? 1.35 : 1;
-  return weekdag * blackFriday * beurs * (1 + 0.1 * Math.sin(i * 0.7 + kanaal.length));
-}
-
-function verdeel(a: GeoAgg, dagen: string[], gewichten: number[]): GeoDagRij[] {
-  const imp = splitInt(Math.round(a.impressions), gewichten);
-  const clk = splitInt(Math.round(a.clicks), gewichten);
-  const cost = splitInt(Math.round(a.cost), gewichten);
-  const conv = splitInt(Math.round(a.conversions), gewichten);
-  const val = splitAlong(Math.round(a.conversionsValue), conv, gewichten);
-  return dagen.map((date, i) => ({ date, code: a.code, impressions: imp[i], clicks: clk[i], cost: cost[i], conversions: conv[i], conversionsValue: val[i] }));
-}
-
-const dagCache = new Map<string, GeoDagRij[]>();
-
-/** De demo-markten per dag over twee jaar, voor één kanaal en niveau. Microsoft heeft er geen. */
-export function demoGeoDagen(kanaal: Exclude<Channel, "blended">, niveau: "country" | "region"): GeoDagRij[] {
-  const vandaag = demoDag(0);
-  const sleutel = `${vandaag}|${kanaal}|${niveau}`;
-  const bewaard = dagCache.get(sleutel);
-  if (bewaard) return bewaard;
-  const basis = niveau === "region" ? STATE_BASE[kanaal] : COUNTRY_BASE[kanaal];
-  const recent = Array.from({ length: DEMO_GEO_RECENT }, (_, i) => demoDag(DEMO_GEO_RECENT - 1 - i));
-  const ouder = Array.from({ length: DEMO_GEO_DAGEN - DEMO_GEO_RECENT }, (_, i) => demoDag(DEMO_GEO_DAGEN - 1 - i));
-  const gRecent = recent.map((d, i) => dagGewicht(d, kanaal, i));
-  const gOuder = ouder.map((d, i) => dagGewicht(d, kanaal, i));
-  const schaal = ouder.length / recent.length;
-  const uit: GeoDagRij[] = [];
-  for (const a of basis) {
-    uit.push(...verdeel(a, recent, gRecent));
-    if (a.code === "FR" && niveau === "country") continue; // dit jaar geopend: geen vorig jaar
-    const f = (niveau === "country" && kanaal === "google" ? COUNTRY_PRIOR_YEAR[a.code] : undefined)
-      ?? { impressions: 0.9, clicks: 0.9, cost: 0.9, conversions: 0.9 };
-    uit.push(...verdeel({
-      code: a.code,
-      impressions: a.impressions * f.impressions * schaal, clicks: a.clicks * f.clicks * schaal,
-      cost: a.cost * f.cost * schaal, conversions: a.conversions * f.conversions * schaal,
-      conversionsValue: a.conversionsValue * f.conversions * schaal,
-    }, ouder, gOuder));
-  }
-  // Eén klokdag tegelijk bewaren: morgen is het venster een dag opgeschoven.
-  for (const k of dagCache.keys()) if (!k.startsWith(vandaag)) dagCache.delete(k);
-  dagCache.set(sleutel, uit);
-  return uit;
-}
+// Hier stond een eigen reeks per dag over twee jaar (demoGeoDagen). Die liep los van de database
+// waaruit de rest van de demopagina leest: Meta en LinkedIn hadden er landcijfers in een periode
+// waarin ze volgens de kerncijfers nog niet liepen. De kaart per dag verdeelt nu de kanaaltotalen
+// van de kerncijfers met de aandelen van de profielen hierboven (lib/demo/geo-demo-periode.ts).

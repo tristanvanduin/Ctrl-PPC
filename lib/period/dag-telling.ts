@@ -9,7 +9,9 @@
 // eerste dagrij ligt, valt terug op hele maanden, en de uitleg zegt dat precies
 // (lib/period/dag-opslag.ts). Zonder dagrijen (de tabel bestaat nog niet, of de sync vulde hem nog
 // niet) telt Google zoals voorheen: hele maanden als dat kan, anders per hele week (maandag t/m
-// zondag): alle weken die de periode RAKEN, en het resultaat zegt welke weken dat waren. Een week of maand naar rato verdelen doen we niet: het
+// zondag): alle weken die de periode RAKEN, en het resultaat zegt welke weken dat waren. Het deel
+// van een periode vóór de eerste weekrij telt dan per hele maand, met hetzelfde label als vóór de
+// dagopslag (telGoogleZonderDagen). Een week of maand naar rato verdelen doen we niet: het
 // tempo binnen een week is niet vlak (Black Friday is geen gemiddelde dag van zijn week), en een
 // verdeling die er als meting uitziet, is een schatting die niet zegt dat hij er een is.
 //
@@ -74,8 +76,9 @@ import { splitsOpDagOpslag } from "./dag-opslag";
 export type TelKanaal = "google" | NietGoogleKanaal;
 
 /** Hoe fijn een kanaal over deze periode geteld is. "dag+maand": Google per dag, met het deel vóór
- *  de dagopslag per maand. */
-export type Fijnheid = "dag" | "week" | "maand" | "dag+maand";
+ *  de dagopslag per maand. "week+maand": Google zonder dagrijen per week, met het deel vóór de
+ *  eerste weekrij per maand. */
+export type Fijnheid = "dag" | "week" | "maand" | "dag+maand" | "week+maand";
 
 /** Een rij uit ads_account_daily (migratie 111): één per klant per dag. */
 export interface GoogleDagRij {
@@ -167,6 +170,13 @@ export interface KanaalTelling {
    * maand, voor de dagopslag begon"); null als er niets terugviel. Alleen Google kent dit.
    */
   venster?: string | null;
+  /**
+   * True als er in de gevraagde periode ten minste één dag- of weekrij was, ook een rij met alleen
+   * nullen: dan is er gemeten en liep het kanaal. Alleen Google vult dit; een dagkanaal ziet dat aan
+   * `geteld`. Zie nogNietGelopen. De maandreeks telt hier NIET mee: buildClientDataFromApi vult een
+   * jaar aan met nulmaanden, dus een nulmaand in die reeks zegt niet dat er gemeten is.
+   */
+  rijenInPeriode?: boolean;
 }
 
 export interface DagTelling {
@@ -228,11 +238,106 @@ export function telGoogle(
       tellers: google.maandTellers ? maandTellersOver(google.maandTellers, monthsIn(maanden)) : null,
       bronStart: start ? `${start}-01` : null, dataTot,
       uitleg: delen.length ? delen.join(" ") : null,
+      rijenInPeriode: false,
     };
   }
   if (google.dagen && google.dagen.length > 0) return telGoogleDagen(p, google);
-  if (!google.weken) return null;
-  return telGoogleWeken(p, google.weken);
+  return telGoogleZonderDagen(p, google);
+}
+
+/** De vroegste maandag met een weekrij (ook een rij met alleen nullen: vanaf daar is er gemeten).
+ *  Ook voor de regel in de periodekiezer (googleWeekNoot), zodat die dezelfde grens gebruikt. */
+export function eersteWeekRij(weken: readonly GoogleWeekRij[]): Dag | null {
+  let eerste: Dag | null = null;
+  for (const w of weken) {
+    const ws = String(w.week_start ?? "").slice(0, 10);
+    if (!isDag(ws) || maandagVanWeek(ws) !== ws) continue;
+    if (eerste === null || ws < eerste) eerste = ws;
+  }
+  return eerste;
+}
+
+/** De vroegste van twee dagen, waarvan er een of beide kunnen ontbreken. */
+function vroegste(a: Dag | null, b: Dag | null): Dag | null {
+  return a && b ? (a < b ? a : b) : a ?? b;
+}
+
+/**
+ * Google zonder dagrijen: per week (ads_account_weekly), en het deel van de periode vóór de eerste
+ * weekrij per hele maand uit de maandreeks, met hetzelfde eerlijke label als de terugval vóór de
+ * dagopslag (splitsOpDagOpslag, met de eerste weekrij als grens). Zonder dat deel telde een periode
+ * van vóór de weekrijen als nul, en zei de vergelijking "Google liep pas vanaf <eerste week>"
+ * terwijl de maandreeks ernaast er al maanden cijfers voor had.
+ *
+ * Het weekdeel begint op de eerste maandag op of na de eerste dag na het maanddeel: een week die
+ * in de laatste getelde maand begint, zit voor een deel al in die maandrij. De dagen daartussen
+ * (hooguit zes) tellen niet, en dat staat erbij; de telling is dan niet exact.
+ *
+ * Null alleen als er niets te tellen valt: geen weekrijen geladen en geen maandreeks.
+ */
+function telGoogleZonderDagen(p: DagPeriode, google: NonNullable<DagTelInvoer["google"]>): KanaalTelling | null {
+  const naam = KANAAL_NAAM.google;
+  const maandStart = google.maanden ? bronStart(alsBronReeks("google", google.maanden)).start : null;
+  const vanMaand = maandStart ? `${maandStart}-01` : null;
+  const eersteWeek = google.weken ? eersteWeekRij(google.weken) : null;
+  const terugval = !!vanMaand && !!google.maanden && (google.weken ? eersteWeek === null || p.start < eersteWeek : false);
+  if (!terugval) {
+    if (!google.weken) return null;
+    const w = telGoogleWeken(p, google.weken);
+    // Het begin van Google is het vroegste van de week- en de maanddata.
+    return { ...w, bronStart: vroegste(w.bronStart, vanMaand) };
+  }
+
+  const gisteren = addDays(today(), -1);
+  const split = splitsOpDagOpslag(p, eersteWeek, "week");
+  const s = slicePeriod(google.maanden!, split.maanden!);
+  const totalen: Totalen = { ...s.totals };
+  const maandEenheden = monthsIn(split.maanden!);
+  let tellers: Tellers | null = google.maandTellers ? maandTellersOver(google.maandTellers, maandEenheden) : null;
+  const delen: string[] = [`${naam}: ${split.label}.`];
+  if (s.missing.length) delen.push(`${naam} heeft geen data voor ${s.missing.join(", ")}.`);
+
+  // Het weekdeel: vanaf de eerste maandag in het dagdeel van de splitsing.
+  let w: KanaalTelling | null = null;
+  let gat: DagPeriode | null = null;
+  if (split.dagDeel) {
+    const maandag = maandagVanWeek(split.dagDeel.start) === split.dagDeel.start
+      ? split.dagDeel.start : addDays(maandagVanWeek(split.dagDeel.start), 7);
+    if (maandag > split.dagDeel.start) gat = { start: split.dagDeel.start, eind: minDag(addDays(maandag, -1), split.dagDeel.eind) };
+    if (maandag <= split.dagDeel.eind) {
+      w = telGoogleWeken({ start: maandag, eind: split.dagDeel.eind }, google.weken!.filter((x) => String(x.week_start ?? "").slice(0, 10) >= maandag));
+      totalen.conversions += w.totalen.conversions;
+      totalen.revenue += w.totalen.revenue;
+      totalen.adSpend += w.totalen.adSpend;
+      tellers = tellers && w.tellers ? { impressions: tellers.impressions + w.tellers.impressions, clicks: tellers.clicks + w.tellers.clicks } : null;
+      if (w.uitleg) delen.push(w.uitleg);
+    }
+  }
+  if (gat) {
+    delen.push(`${formatDagPeriode(gat)} telt niet mee: die dagen vallen in een week die in de vorige maand begint, en een week of maand wordt niet verdeeld.`);
+  }
+
+  const maandEind = minDag(laatsteDagVanMaand(split.maanden!.end), gisteren);
+  const start = split.maandenRuimer ? `${split.maanden!.start}-01` : split.maandDeel!.start;
+  const eind = w?.geteld ? w.geteld.eind : split.dagDeel ? split.maandDeel!.eind : maandEind;
+  const geteld = start <= eind ? { start, eind } : null;
+  const metData = [...alsBronReeks("google", google.maanden!).maanden].filter(([, t]) => heeftData(t)).map(([m]) => m)
+    .sort((a, b) => monthIndex(a) - monthIndex(b));
+  const laatsteMaand = metData[metData.length - 1];
+  return {
+    kanaal: "google", gevraagd: p, geteld,
+    fijnheid: w ? "week+maand" : "maand",
+    wijktAf: !zelfde(geteld, p),
+    eenheden: [...maandEenheden, ...(w?.eenheden ?? [])],
+    ontbrekend: [...s.missing, ...(w?.ontbrekend ?? [])],
+    totalen, tellers,
+    bronStart: vroegste(vanMaand, w?.bronStart ?? null),
+    dataTot: w?.dataTot ?? (laatsteMaand ? minDag(laatsteDagVanMaand(laatsteMaand), gisteren) : null),
+    uitleg: delen.join(" "),
+    venster: split.label,
+    exact: !split.maandenRuimer && !gat,
+    rijenInPeriode: !!w?.rijenInPeriode,
+  };
 }
 
 /**
@@ -276,6 +381,8 @@ export function telGoogleDagen(p: DagPeriode, google: NonNullable<DagTelInvoer["
   let ontbrekend: string[] = [];
   let eenheden: string[] = [];
   const delen: string[] = [];
+  // Een dagrij in de periode (ook in het deel dat per maand telt) zegt dat er gemeten is.
+  const rijenInPeriode = dagen.some((d) => dagIn(d, p));
   if (split.maanden) {
     if (google.maanden) {
       const s = slicePeriod(google.maanden, split.maanden);
@@ -326,6 +433,7 @@ export function telGoogleDagen(p: DagPeriode, google: NonNullable<DagTelInvoer["
     uitleg: delen.length ? delen.join(" ") : null,
     venster: split.label,
     exact: !split.maandenRuimer,
+    rijenInPeriode,
   };
 }
 
@@ -424,6 +532,7 @@ export function telGoogleWeken(p: DagPeriode, weken: readonly GoogleWeekRij[]): 
     bronStart: eersteActief?.week_start ?? null,
     dataTot: laatsteRij ? minDag(addDays(laatsteRij.week_start, 6), gisteren) : null,
     uitleg: delen.length ? delen.join(" ") : null,
+    rijenInPeriode: raakt.length > 0,
   };
 }
 
@@ -507,6 +616,26 @@ export function telDagPeriode(p: DagPeriode, invoer: DagTelInvoer): DagTelling {
   return { periode: p, perKanaal, totaal, gemengd: perKanaal.some((t) => t.wijktAf) };
 }
 
+/**
+ * De regel voor een kanaal dat in de hele periode nog niet liep: "Meta liep in deze periode nog
+ * niet; eerste dag met data: 7 jun 2026". Null als het kanaal er wel was, ook met nullen: een kanaal
+ * dat liep maar niets uitgaf of opleverde, toont die nullen. Een rij nullen voor een kanaal dat er
+ * nog niet was, leest als een gemeten nul ("kosten per 1.000 vertoningen niet te berekenen").
+ *
+ * Nog niet gelopen: de start van het kanaal (bronStart, uit ALLE rijen) ligt na de periode, en er
+ * is in de periode niets geteld en geen enkele rij: een rij met alleen nullen is een gemeten dag,
+ * week of maand. Een dagkanaal ziet dat aan `geteld` (null zonder rijen in de periode), Google aan
+ * `rijenInPeriode`: zijn bronStart is de eerste ACTIEVE week of dag, dus nulrijen ervoor liepen al.
+ */
+export function nogNietGelopen(t: KanaalTelling | null | undefined): string | null {
+  if (!t || !t.bronStart || t.bronStart <= t.gevraagd.eind) return null;
+  const iets = t.totalen.conversions || t.totalen.revenue || t.totalen.adSpend || t.tellers?.impressions || t.tellers?.clicks;
+  if (iets) return null;
+  if (t.rijenInPeriode) return null;
+  if (t.kanaal !== "google" && t.geteld !== null) return null;
+  return `${KANAAL_NAAM[t.kanaal]} liep in deze periode nog niet; eerste dag met data: ${formatDag(t.bronStart)}.`;
+}
+
 // ── Vergelijken ────────────────────────────────────────────────────────────
 
 export interface KanaalVergelijking {
@@ -550,6 +679,10 @@ function maandBron(k: TelKanaal, invoer: DagTelInvoer): BronReeks | null {
 }
 
 const maandTekst = (r: { start: Month; end: Month }) => formatRange(r);
+
+const FIJNHEID_TEKST: Record<Fijnheid, string> = {
+  dag: "per dag", week: "per week", maand: "per maand", "dag+maand": "per dag en maand", "week+maand": "per week en maand",
+};
 
 /**
  * Een dagperiode tegen zijn vergelijkingsperiode, per kanaal gepaard (zie de kop van dit bestand).
@@ -614,6 +747,11 @@ export function telDagVergelijking(p: DagPeriode, c: DagPeriode, invoer: DagTelI
         // Hele maanden aan een kant, dagen aan de andere: dan vergelijk je niet dezelfde dagen.
         uitleg = ruim.map(([t, wat]) => `${naam} telt in ${wat} een deel als hele maand${t.venster ? ` (${t.venster})` : ""}.`).join(" ") +
           " De periodes tellen dan niet even veel dagen: dit kanaal valt buiten het percentage.";
+      } else if (h.fijnheid !== v.fijnheid) {
+        // Dezelfde dagen uit verschillende bronnen (maandtabellen tegen weekrijen, of hele maanden
+        // tegen weken) zijn niet dezelfde optelling: een verschil daartussen is geen verandering.
+        uitleg = `${naam} telt de gekozen periode ${FIJNHEID_TEKST[h.fijnheid]} en de vergelijkingsperiode ${FIJNHEID_TEKST[v.fijnheid]}. ` +
+          "Dat zijn verschillende bronnen: dit kanaal valt buiten het percentage.";
       } else {
         gepaard = { huidig: { ...h.totalen }, vorig: { ...v.totalen } };
         const afwijkend = [h, v].filter((t) => t.wijktAf && t.uitleg).map((t) => t.uitleg!);

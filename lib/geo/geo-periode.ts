@@ -21,12 +21,13 @@
 // NOOIT EEN THROW: een tabel die ontbreekt of een lezing die faalt, is een kanaal zonder dagbron
 // (Google valt dan helemaal terug op de maanden, met dat in het label).
 //
-// In demo komen de rijen uit lib/demo/geo-demo.ts (demoGeoDagen), per dag en per kanaal.
+// In demo: de kanaaltotalen van de kerncijfers (dezelfde rijen uit de geseede database, dezelfde
+// telling), verdeeld over de landen met de vaste aandelen van de mock (lib/demo/geo-demo-periode.ts).
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { isDemoClientValue } from "@/lib/demo/mock-supabase";
-import { demoGeoDagen } from "@/lib/demo/geo-demo";
+import { demoGeoInvoer, demoGeoPeriode } from "@/lib/demo/geo-demo-periode";
 import type { DagPeriode } from "@/lib/period/dag-periode";
 import { landcodeUitLinkedInUrn, landcodeUitNaam } from "./land-namen";
 import { regionNameToUsps } from "./us-fips";
@@ -85,14 +86,14 @@ export interface ResolveGeoPeriodeArgs {
 
 export async function resolveGeoPeriode({ clientId, channel, periode, vergelijking }: ResolveGeoPeriodeArgs): Promise<GeoPeriodeResultaat> {
   const gevraagd: GeoDagKanaal[] = channel === "blended" ? [...GEO_DAG_KANALEN] : [channel];
-  if (isDemoClientValue(clientId)) {
-    return telGeoPeriode(gevraagd, periode, vergelijking, async (kanaal, niveau) => {
-      // Microsoft heeft in de demo geen landdata: dat hoort de kaart te zeggen.
-      const dagen = kanaal === "microsoft" ? [] : demoGeoDagen(kanaal, niveau);
-      return { kanaal, dagen, eersteDag: eersteDagVan(dagen) };
-    });
-  }
   const sb = getSupabaseAdmin();
+  if (isDemoClientValue(clientId)) {
+    // De demo: dezelfde rijen en dezelfde telling als de kerncijfers op de pagina, verdeeld over de
+    // landen met de aandelen van de mock (lib/demo/geo-demo-periode.ts). Zonder database is er niets
+    // te tellen: dan zegt de kaart per kanaal dat er geen landdata is, net als de pagina zonder cijfers.
+    if (!sb) return telGeoPeriode(gevraagd, periode, vergelijking, async (kanaal) => ({ kanaal, dagen: null }));
+    return demoGeoPeriode(gevraagd, periode, vergelijking, await demoGeoInvoer(sb, clientId));
+  }
   if (!sb) return telGeoPeriode(gevraagd, periode, vergelijking, async (kanaal) => ({ kanaal, dagen: null }));
   const kanalen = channel === "blended"
     ? (await Promise.all(gevraagd.map(async (k) => ((await kanaalActief(sb, clientId, k)) ? k : null)))).filter((k): k is GeoDagKanaal => k !== null)

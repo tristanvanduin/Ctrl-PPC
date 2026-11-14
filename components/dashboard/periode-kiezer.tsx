@@ -21,7 +21,9 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import { CalendarDays, ChevronDown } from "lucide-react";
 import { usePeriod } from "@/lib/period/period-context";
-import { useGoogleDagStart } from "@/lib/period/use-dag-telling";
+import { useGoogleDagStart, useGoogleWeekStart } from "@/lib/period/use-dag-telling";
+import { alsBronReeks, bronStart } from "@/lib/period/apply-period";
+import type { ClientHistoricalData } from "@/lib/types";
 import {
   googleWeekNoot, kiesPeriode, kiesVergelijk, periodeKnop, SNELLE_PERIODES, VERGELIJK_KEUZES, vergelijkUitleg, vergelijkZin,
   vrijePeriode, schoneDagKeuze, type DagStaat,
@@ -55,7 +57,7 @@ const knopKlasse = (aan: boolean) =>
   `min-h-11 rounded-lg border px-3 text-body font-medium transition-colors ${
     aan ? "border-brand-gray bg-brand-gray text-white" : "border-border bg-card text-brand-gray hover:border-gray-400"}`;
 
-export function PeriodeKiezer({ scope, clientId, events, kanalen, laden = false, onNaarEvents }: {
+export function PeriodeKiezer({ scope, clientId, events, kanalen, googleData = null, laden = false, onNaarEvents }: {
   /** Per klant: de sessievlag "zelf een vergelijking gekozen" geldt voor deze klant. */
   scope: string;
   /** De klant, om te weten waar de dagopslag van Google begint (de regel over Google). Zonder: de
@@ -65,6 +67,9 @@ export function PeriodeKiezer({ scope, clientId, events, kanalen, laden = false,
   events: readonly EventPeriode[] | null;
   /** De kanalen van de klant, voor de regel over Google per week. */
   kanalen: readonly Kanaal[];
+  /** De maandreeks van Google, zoals de kerncijfers hem tellen: zonder dagopslag valt Google vóór de
+   *  eerste weekrij terug op hele maanden als hier data in staat, en dan zegt de regel dat. */
+  googleData?: ClientHistoricalData | null;
   /** De pagina weet nog niet tot waar de data loopt: dan is de kiezer nog niet te openen. */
   laden?: boolean;
   /** Naar Instellingen > Events. */
@@ -73,6 +78,9 @@ export function PeriodeKiezer({ scope, clientId, events, kanalen, laden = false,
   const periode = usePeriod();
   const staat = periode.dag;
   const googleDagStart = useGoogleDagStart(clientId ?? null, !!staat && kanalen.includes("google"));
+  // Alleen nodig zonder dagopslag: dan telt Google per week, of vóór de eerste weekrij per maand.
+  const googleWeekStart = useGoogleWeekStart(clientId ?? null, !!staat && kanalen.includes("google") && googleDagStart === null);
+  const heeftMaanden = useMemo(() => !!googleData && bronStart(alsBronReeks("google", googleData)).start !== null, [googleData]);
   const [open, setOpen] = useState(false);
   const opener = useRef<HTMLButtonElement | null>(null);
   const paneel = useRef<HTMLDivElement>(null);
@@ -106,8 +114,13 @@ export function PeriodeKiezer({ scope, clientId, events, kanalen, laden = false,
   const knop = periodeKnop(staat, periode.range);
   const vergelijkLabel = VERGELIJK_KEUZES.find((v) => v.modus === staat.keuze.vergelijk)?.label ?? "";
   const zin = vergelijkZin(staat);
-  // Zolang onbekend is of Google per dag telt, geen regel: anders stond er eerst "per week".
-  const noot = clientId && googleDagStart === undefined ? null : googleWeekNoot(staat.periode, kanalen, googleDagStart);
+  // Zolang onbekend is of Google per dag telt, geen regel: anders stond er eerst "per week". Zonder
+  // dagopslag ook wachten op de eerste weekrij: anders stond er eerst "weekniveau" waar de kerncijfers
+  // per maand tellen.
+  const wachtOpWeek = googleDagStart === null && googleWeekStart === undefined;
+  const noot = clientId && (googleDagStart === undefined || wachtOpWeek) ? null
+    : googleWeekNoot(staat.periode, kanalen, googleDagStart,
+      googleWeekStart ? { eersteWeek: googleWeekStart.eersteWeek, heeftMaanden } : null);
 
   const openMet = (knopEl: HTMLButtonElement) => {
     opener.current = knopEl;

@@ -373,14 +373,26 @@ export function vergelijkZin(staat: DagStaat): string {
  * telt Google per dag zoals de rest, en is er alleen een regel als een deel van de periode vóór de
  * dagopslag ligt (lib/period/dag-opslag.ts): geen terugval, geen regel. Zonder dagopslag (null of
  * weggelaten) telt Google per week, en zegt de regel welke weken dat zijn.
+ *
+ * `weekbron`: de eerste weekrij (eersteWeekRij in dag-telling.ts) en of er een maandreeks met data is.
+ * Begint de periode zonder dagopslag vóór de eerste weekrij (of zijn er geen weekrijen) terwijl er
+ * maanddata is, dan telt Google dat deel per hele maand (telGoogleZonderDagen), en zegt de regel dat
+ * met hetzelfde label als de kerncijfers. Weggelaten: de regel zegt per week, zoals voorheen.
  */
-export function googleWeekNoot(periode: DagPeriode, kanalen: readonly Kanaal[], googleEersteDag?: Dag | null): string | null {
+export function googleWeekNoot(
+  periode: DagPeriode, kanalen: readonly Kanaal[], googleEersteDag?: Dag | null,
+  weekbron?: { eersteWeek: Dag | null; heeftMaanden: boolean } | null,
+): string | null {
   if (!kanalen.includes("google") || alsMaandPeriode(periode)) return null;
   const dag = kanalen.filter((k) => k !== "google").map((k) => KANAAL_NAAM[k]);
   const rest = dag.length === 0 ? "" : ` ${opsomming(dag)} ${dag.length === 1 ? "telt" : "tellen"} per dag.`;
   if (googleEersteDag) {
     const { label } = splitsOpDagOpslag(periode, googleEersteDag);
     return label ? `Google: ${label}.${rest}` : null;
+  }
+  if (weekbron?.heeftMaanden && (weekbron.eersteWeek === null || periode.start < weekbron.eersteWeek)) {
+    const { label } = splitsOpDagOpslag(periode, weekbron.eersteWeek, "week");
+    if (label) return `Google: ${label}.${rest}`;
   }
   const weken = { start: maandagVanWeek(periode.start), eind: addDays(maandagVanWeek(periode.eind), 6) };
   return `Google telt op weekniveau: de weken die de periode raken (${formatDagPeriode(weken)}).${rest}`;

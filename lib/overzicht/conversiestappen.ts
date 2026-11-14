@@ -395,6 +395,9 @@ function som(rijen: readonly Rij[], velden: readonly string[]): number | null {
 /**
  * De stappen van één kanaal over een periode per dag. `googleKlikken` zijn de klikken van Google
  * over dezelfde dagen, als die bekend zijn: Google heeft geen klikken per dag in deze rijen.
+ * `googleKlikkenPerMaand`: de klikken van Google per maand ("YYYY-MM"). Telt Google de stappen per
+ * maand (geen dagrijen voor de periode), dan zijn de klikken over DIEZELFDE maanden bekend, ook als
+ * de periode zelf geen hele maanden is.
  */
 export function telKanaalStappen(
   kanaal: Kanaal,
@@ -402,9 +405,10 @@ export function telKanaalStappen(
   trechter: GeldendeTrechter,
   rijen: StapRijen,
   googleKlikken: number | null = null,
+  googleKlikkenPerMaand: ReadonlyMap<string, { clicks: number }> | null = null,
 ): KanaalStappen {
   const naam = KANAAL_NAAM[kanaal];
-  if (kanaal === "google") return telGoogle(periode, trechter, rijen.google ?? null, googleKlikken);
+  if (kanaal === "google") return telGoogle(periode, trechter, rijen.google ?? null, googleKlikken, googleKlikkenPerMaand);
 
   const alle = rijen[kanaal] ?? null;
   const binnen = alle ? alle.filter((r) => isDatum(dagVan(r)) && dagIn(dagVan(r), periode)) : [];
@@ -439,8 +443,10 @@ function telGoogle(
   periode: DagPeriode,
   trechter: GeldendeTrechter,
   google: StapRijen["google"] | null,
-  klikken: number | null,
+  klikkenGegeven: number | null,
+  klikkenPerMaand: ReadonlyMap<string, { clicks: number }> | null,
 ): KanaalStappen {
+  let klikken = klikkenGegeven;
   const naam = KANAAL_NAAM.google;
   const dagrijen = google?.dag?.length ? google.dag : null;
   const maandrijen = google?.maand?.length ? google.maand : null;
@@ -464,6 +470,9 @@ function telGoogle(
     const set = new Set(monthsIn(maanden));
     bronStart = eersteDag(perMaand);
     binnen = perMaand.filter((r) => set.has(dagVan(r).slice(0, 7)));
+    // De klikken over dezelfde hele maanden als de stappen: anders begon de keten bij een periode
+    // die geen hele maanden is zonder klikken, terwijl de maanden ze wel hebben.
+    if (klikkenPerMaand) klikken = monthsIn(maanden).reduce((t, m) => t + (klikkenPerMaand.get(m)?.clicks ?? 0), 0);
     // Alleen een noot als er iets geteld is: "geteld is november" bij nul rijen klopt niet.
     if (binnen.length) {
       noot = alsMaandPeriode(periode)

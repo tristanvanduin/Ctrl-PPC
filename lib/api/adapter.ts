@@ -9,6 +9,7 @@
 import type { MonthlyRecord, WeeklyRecord, ClientHistoricalData, ClientAnnualData } from "../types";
 import type { GoogleAdsMetrics } from "./google-ads";
 import type { MetaParsedMetrics } from "./meta-ads";
+import { today } from "../reporting-date";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -403,4 +404,32 @@ export function buildClientDataFromApiLegacy(
     2026,
     realizedThroughMonth,
   );
+}
+
+/**
+ * Het lichaam van /api/google-ads/client-data zoals de browser het leest (res.json()). Alleen de
+ * velden die hier gelezen worden zijn benoemd; de rest gaat ongezien door naar de staat.
+ */
+export type GoogleAntwoord = Record<string, unknown> & { error?: string };
+
+/**
+ * De Google-reeks uit het antwoord van de route: precies wat useClientData altijd bouwde. Los, zodat de
+ * kerncijfers die de server al in de HTML zet (components/dashboard/band-uit-zaad.tsx) dezelfde
+ * reeks uit hetzelfde antwoord bouwen, en niet een tweede vertaling die ergens anders afrondt.
+ */
+export function googleDataUitAntwoord(clientId: string, apiData: GoogleAntwoord): ClientHistoricalData {
+  return {
+    ...buildClientDataFromApi(
+      clientId,
+      (apiData.historicalYears as YearDataInput[]) ?? [],
+      (apiData.currentYearMonthly as ApiMonthlyData[]) ?? [],
+      (apiData.currentYearWeekly as ApiWeeklyData[]) ?? [],
+      apiData.targetCurrentYear as Parameters<typeof buildClientDataFromApi>[4],
+      (apiData.currentYear as number | undefined) ?? Number(today().slice(0, 4)),
+      apiData.realizedThroughMonth as number,
+    ),
+    // Tot waar de route de data definitief acht. Het venster van de KPI-band eindigt hierop;
+    // zonder (een oudere route) volgen de presets de kalender.
+    dataStand: (apiData.dataStand as ClientHistoricalData["dataStand"]) ?? null,
+  };
 }

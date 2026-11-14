@@ -419,6 +419,10 @@ async function main() {
     const enkel = metPeriode(createElement(GeoEnkelLandKaart, { channel: "blended", land, voorbehoud: "zonder Microsoft", voorbehoudUitleg: MICROSOFT_UITLEG }));
     check("één land: de hele zin staat open in de kaart, niet alleen in een tooltip", tekst(enkel).includes("In de markten nog niet; de eigen Microsoft-cijfers staan op het tabblad Microsoft."), tekst(enkel).slice(0, 300));
     check("één land in de vertrouwde weergave: geen regel erbij", !/data-venster-uitleg/.test(metPeriode(createElement(GeoEnkelLandKaart, { channel: "blended", land }))));
+    // De nieuwe weergave volgt de kiezer per dag, ook als er geen of één land is (een kanaal dat in
+    // de periode nog niet liep): dan geen "laatste 180 dagen" in het label.
+    const perDag = tekst(metPeriode(createElement(GeoEnkelLandKaart, { channel: "meta", land: null, voorbehoud: "zonder Meta", voorbehoudUitleg: "Meta liep in deze periode nog niet.", perDag: true })));
+    check("geen of één land in de nieuwe weergave: het label volgt de periode", perDag.includes("volgt periode") && !perDag.includes("laatste 180 dagen"), perDag.slice(0, 200));
     // Meerdere landen, maar geen rijen voor de gekozen metriek: dan is er geen lade onder de kaart.
     const leeg = {
       metricKey: "cpa", setMetricKey: () => {}, metric: METRICS.find((m) => m.key === "conversions")!, focus: null, setFocus: () => {},
